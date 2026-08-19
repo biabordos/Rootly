@@ -12,13 +12,13 @@ The MVP focuses on investigation and diagnosis only. It does not perform automat
 
 The proposed high-level architecture of the system is illustrated below.
 
-![Architecture](./docs/diagrams/architecture.png)
+![Architecture](./architecture.png)
 
 ## ReAct Reasoning Loop
 
 The investigation process follows a ReAct-style **Thought → Action → Observation** loop, allowing the agent to iteratively gather information from the available tools before producing the final diagnosis.
 
-![ReAct Reasoning Loop](./docs/diagrams/react-reasoning-loop.png)
+![ReAct Reasoning Loop](./react-reasoning-loop.png)
 
 ---
 
