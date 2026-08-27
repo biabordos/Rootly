@@ -1,0 +1,103 @@
+ROOTLY — PLAN DE IMPLEMENTARE (2 PERSOANE)
+============================================
+Bazat pe README.md si ROADMAP.md (27 august 2026)
+
+
+PRINCIPIUL DE IMPARTIRE
+------------------------
+Impartire pe verticala de responsabilitate, nu pe zile — fiecare persoana
+"detine" o jumatate din sistem si poate lucra in paralel fara sa blocheze
+pe celalalt. Punctul de sincronizare e la finalul Fazei 2 (contractul
+tool-urilor).
+
+
+PERSOANA A — "DATE & TOOL-URI" (fundatia)
+===========================================
+
+FAZA 1 — Schelet + date mock
+------------------------------
+- Creeaza structura de directoare din ROADMAP (src/, data/, tests/, docs/diagrams/)
+- Repara inconsistenta cu imaginile (README leaga spre ./diagrame_imagini/,
+  dar sectiunea 10 zice docs/diagrams/) — alege o varianta si aliniaza README-ul
+- Genereaza datele mock:
+    * 5-10 componente CMDB cu dependente realiste
+    * 50-100 log entries pe mai multe servicii
+    * 2-3 scenarii de alerta cu cauze diferite
+    * 5-10 incidente istorice pentru RAG
+- Scrie schemele Pydantic (Alert, CMDBComponent, LogEntry, Incident)
+  conform sectiunii 5.2 din README
+
+FAZA 2 — Tool-urile
+---------------------
+- cmdb_lookup(component) — lookup + traversare dependente
+- log_search(service, time_window, level) — filtrare
+- similar_incidents_search(query) — placeholder keyword-match
+  (varianta ChromaDB e Faza 5, optionala)
+- Teste unitare pentru toate 3, pe datele mock
+- Defineste schema JSON de function-calling pentru fiecare tool
+
+>>> LIVRABIL DE SINCRONIZARE:
+    3 functii Python testate + schema lor de tool-use,
+    gata de conectat la un LLM.
+
+
+PERSOANA B — "AGENT & INTERFATA" (orchestrarea)
+==================================================
+
+FAZA 3 — Orchestratorul ReAct
+--------------------------------
+- Alege LLM-ul (Claude API cu tool use, conform recomandarii din ROADMAP)
+- Implementeaza bucla Thought -> Action -> Observation
+  (poate lucra cu tool-uri mock/dummy pana Persoana A termina Faza 2)
+- Implementeaza criteriile de oprire (sectiunea 6 README)
+- Tine step history explicit (thought/action/observation) pentru trace
+- Sintetizeaza pachetul final de diagnostic:
+    summary, componenta, severitate, dependente, dovezi,
+    root-cause, confidence, recomandare escaladare
+
+FAZA 4 — Interfata
+--------------------
+- CLI cu output formatat (Rich) ca prim livrabil rapid
+- Daca ramane timp: UI Streamlit
+    (dropdown scenariu, panou trace live, panou diagnostic final,
+     export JSON/MD)
+
+>>> LIVRABIL DE SINCRONIZARE:
+    odata ce Persoana A da tool-urile reale, Persoana B le conecteaza
+    in locul mock-urilor din orchestrator — integrare rapida pentru ca
+    schema a fost stabilita impreuna la finalul Fazei 2.
+
+
+PUNCT COMUN (impreuna, nu separat)
+=====================================
+- Rulati impreuna cele 2-3 scenarii end-to-end si verificati manual daca
+  diagnosticul e plauzibil (practic "Demo #1")
+- Decideti impreuna, INAINTE de a incepe, contractul exact al tool-urilor
+  (nume parametri, format return) — evita retusuri ulterioare
+
+
+EXTENSII OPTIONALE (daca timpul permite, tot 50/50)
+======================================================
+Task                                                          Cine
+----------------------------------------------------------------------
+Faza 5 — RAG cu ChromaDB pentru incidente istorice             Persoana A
+  (extensie naturala a datelor)
+
+Faza 6 — KPI-uri (Time-to-Diagnosis, Correctness Rate)          Persoana B
+  + EVAL_RESULTS.md (extensie naturala a orchestratorului)
+
+Faza 7 — README final, CI, polish                              Impreuna,
+                                                                 la coada
+
+
+CALEA CRITICA (daca timpul e foarte limitat)
+================================================
+1. Persoana A: Faza 1 (jumatate zi)
+2. Persoana A: Faza 2 (jumatate zi)
+   -- in paralel, Persoana B pregateste scheletul orchestratorului
+      cu tool-uri fake
+3. Persoana B: Faza 3 conectat la tool-urile reale (1-2 zile)
+4. Persoana B: Faza 4 varianta CLI (cateva ore)
+
+Asta da un MVP demonstrabil rapid; RAG, UI web si KPI-urile raman
+"nice to have".
