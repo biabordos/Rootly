@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ALRT-001",
+    "service": "checkout-api",
+    "alert_type": "error_rate_high",
+    "severity_reported": "high",
+    "timestamp": "2026-08-18T09:12:00Z",
+    "metric_value": 7.4
+  },
+  {
+    "id": "ALRT-002",
+    "service": "inventory-service",
+    "alert_type": "latency_high",
+    "severity_reported": "medium",
+    "timestamp": "2026-08-20T14:30:00Z",
+    "metric_value": 2450.0
+  },
+  {
+    "id": "ALRT-003",
+    "service": "auth-service",
+    "alert_type": "unavailability",
+    "severity_reported": "critical",
+    "timestamp": "2026-08-22T03:45:40Z",
+    "metric_value": 100.0
+  }
+]

@@ -1,0 +1,88 @@
+[
+  {
+    "id": "INC-2025-114",
+    "description": "checkout-api errors caused by payments-db connection pool exhaustion",
+    "root_cause": "DB connection pool misconfigured after a scale-up event",
+    "resolution": "Increased pool size and added a circuit breaker",
+    "tags": [
+      "checkout-api",
+      "payments-db",
+      "timeout"
+    ]
+  },
+  {
+    "id": "INC-2025-098",
+    "description": "inventory-service latency spike caused by a cache-redis eviction storm after the memory limit was reached",
+    "root_cause": "Redis maxmemory too low for the working set, triggering aggressive eviction under load",
+    "resolution": "Increased maxmemory and tuned the eviction policy; added a memory-usage alert",
+    "tags": [
+      "inventory-service",
+      "cache-redis",
+      "latency"
+    ]
+  },
+  {
+    "id": "INC-2025-076",
+    "description": "auth-service crash loop after user-db exhausted its connection limit",
+    "root_cause": "auth-service was autoscaled to handle a traffic spike without raising user-db's max_connections, exhausting the pool",
+    "resolution": "Added a pgbouncer connection pooler in front of user-db",
+    "tags": [
+      "auth-service",
+      "user-db",
+      "crash"
+    ]
+  },
+  {
+    "id": "INC-2025-055",
+    "description": "web-frontend returning intermittent 502s during high traffic",
+    "root_cause": "auth-service token validation calls timing out under load",
+    "resolution": "Added a short-lived cache for token validation results",
+    "tags": [
+      "web-frontend",
+      "auth-service",
+      "latency"
+    ]
+  },
+  {
+    "id": "INC-2025-041",
+    "description": "order-service occasionally processing orders with stale payment status",
+    "root_cause": "payments-db read replica lag under heavy write load",
+    "resolution": "Routed payment-status reads for in-flight orders to the primary",
+    "tags": [
+      "order-service",
+      "payments-db",
+      "data-consistency"
+    ]
+  },
+  {
+    "id": "INC-2024-233",
+    "description": "notification-service silently dropping order-confirmation messages",
+    "root_cause": "Unhandled exception on a malformed message payload",
+    "resolution": "Added schema validation and a dead-letter queue for failed messages",
+    "tags": [
+      "notification-service",
+      "error-handling"
+    ]
+  },
+  {
+    "id": "INC-2024-198",
+    "description": "inventory-service write failures caused by inventory-db running out of disk space",
+    "root_cause": "Disk usage grew past capacity with no autoscaling or alerting in place",
+    "resolution": "Enabled storage autoscaling and added a disk-usage alert",
+    "tags": [
+      "inventory-db",
+      "inventory-service",
+      "disk"
+    ]
+  },
+  {
+    "id": "INC-2024-150",
+    "description": "checkout-api elevated error rate right after a deployment",
+    "root_cause": "A bad deployment shipped with a missing environment variable, causing a crash loop",
+    "resolution": "Rolled back the deployment and added pre-deploy config validation",
+    "tags": [
+      "checkout-api",
+      "deployment"
+    ]
+  }
+]
