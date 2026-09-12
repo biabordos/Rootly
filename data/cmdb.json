@@ -1,0 +1,120 @@
+[
+  {
+    "id": "CI-010",
+    "name": "web-frontend",
+    "type": "frontend",
+    "owner_team": "web-team",
+    "depends_on": [
+      "CI-014 (checkout-api)",
+      "CI-030 (auth-service)"
+    ],
+    "depended_by": []
+  },
+  {
+    "id": "CI-014",
+    "name": "checkout-api",
+    "type": "microservice",
+    "owner_team": "payments-team",
+    "depends_on": [
+      "CI-021 (payments-db)",
+      "CI-030 (auth-service)",
+      "CI-050 (inventory-service)",
+      "CI-070 (order-service)"
+    ],
+    "depended_by": [
+      "CI-010 (web-frontend)"
+    ]
+  },
+  {
+    "id": "CI-021",
+    "name": "payments-db",
+    "type": "database",
+    "owner_team": "payments-team",
+    "depends_on": [],
+    "depended_by": [
+      "CI-014 (checkout-api)",
+      "CI-070 (order-service)"
+    ]
+  },
+  {
+    "id": "CI-030",
+    "name": "auth-service",
+    "type": "microservice",
+    "owner_team": "platform-team",
+    "depends_on": [
+      "CI-031 (user-db)"
+    ],
+    "depended_by": [
+      "CI-014 (checkout-api)",
+      "CI-010 (web-frontend)"
+    ]
+  },
+  {
+    "id": "CI-031",
+    "name": "user-db",
+    "type": "database",
+    "owner_team": "platform-team",
+    "depends_on": [],
+    "depended_by": [
+      "CI-030 (auth-service)"
+    ]
+  },
+  {
+    "id": "CI-050",
+    "name": "inventory-service",
+    "type": "microservice",
+    "owner_team": "catalog-team",
+    "depends_on": [
+      "CI-051 (inventory-db)",
+      "CI-060 (cache-redis)"
+    ],
+    "depended_by": [
+      "CI-014 (checkout-api)"
+    ]
+  },
+  {
+    "id": "CI-051",
+    "name": "inventory-db",
+    "type": "database",
+    "owner_team": "catalog-team",
+    "depends_on": [],
+    "depended_by": [
+      "CI-050 (inventory-service)"
+    ]
+  },
+  {
+    "id": "CI-060",
+    "name": "cache-redis",
+    "type": "cache",
+    "owner_team": "platform-team",
+    "depends_on": [],
+    "depended_by": [
+      "CI-050 (inventory-service)",
+      "CI-070 (order-service)"
+    ]
+  },
+  {
+    "id": "CI-070",
+    "name": "order-service",
+    "type": "microservice",
+    "owner_team": "orders-team",
+    "depends_on": [
+      "CI-021 (payments-db)",
+      "CI-060 (cache-redis)",
+      "CI-080 (notification-service)"
+    ],
+    "depended_by": [
+      "CI-014 (checkout-api)"
+    ]
+  },
+  {
+    "id": "CI-080",
+    "name": "notification-service",
+    "type": "microservice",
+    "owner_team": "platform-team",
+    "depends_on": [],
+    "depended_by": [
+      "CI-070 (order-service)"
+    ]
+  }
+]
