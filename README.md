@@ -396,9 +396,40 @@ A manual evaluation checklist can be applied to a fixed set of test scenarios to
 
 # 8. MVP Status
 
-> **Current status:** Documentation and system design phase.
+> **Current status:** MVP implemented — tools, ReAct agent, CLI and Streamlit UI.
 
-The repository currently contains the project documentation and architecture design. Implementation of the orchestrator, mock tools, datasets, and interface will be added incrementally.
+| Component | Implementation |
+| --- | --- |
+| Mock data | 5 alert scenarios, 10 CMDB components, 124 logs, 10 historical incidents (see `MOCK_DATA_README.md`) |
+| Tools | `cmdb_lookup`, `log_search`, `similar_incidents_search` (RAG: ChromaDB + all-MiniLM-L6-v2, BM25 fallback) |
+| Agent | ReAct loop on Mistral tool calling via LangChain (`langchain-mistralai`); the diagnosis is submitted through a `submit_diagnosis` tool |
+| Guardrail | The package may only reference CMDB components and historical incidents that exist, and must cite log evidence |
+| Interfaces | `run_cli.py` (Rich) and `src/ui/streamlit_app.py` |
+
+## Getting started
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env        # then set MISTRAL_API_KEY
+```
+
+A free Mistral API key is available on the **Experiment** plan at [console.mistral.ai](https://console.mistral.ai) (phone verification required). It is rate-limited to roughly one request per second; the agent retries automatically when it hits the limit.
+
+```bash
+python run_cli.py                      # list scenarios
+python run_cli.py ALRT-001             # live Thought → Action → Observation trace + diagnosis
+python run_cli.py ALRT-001 --verbose   # include full tool observations
+python run_cli.py ALRT-001 --export    # save diagnosis (.json, .md) and trace to exports/
+
+streamlit run src/ui/streamlit_app.py  # web UI with trace, diagnosis package and exports
+
+python -m pytest                       # tool + agent tests (offline, no API key needed)
+python evaluate.py                     # run all 5 scenarios and write EVAL_RESULTS.md
+```
+
+The first run downloads the embedding model (~80 MB) and builds the local vector index in `.chroma/`.
+
+Configuration lives in `.env`: `MISTRAL_MODEL` (default `mistral-large-latest`) and `MAX_REACT_STEPS` (default 15).
 
 ---
 
@@ -421,15 +452,20 @@ Planned extensions may include:
 
 # 10. Project Structure
 
-The project structure will evolve as implementation progresses. The documentation diagrams are currently stored under `docs/diagrams/`.
-
 ```text
 Rootly/
-├── README.md
-└── docs/
-    └── diagrams/
-        ├── architecture.png
-        └── react-reasoning-loop.png
+├── data/                        # alerts, CMDB, logs, historical incidents (JSON)
+├── src/
+│   ├── models/schemas.py        # Pydantic schemas incl. DiagnosisPackage
+│   ├── data_loader.py           # cached, validated dataset loading
+│   ├── tools/                   # cmdb_lookup, log_search, incident_search (RAG)
+│   ├── agent/                   # system prompt, tool registry, ReAct loop, report export
+│   └── ui/streamlit_app.py      # Streamlit interface
+├── tests/                       # tool tests + offline agent tests (+ optional live test)
+├── diagrame_imagini/            # architecture diagrams
+├── run_cli.py                   # CLI entry point
+├── evaluate.py                  # runs all scenarios, writes EVAL_RESULTS.md
+├── MOCK_DATA_README.md          # scenario design and ground truth
+├── requirements.txt
+└── .env.example
 ```
-
-As implementation progresses, additional directories for source code, mock data, tools, and tests will be added.

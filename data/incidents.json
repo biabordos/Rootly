@@ -1,88 +1,112 @@
 [
   {
     "id": "INC-2025-114",
-    "description": "checkout-api errors caused by payments-db connection pool exhaustion",
-    "root_cause": "DB connection pool misconfigured after a scale-up event",
-    "resolution": "Increased pool size and added a circuit breaker",
-    "tags": [
-      "checkout-api",
-      "payments-db",
-      "timeout"
-    ]
+    "description": "checkout-api returning 5xx errors due to payments-db connection pool exhaustion during Black Friday traffic spike",
+    "root_cause": "payments-db max_connections set to 20, insufficient for peak load. Connection pool depleted under sustained high-throughput checkout flow, causing all new payment requests to timeout.",
+    "resolution": "Increased payments-db connection pool from 20 to 50, added PgBouncer connection pooler as middleware, implemented circuit breaker pattern on checkout-api side",
+    "tags": ["checkout-api", "payments-db", "connection-pool", "timeout", "capacity", "resource-exhaustion"],
+    "severity": "high",
+    "date_resolved": "2025-11-29",
+    "duration_minutes": 47,
+    "root_cause_category": "RC-04_capacity_exhaustion"
   },
   {
-    "id": "INC-2025-098",
-    "description": "inventory-service latency spike caused by a cache-redis eviction storm after the memory limit was reached",
-    "root_cause": "Redis maxmemory too low for the working set, triggering aggressive eviction under load",
-    "resolution": "Increased maxmemory and tuned the eviction policy; added a memory-usage alert",
-    "tags": [
-      "inventory-service",
-      "cache-redis",
-      "latency"
-    ]
+    "id": "INC-2025-089",
+    "description": "order-service experiencing intermittent timeouts when querying payments-db during end-of-month batch processing",
+    "root_cause": "End-of-month reconciliation batch job consumed 15 of 20 available connections for extended periods, starving real-time order queries. Batch and OLTP workloads competing for same connection pool.",
+    "resolution": "Separated batch processing to read replica, reserved 5 connections exclusively for real-time queries using connection pool partitioning",
+    "tags": ["order-service", "payments-db", "timeout", "batch-processing", "connection-pool"],
+    "severity": "medium",
+    "date_resolved": "2025-06-30",
+    "duration_minutes": 125,
+    "root_cause_category": "RC-04_capacity_exhaustion"
   },
   {
-    "id": "INC-2025-076",
-    "description": "auth-service crash loop after user-db exhausted its connection limit",
-    "root_cause": "auth-service was autoscaled to handle a traffic spike without raising user-db's max_connections, exhausting the pool",
-    "resolution": "Added a pgbouncer connection pooler in front of user-db",
-    "tags": [
-      "auth-service",
-      "user-db",
-      "crash"
-    ]
+    "id": "INC-2025-203",
+    "description": "notification-service memory leak after v1.8.0 deployment caused OOMKilled restarts every 30 minutes",
+    "root_cause": "Version 1.8.0 introduced an email template caching layer that never evicted entries. Each unique email template was cached indefinitely, causing heap to grow linearly with request volume until OOM.",
+    "resolution": "Rolled back to v1.7.3, fixed the cache to use LRU eviction with 500-entry cap, redeployed as v1.8.1 with memory monitoring alerts",
+    "tags": ["notification-service", "memory-leak", "OOMKilled", "deployment", "cache", "code-defect"],
+    "severity": "medium",
+    "date_resolved": "2025-09-15",
+    "duration_minutes": 85,
+    "root_cause_category": "RC-01_code_defect"
   },
   {
-    "id": "INC-2025-055",
-    "description": "web-frontend returning intermittent 502s during high traffic",
-    "root_cause": "auth-service token validation calls timing out under load",
-    "resolution": "Added a short-lived cache for token validation results",
-    "tags": [
-      "web-frontend",
-      "auth-service",
-      "latency"
-    ]
+    "id": "INC-2025-067",
+    "description": "user-service high CPU and degraded response times after v2.3.0 deployment with unoptimized database query",
+    "root_cause": "New user search feature in v2.3.0 used a full table scan instead of indexed query for the /api/users/search endpoint. CPU spiked to 95% under normal traffic as the query was called on every keystroke.",
+    "resolution": "Added composite index on (last_name, first_name, email), optimized query to use ILIKE with trigram index, added query timeout of 200ms",
+    "tags": ["user-service", "deployment", "CPU", "query-optimization", "database", "performance"],
+    "severity": "medium",
+    "date_resolved": "2025-04-12",
+    "duration_minutes": 60,
+    "root_cause_category": "RC-01_code_defect"
   },
   {
-    "id": "INC-2025-041",
-    "description": "order-service occasionally processing orders with stale payment status",
-    "root_cause": "payments-db read replica lag under heavy write load",
-    "resolution": "Routed payment-status reads for in-flight orders to the primary",
-    "tags": [
-      "order-service",
-      "payments-db",
-      "data-consistency"
-    ]
+    "id": "INC-2025-156",
+    "description": "auth-service complete outage caused by redis-cache crash, cascading to all authenticated endpoints",
+    "root_cause": "Redis maxmemory reached 4GB limit during a session storm (marketing campaign drove 3x normal signups). OOM killer terminated Redis process. auth-service had no fallback for session validation without Redis.",
+    "resolution": "Increased Redis maxmemory to 8GB, implemented database-backed session fallback in auth-service, added Redis memory alerting at 70% and 85% thresholds",
+    "tags": ["auth-service", "redis-cache", "OOM", "cascade", "session", "authentication", "outage"],
+    "severity": "critical",
+    "date_resolved": "2025-07-22",
+    "duration_minutes": 35,
+    "root_cause_category": "RC-06_network_dns"
   },
   {
-    "id": "INC-2024-233",
-    "description": "notification-service silently dropping order-confirmation messages",
-    "root_cause": "Unhandled exception on a malformed message payload",
-    "resolution": "Added schema validation and a dead-letter queue for failed messages",
-    "tags": [
-      "notification-service",
-      "error-handling"
-    ]
+    "id": "INC-2024-301",
+    "description": "api-gateway elevated latency and intermittent 504 errors due to upstream CDN provider degradation",
+    "root_cause": "CDN provider experienced routing issues in EU-West region, causing 40% of static asset requests to timeout. api-gateway health checks were passing (they hit /health, not CDN-dependent paths) masking the issue.",
+    "resolution": "Waited for CDN provider resolution (2h), then implemented multi-CDN failover and added synthetic monitoring that tests CDN-dependent paths",
+    "tags": ["api-gateway", "CDN", "third-party", "latency", "cascade", "external-dependency"],
+    "severity": "high",
+    "date_resolved": "2024-12-03",
+    "duration_minutes": 145,
+    "root_cause_category": "RC-08_third_party"
   },
   {
-    "id": "INC-2024-198",
-    "description": "inventory-service write failures caused by inventory-db running out of disk space",
-    "root_cause": "Disk usage grew past capacity with no autoscaling or alerting in place",
-    "resolution": "Enabled storage autoscaling and added a disk-usage alert",
-    "tags": [
-      "inventory-db",
-      "inventory-service",
-      "disk"
-    ]
+    "id": "INC-2025-278",
+    "description": "checkout-api payment failures after configuration change reduced database query timeout from 5000ms to 500ms",
+    "root_cause": "Operations team updated checkout-api config to reduce query timeout as part of a latency optimization initiative. The new 500ms timeout was too aggressive for complex payment verification queries that legitimately take 200-800ms under load.",
+    "resolution": "Reverted timeout to 3000ms (compromise between old 5000ms and attempted 500ms), documented acceptable query time ranges per endpoint, added config change review requirement for timeout values",
+    "tags": ["checkout-api", "config-change", "timeout", "payments-db", "misconfiguration"],
+    "severity": "high",
+    "date_resolved": "2025-10-08",
+    "duration_minutes": 40,
+    "root_cause_category": "RC-02_config_change"
   },
   {
-    "id": "INC-2024-150",
-    "description": "checkout-api elevated error rate right after a deployment",
-    "root_cause": "A bad deployment shipped with a missing environment variable, causing a crash loop",
-    "resolution": "Rolled back the deployment and added pre-deploy config validation",
-    "tags": [
-      "checkout-api",
-      "deployment"
-    ]
+    "id": "INC-2024-445",
+    "description": "payments-db planned maintenance window caused 15-minute service degradation when failover took longer than expected",
+    "root_cause": "Scheduled maintenance on primary payments-db node. Automatic failover to replica took 12 minutes instead of expected 30 seconds due to replication lag backlog. During failover, all write queries failed.",
+    "resolution": "Implemented streaming replication monitoring, added pre-maintenance replication lag check (must be <100ms before proceeding), updated runbook with manual failover steps",
+    "tags": ["payments-db", "maintenance", "failover", "replication-lag", "planned-downtime"],
+    "severity": "medium",
+    "date_resolved": "2024-11-15",
+    "duration_minutes": 15,
+    "root_cause_category": "RC-04_capacity_exhaustion"
+  },
+  {
+    "id": "INC-2025-341",
+    "description": "Complete web-frontend outage when auth-service internal TLS certificate expired, breaking all inter-service HTTPS communication",
+    "root_cause": "Internal TLS certificate for auth-service.internal expired after 1-year validity period. Certificate renewal was manual and no automated alerting existed for internal cert expiry. All services communicating with auth-service over mTLS immediately failed.",
+    "resolution": "Renewed certificate manually (15 min to generate + deploy), implemented cert-manager for automatic renewal 30 days before expiry, added monitoring for all internal certificate expiry dates",
+    "tags": ["auth-service", "TLS", "certificate-expired", "outage", "web-frontend", "mTLS", "security"],
+    "severity": "critical",
+    "date_resolved": "2025-12-01",
+    "duration_minutes": 28,
+    "root_cause_category": "RC-07_auth"
+  },
+  {
+    "id": "INC-2024-512",
+    "description": "auth-service intermittent 403 errors after IAM policy update restricted OAuth scope for service-to-service tokens",
+    "root_cause": "Security team updated IAM policies to enforce least-privilege OAuth scopes. The change inadvertently removed the 'user:read' scope from service-to-service tokens used by checkout-api and user-service to call auth-service, causing sporadic 403 Forbidden errors.",
+    "resolution": "Added missing 'user:read' scope back to service accounts, implemented policy-as-code review process requiring automated scope validation before IAM changes are applied",
+    "tags": ["auth-service", "IAM", "OAuth", "permissions", "config-change", "security-policy"],
+    "severity": "high",
+    "date_resolved": "2024-09-20",
+    "duration_minutes": 55,
+    "root_cause_category": "RC-07_auth"
   }
 ]

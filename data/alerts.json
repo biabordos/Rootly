@@ -5,22 +5,53 @@
     "alert_type": "error_rate_high",
     "severity_reported": "high",
     "timestamp": "2026-08-18T09:12:00Z",
-    "metric_value": 7.4
+    "metric_value": 7.4,
+    "description": "checkout-api error rate exceeded 5% threshold (current: 7.4%)",
+    "root_cause_category": "RC-04_capacity_exhaustion",
+    "failure_mode": "FM-13_resource_exhaustion"
   },
   {
     "id": "ALRT-002",
-    "service": "inventory-service",
+    "service": "user-service",
     "alert_type": "latency_high",
     "severity_reported": "medium",
-    "timestamp": "2026-08-20T14:30:00Z",
-    "metric_value": 2450.0
+    "timestamp": "2026-08-19T14:35:00Z",
+    "metric_value": 1850,
+    "description": "user-service p99 latency exceeded 500ms SLO (current: 1850ms)",
+    "root_cause_category": "RC-01_code_defect",
+    "failure_mode": "FM-09_deploy_induced_regression"
   },
   {
     "id": "ALRT-003",
-    "service": "auth-service",
-    "alert_type": "unavailability",
+    "service": "api-gateway",
+    "alert_type": "error_rate_high",
     "severity_reported": "critical",
-    "timestamp": "2026-08-22T03:45:40Z",
-    "metric_value": 100.0
+    "timestamp": "2026-08-20T03:22:00Z",
+    "metric_value": 92.0,
+    "description": "api-gateway error rate at 92%, nearly all requests failing",
+    "root_cause_category": "RC-06_network_dns",
+    "failure_mode": "FM-01_cross_org_cascade"
+  },
+  {
+    "id": "ALRT-004",
+    "service": "order-service",
+    "alert_type": "error_rate_high",
+    "severity_reported": "high",
+    "timestamp": "2026-08-21T11:45:00Z",
+    "metric_value": 52.0,
+    "description": "order-service error rate exceeded 5% threshold (current: 52%)",
+    "root_cause_category": "RC-02_config_change",
+    "failure_mode": "FM-10_config_induced_failure"
+  },
+  {
+    "id": "ALRT-005",
+    "service": "web-frontend",
+    "alert_type": "service_unavailable",
+    "severity_reported": "critical",
+    "timestamp": "2026-08-22T16:08:00Z",
+    "metric_value": 0.0,
+    "description": "web-frontend completely unavailable, 0% success rate",
+    "root_cause_category": "RC-07_auth",
+    "failure_mode": "FM-23_hidden_internal_coupling"
   }
 ]

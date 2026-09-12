@@ -1,499 +1,144 @@
 [
-  {
-    "timestamp": "2026-08-15T02:41:27Z",
-    "service": "cache-redis",
-    "level": "INFO",
-    "message": "Scheduled job 'inventory-reconcile' completed",
-    "trace_id": "noise-242291"
-  },
-  {
-    "timestamp": "2026-08-15T07:56:36Z",
-    "service": "order-service",
-    "level": "DEBUG",
-    "message": "Background sync tick completed",
-    "trace_id": "noise-182582"
-  },
-  {
-    "timestamp": "2026-08-15T10:49:08Z",
-    "service": "inventory-service",
-    "level": "INFO",
-    "message": "Config reloaded without restart",
-    "trace_id": "noise-768061"
-  },
-  {
-    "timestamp": "2026-08-15T11:37:35Z",
-    "service": "user-db",
-    "level": "INFO",
-    "message": "Cache hit for key cache:session:1158",
-    "trace_id": "noise-255287"
-  },
-  {
-    "timestamp": "2026-08-15T17:15:58Z",
-    "service": "inventory-db",
-    "level": "INFO",
-    "message": "Request processed successfully in 57ms",
-    "trace_id": "noise-989545"
-  },
-  {
-    "timestamp": "2026-08-16T02:34:13Z",
-    "service": "inventory-service",
-    "level": "INFO",
-    "message": "Cache hit for key cache:sku:6180",
-    "trace_id": "noise-630458"
-  },
-  {
-    "timestamp": "2026-08-16T05:04:38Z",
-    "service": "order-service",
-    "level": "INFO",
-    "message": "Scheduled job 'daily-report' completed",
-    "trace_id": "noise-171262"
-  },
-  {
-    "timestamp": "2026-08-16T05:19:06Z",
-    "service": "payments-db",
-    "level": "INFO",
-    "message": "Health check OK",
-    "trace_id": "noise-706794"
-  },
-  {
-    "timestamp": "2026-08-16T12:55:02Z",
-    "service": "payments-db",
-    "level": "DEBUG",
-    "message": "Incoming request GET /status",
-    "trace_id": "noise-593554"
-  },
-  {
-    "timestamp": "2026-08-16T19:27:22Z",
-    "service": "order-service",
-    "level": "INFO",
-    "message": "Deployment finished successfully (v1.9.4)",
-    "trace_id": "noise-863934"
-  },
-  {
-    "timestamp": "2026-08-17T17:46:15Z",
-    "service": "checkout-api",
-    "level": "INFO",
-    "message": "Cache hit for key cache:sku:6820",
-    "trace_id": "noise-271339"
-  },
-  {
-    "timestamp": "2026-08-18T09:05:11Z",
-    "service": "checkout-api",
-    "level": "INFO",
-    "message": "Payment request received for order ORD-88213",
-    "trace_id": "abc118"
-  },
-  {
-    "timestamp": "2026-08-18T09:06:47Z",
-    "service": "payments-db",
-    "level": "WARN",
-    "message": "Connection pool at 95% capacity (190/200 active connections)",
-    "trace_id": "abc118"
-  },
-  {
-    "timestamp": "2026-08-18T09:08:02Z",
-    "service": "checkout-api",
-    "level": "WARN",
-    "message": "Payment request queued, pool near capacity",
-    "trace_id": "abc119"
-  },
-  {
-    "timestamp": "2026-08-18T09:09:15Z",
-    "service": "payments-db",
-    "level": "ERROR",
-    "message": "Max connections reached, rejecting new connection",
-    "trace_id": "abc119"
-  },
-  {
-    "timestamp": "2026-08-18T09:10:32Z",
-    "service": "checkout-api",
-    "level": "ERROR",
-    "message": "Connection timeout to payments-db",
-    "trace_id": "abc123"
-  },
-  {
-    "timestamp": "2026-08-18T09:10:58Z",
-    "service": "checkout-api",
-    "level": "ERROR",
-    "message": "Failed to process checkout for order ORD-88214: upstream timeout",
-    "trace_id": "abc123"
-  },
-  {
-    "timestamp": "2026-08-18T09:11:20Z",
-    "service": "payments-db",
-    "level": "ERROR",
-    "message": "Max connections reached, rejecting new connection",
-    "trace_id": "abc124"
-  },
-  {
-    "timestamp": "2026-08-18T09:11:45Z",
-    "service": "web-frontend",
-    "level": "WARN",
-    "message": "Upstream checkout-api returned 503 for /checkout",
-    "trace_id": "abc124"
-  },
-  {
-    "timestamp": "2026-08-18T09:12:00Z",
-    "service": "checkout-api",
-    "level": "ERROR",
-    "message": "Error rate threshold exceeded: 7.4% over last 5 minutes",
-    "trace_id": "abc125"
-  },
-  {
-    "timestamp": "2026-08-19T00:39:09Z",
-    "service": "web-frontend",
-    "level": "DEBUG",
-    "message": "Incoming request GET /status",
-    "trace_id": "noise-350132"
-  },
-  {
-    "timestamp": "2026-08-19T04:23:48Z",
-    "service": "cache-redis",
-    "level": "INFO",
-    "message": "Config reloaded without restart",
-    "trace_id": "noise-269396"
-  },
-  {
-    "timestamp": "2026-08-19T09:05:54Z",
-    "service": "checkout-api",
-    "level": "DEBUG",
-    "message": "Connection pool stats: 12/100 active",
-    "trace_id": "noise-344098"
-  },
-  {
-    "timestamp": "2026-08-19T09:13:03Z",
-    "service": "web-frontend",
-    "level": "INFO",
-    "message": "Health check OK",
-    "trace_id": "noise-707314"
-  },
-  {
-    "timestamp": "2026-08-19T11:27:04Z",
-    "service": "inventory-service",
-    "level": "INFO",
-    "message": "Deployment finished successfully (v2.0.6)",
-    "trace_id": "noise-796503"
-  },
-  {
-    "timestamp": "2026-08-19T15:14:17Z",
-    "service": "inventory-db",
-    "level": "DEBUG",
-    "message": "Background sync tick completed",
-    "trace_id": "noise-557007"
-  },
-  {
-    "timestamp": "2026-08-20T14:20:03Z",
-    "service": "cache-redis",
-    "level": "WARN",
-    "message": "Memory usage at 92% of maxmemory, evictions increasing",
-    "trace_id": "def201"
-  },
-  {
-    "timestamp": "2026-08-20T14:22:41Z",
-    "service": "cache-redis",
-    "level": "WARN",
-    "message": "Evicted 1200 keys in the last 60s (allkeys-lru policy)",
-    "trace_id": "def201"
-  },
-  {
-    "timestamp": "2026-08-20T14:24:19Z",
-    "service": "inventory-service",
-    "level": "WARN",
-    "message": "Cache miss rate elevated: 68% (baseline 12%)",
-    "trace_id": "def202"
-  },
-  {
-    "timestamp": "2026-08-20T14:25:37Z",
-    "service": "inventory-service",
-    "level": "ERROR",
-    "message": "Redis GET timeout for key inventory:sku:SKU-4471",
-    "trace_id": "def203"
-  },
-  {
-    "timestamp": "2026-08-20T14:27:02Z",
-    "service": "inventory-db",
-    "level": "WARN",
-    "message": "Query queue depth increasing (120 pending reads)",
-    "trace_id": "def203"
-  },
-  {
-    "timestamp": "2026-08-20T14:28:14Z",
-    "service": "inventory-service",
-    "level": "ERROR",
-    "message": "Redis GET timeout for key inventory:sku:SKU-5502",
-    "trace_id": "def204"
-  },
-  {
-    "timestamp": "2026-08-20T14:29:50Z",
-    "service": "checkout-api",
-    "level": "WARN",
-    "message": "Upstream inventory-service latency high, slow checkout for order ORD-88401",
-    "trace_id": "def205"
-  },
-  {
-    "timestamp": "2026-08-20T14:30:00Z",
-    "service": "inventory-service",
-    "level": "ERROR",
-    "message": "p95 latency 2450ms for GET /inventory/{sku} (SLO: 300ms)",
-    "trace_id": "def205"
-  },
-  {
-    "timestamp": "2026-08-21T00:48:51Z",
-    "service": "auth-service",
-    "level": "INFO",
-    "message": "Health check OK",
-    "trace_id": "noise-267414"
-  },
-  {
-    "timestamp": "2026-08-21T01:46:29Z",
-    "service": "inventory-db",
-    "level": "INFO",
-    "message": "Request processed successfully in 75ms",
-    "trace_id": "noise-662275"
-  },
-  {
-    "timestamp": "2026-08-21T02:49:17Z",
-    "service": "auth-service",
-    "level": "INFO",
-    "message": "Cache hit for key cache:user:4652",
-    "trace_id": "noise-468203"
-  },
-  {
-    "timestamp": "2026-08-21T09:38:13Z",
-    "service": "web-frontend",
-    "level": "INFO",
-    "message": "Deployment finished successfully (v1.1.8)",
-    "trace_id": "noise-852470"
-  },
-  {
-    "timestamp": "2026-08-21T17:08:12Z",
-    "service": "inventory-service",
-    "level": "INFO",
-    "message": "Config reloaded without restart",
-    "trace_id": "noise-540869"
-  },
-  {
-    "timestamp": "2026-08-21T19:51:41Z",
-    "service": "user-db",
-    "level": "INFO",
-    "message": "Scheduled job 'inventory-reconcile' completed",
-    "trace_id": "noise-654634"
-  },
-  {
-    "timestamp": "2026-08-21T21:31:13Z",
-    "service": "notification-service",
-    "level": "INFO",
-    "message": "Health check OK",
-    "trace_id": "noise-665427"
-  },
-  {
-    "timestamp": "2026-08-21T21:38:51Z",
-    "service": "web-frontend",
-    "level": "DEBUG",
-    "message": "Background sync tick completed",
-    "trace_id": "noise-226935"
-  },
-  {
-    "timestamp": "2026-08-21T23:37:27Z",
-    "service": "inventory-service",
-    "level": "INFO",
-    "message": "Cache hit for key cache:user:5339",
-    "trace_id": "noise-711878"
-  },
-  {
-    "timestamp": "2026-08-22T03:38:02Z",
-    "service": "auth-service",
-    "level": "INFO",
-    "message": "Autoscaler increased replicas from 4 to 12 (CPU > 80%)",
-    "trace_id": "ghi301"
-  },
-  {
-    "timestamp": "2026-08-22T03:40:19Z",
-    "service": "user-db",
-    "level": "WARN",
-    "message": "Active connections 180/200",
-    "trace_id": "ghi301"
-  },
-  {
-    "timestamp": "2026-08-22T03:42:07Z",
-    "service": "user-db",
-    "level": "ERROR",
-    "message": "FATAL: remaining connection slots reserved for non-replication superuser connections",
-    "trace_id": "ghi302"
-  },
-  {
-    "timestamp": "2026-08-22T03:42:33Z",
-    "service": "auth-service",
-    "level": "ERROR",
-    "message": "Failed to acquire DB connection from pool: pool exhausted",
-    "trace_id": "ghi302"
-  },
-  {
-    "timestamp": "2026-08-22T03:43:51Z",
-    "service": "auth-service",
-    "level": "ERROR",
-    "message": "Failed to acquire DB connection from pool: pool exhausted",
-    "trace_id": "ghi303"
-  },
-  {
-    "timestamp": "2026-08-22T03:44:10Z",
-    "service": "auth-service",
-    "level": "ERROR",
-    "message": "Health check failed on /healthz, restarting pod auth-service-7f9c-x2k1",
-    "trace_id": "ghi304"
-  },
-  {
-    "timestamp": "2026-08-22T03:44:45Z",
-    "service": "checkout-api",
-    "level": "WARN",
-    "message": "Auth token validation failing intermittently for upstream auth-service",
-    "trace_id": "ghi304"
-  },
-  {
-    "timestamp": "2026-08-22T03:45:10Z",
-    "service": "web-frontend",
-    "level": "ERROR",
-    "message": "Login requests failing: upstream auth-service unavailable (503)",
-    "trace_id": "ghi305"
-  },
-  {
-    "timestamp": "2026-08-22T03:45:40Z",
-    "service": "auth-service",
-    "level": "ERROR",
-    "message": "CrashLoopBackOff: 5 restarts in the last 5 minutes",
-    "trace_id": "ghi306"
-  },
-  {
-    "timestamp": "2026-08-23T00:37:35Z",
-    "service": "auth-service",
-    "level": "DEBUG",
-    "message": "Connection pool stats: 14/100 active",
-    "trace_id": "noise-341292"
-  },
-  {
-    "timestamp": "2026-08-23T02:52:48Z",
-    "service": "cache-redis",
-    "level": "INFO",
-    "message": "Config reloaded without restart",
-    "trace_id": "noise-346277"
-  },
-  {
-    "timestamp": "2026-08-23T03:18:27Z",
-    "service": "notification-service",
-    "level": "DEBUG",
-    "message": "Background sync tick completed",
-    "trace_id": "noise-265840"
-  },
-  {
-    "timestamp": "2026-08-23T08:13:42Z",
-    "service": "auth-service",
-    "level": "INFO",
-    "message": "Deployment finished successfully (v2.9.9)",
-    "trace_id": "noise-850981"
-  },
-  {
-    "timestamp": "2026-08-23T10:57:34Z",
-    "service": "user-db",
-    "level": "DEBUG",
-    "message": "Background sync tick completed",
-    "trace_id": "noise-184491"
-  },
-  {
-    "timestamp": "2026-08-24T01:01:05Z",
-    "service": "checkout-api",
-    "level": "INFO",
-    "message": "Scheduled job 'inventory-reconcile' completed",
-    "trace_id": "noise-329258"
-  },
-  {
-    "timestamp": "2026-08-24T01:13:53Z",
-    "service": "payments-db",
-    "level": "INFO",
-    "message": "Cache hit for key cache:user:7797",
-    "trace_id": "noise-540552"
-  },
-  {
-    "timestamp": "2026-08-24T06:59:34Z",
-    "service": "checkout-api",
-    "level": "DEBUG",
-    "message": "Incoming request GET /status",
-    "trace_id": "noise-891952"
-  },
-  {
-    "timestamp": "2026-08-24T08:04:13Z",
-    "service": "cache-redis",
-    "level": "INFO",
-    "message": "Config reloaded without restart",
-    "trace_id": "noise-694731"
-  },
-  {
-    "timestamp": "2026-08-24T08:53:05Z",
-    "service": "cache-redis",
-    "level": "INFO",
-    "message": "Scheduled job 'session-cleanup' completed",
-    "trace_id": "noise-593152"
-  },
-  {
-    "timestamp": "2026-08-24T11:27:26Z",
-    "service": "payments-db",
-    "level": "DEBUG",
-    "message": "Background sync tick completed",
-    "trace_id": "noise-589710"
-  },
-  {
-    "timestamp": "2026-08-24T15:06:27Z",
-    "service": "notification-service",
-    "level": "DEBUG",
-    "message": "Connection pool stats: 10/100 active",
-    "trace_id": "noise-479781"
-  },
-  {
-    "timestamp": "2026-08-24T15:30:13Z",
-    "service": "cache-redis",
-    "level": "INFO",
-    "message": "Health check OK",
-    "trace_id": "noise-520521"
-  },
-  {
-    "timestamp": "2026-08-24T18:38:41Z",
-    "service": "inventory-db",
-    "level": "INFO",
-    "message": "Request processed successfully in 177ms",
-    "trace_id": "noise-437902"
-  },
-  {
-    "timestamp": "2026-08-24T19:04:24Z",
-    "service": "inventory-db",
-    "level": "INFO",
-    "message": "Request processed successfully in 150ms",
-    "trace_id": "noise-500156"
-  },
-  {
-    "timestamp": "2026-08-24T19:47:09Z",
-    "service": "inventory-db",
-    "level": "INFO",
-    "message": "Scheduled job 'daily-report' completed",
-    "trace_id": "noise-348237"
-  },
-  {
-    "timestamp": "2026-08-24T20:36:12Z",
-    "service": "user-db",
-    "level": "INFO",
-    "message": "Request processed successfully in 57ms",
-    "trace_id": "noise-853240"
-  },
-  {
-    "timestamp": "2026-08-25T04:27:11Z",
-    "service": "web-frontend",
-    "level": "INFO",
-    "message": "Config reloaded without restart",
-    "trace_id": "noise-392075"
-  },
-  {
-    "timestamp": "2026-08-25T14:16:48Z",
-    "service": "checkout-api",
-    "level": "INFO",
-    "message": "Cache hit for key cache:sku:9270",
-    "trace_id": "noise-359249"
-  }
+
+  {"_comment": "═══ SCENARIO 1: ALRT-001 — checkout-api — payments-db pool exhaustion ═══"},
+
+  {"timestamp": "2026-08-18T09:05:12Z", "service": "checkout-api",  "level": "INFO",  "message": "Processing order ORD-8847, payment validation started", "trace_id": "tr-1a01", "event_type": "metric"},
+  {"timestamp": "2026-08-18T09:05:45Z", "service": "payments-db",   "level": "INFO",  "message": "Query executed in 12ms: SELECT balance FROM accounts WHERE user_id='U-4410'", "trace_id": "tr-1a02", "event_type": "metric"},
+  {"timestamp": "2026-08-18T09:07:22Z", "service": "payments-db",   "level": "WARN",  "message": "Connection pool usage at 85% (17/20 active connections)", "trace_id": "tr-1a03", "event_type": "metric"},
+  {"timestamp": "2026-08-18T09:08:01Z", "service": "checkout-api",  "level": "INFO",  "message": "Payment validation started for ORD-8851", "trace_id": "tr-1a04", "event_type": "metric"},
+  {"timestamp": "2026-08-18T09:08:33Z", "service": "payments-db",   "level": "WARN",  "message": "Connection pool usage at 95% (19/20 active connections)", "trace_id": "tr-1a05", "event_type": "metric"},
+  {"timestamp": "2026-08-18T09:09:15Z", "service": "payments-db",   "level": "ERROR", "message": "Max connections reached (20/20), rejecting new connection requests", "trace_id": "tr-1a06", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:09:18Z", "service": "checkout-api",  "level": "ERROR", "message": "Connection timeout to payments-db after 5000ms", "trace_id": "tr-1a07", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:09:22Z", "service": "checkout-api",  "level": "ERROR", "message": "Failed to process payment for ORD-8852: database connection unavailable", "trace_id": "tr-1a08", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:09:45Z", "service": "payments-db",   "level": "ERROR", "message": "Connection pool exhausted, 12 requests queued and waiting", "trace_id": "tr-1a09", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:10:01Z", "service": "checkout-api",  "level": "ERROR", "message": "Connection timeout to payments-db after 5000ms", "trace_id": "tr-1a10", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:10:05Z", "service": "order-service", "level": "WARN",  "message": "Checkout callback delayed for ORD-8852, retrying in 2s", "trace_id": "tr-1a11", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:10:32Z", "service": "checkout-api",  "level": "ERROR", "message": "5xx error rate at 7.4% (threshold: 5%)", "trace_id": "tr-1a12", "event_type": "metric"},
+  {"timestamp": "2026-08-18T09:10:45Z", "service": "auth-service",  "level": "INFO",  "message": "Token validation successful for user U-4421", "trace_id": "tr-1a13", "event_type": "health_check"},
+  {"timestamp": "2026-08-18T09:11:00Z", "service": "payments-db",   "level": "ERROR", "message": "Max connections reached (20/20), 23 requests queued", "trace_id": "tr-1a14", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:11:15Z", "service": "checkout-api",  "level": "ERROR", "message": "Connection timeout to payments-db after 5000ms", "trace_id": "tr-1a15", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:11:22Z", "service": "checkout-api",  "level": "ERROR", "message": "Circuit breaker OPEN for payments-db — all requests short-circuited", "trace_id": "tr-1a16", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:11:30Z", "service": "notification-service", "level": "INFO", "message": "Email sent: order confirmation ORD-8849", "trace_id": "tr-1a17", "event_type": "metric"},
+  {"timestamp": "2026-08-18T09:11:45Z", "service": "checkout-api",  "level": "ERROR", "message": "All payment requests failing, circuit breaker open for payments-db", "trace_id": "tr-1a18", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:12:00Z", "service": "checkout-api",  "level": "ERROR", "message": "ALERT TRIGGERED: error_rate_high, current value: 7.4%", "trace_id": "tr-1a19", "event_type": "alert"},
+  {"timestamp": "2026-08-18T09:12:15Z", "service": "web-frontend",  "level": "WARN",  "message": "Checkout page returning 502 errors to users", "trace_id": "tr-1a20", "event_type": "error"},
+  {"timestamp": "2026-08-18T09:12:30Z", "service": "user-service",  "level": "INFO",  "message": "User profile fetched for U-4421 in 23ms", "trace_id": "tr-1a21", "event_type": "metric"},
+  {"timestamp": "2026-08-18T09:13:00Z", "service": "api-gateway",   "level": "WARN",  "message": "Elevated 5xx from downstream checkout-api, 12 errors in last 60s", "trace_id": "tr-1a22", "event_type": "metric"},
+
+  {"_comment": "═══ SCENARIO 2: ALRT-002 — user-service — deploy-induced memory leak ═══"},
+
+  {"timestamp": "2026-08-19T14:25:00Z", "service": "user-service",  "level": "INFO",  "message": "Deployment started: v2.4.1 -> v2.5.0 (commit abc123f, author: dev-jsmith)", "trace_id": "tr-2b01", "event_type": "deploy"},
+  {"timestamp": "2026-08-19T14:25:30Z", "service": "user-service",  "level": "INFO",  "message": "Deployment completed: v2.5.0 running on 3/3 pods", "trace_id": "tr-2b02", "event_type": "deploy"},
+  {"timestamp": "2026-08-19T14:26:00Z", "service": "user-service",  "level": "INFO",  "message": "Health check passed, all endpoints responding", "trace_id": "tr-2b03", "event_type": "health_check"},
+  {"timestamp": "2026-08-19T14:27:15Z", "service": "user-service",  "level": "INFO",  "message": "GET /api/users/profile responded in 45ms", "trace_id": "tr-2b04", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:28:30Z", "service": "checkout-api",  "level": "INFO",  "message": "Processing order ORD-8901, payment flow normal", "trace_id": "tr-2b05", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:29:00Z", "service": "user-service",  "level": "INFO",  "message": "GET /api/users/profile responded in 120ms (degrading)", "trace_id": "tr-2b06", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:30:00Z", "service": "user-service",  "level": "WARN",  "message": "Memory usage at 72% (1.44GB/2GB)", "trace_id": "tr-2b07", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:30:45Z", "service": "user-service",  "level": "INFO",  "message": "GET /api/users/profile responded in 340ms (further degradation)", "trace_id": "tr-2b08", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:31:15Z", "service": "user-db",       "level": "INFO",  "message": "Query executed in 3ms: SELECT * FROM users WHERE id='U-4421'", "trace_id": "tr-2b09", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:31:30Z", "service": "user-service",  "level": "WARN",  "message": "Memory usage at 81% (1.62GB/2GB)", "trace_id": "tr-2b10", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:32:00Z", "service": "user-service",  "level": "WARN",  "message": "GC pause detected: 450ms, heap pressure increasing", "trace_id": "tr-2b11", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:32:30Z", "service": "auth-service",  "level": "INFO",  "message": "Token validated for user U-3301 in 8ms", "trace_id": "tr-2b12", "event_type": "health_check"},
+  {"timestamp": "2026-08-19T14:33:00Z", "service": "user-service",  "level": "WARN",  "message": "Memory usage at 89% (1.78GB/2GB)", "trace_id": "tr-2b13", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:33:15Z", "service": "user-service",  "level": "ERROR", "message": "Response time exceeded SLO: GET /api/users/profile 1200ms (SLO: 500ms)", "trace_id": "tr-2b14", "event_type": "error"},
+  {"timestamp": "2026-08-19T14:33:45Z", "service": "user-service",  "level": "WARN",  "message": "GC pause detected: 890ms, severe heap pressure", "trace_id": "tr-2b15", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:34:00Z", "service": "user-service",  "level": "ERROR", "message": "Memory usage critical at 94% (1.88GB/2GB)", "trace_id": "tr-2b16", "event_type": "error"},
+  {"timestamp": "2026-08-19T14:34:15Z", "service": "user-service",  "level": "ERROR", "message": "OOMKilled: pod user-service-7d8f9 terminated by kernel, restarting", "trace_id": "tr-2b17", "event_type": "error"},
+  {"timestamp": "2026-08-19T14:34:30Z", "service": "user-service",  "level": "INFO",  "message": "Pod restarting (1/3 pods down), health check pending", "trace_id": "tr-2b18", "event_type": "health_check"},
+  {"timestamp": "2026-08-19T14:34:45Z", "service": "api-gateway",   "level": "WARN",  "message": "user-service returning 503, 5 requests failed in last 30s", "trace_id": "tr-2b19", "event_type": "error"},
+  {"timestamp": "2026-08-19T14:35:00Z", "service": "user-service",  "level": "ERROR", "message": "ALERT TRIGGERED: latency_high, p99 latency: 1850ms", "trace_id": "tr-2b20", "event_type": "alert"},
+  {"timestamp": "2026-08-19T14:35:30Z", "service": "user-service",  "level": "WARN",  "message": "Memory usage at 45% after restart — already climbing again", "trace_id": "tr-2b21", "event_type": "metric"},
+  {"timestamp": "2026-08-19T14:36:00Z", "service": "notification-service", "level": "INFO", "message": "Push notification sent to U-3301", "trace_id": "tr-2b22", "event_type": "metric"},
+
+  {"_comment": "═══ SCENARIO 3: ALRT-003 — api-gateway — redis crash → auth cascade ═══"},
+
+  {"timestamp": "2026-08-20T03:14:00Z", "service": "redis-cache",   "level": "INFO",  "message": "Memory usage: 3.8GB/4GB (95%)", "trace_id": "tr-3c01", "event_type": "metric"},
+  {"timestamp": "2026-08-20T03:14:30Z", "service": "redis-cache",   "level": "WARN",  "message": "Memory usage critical: 3.95GB/4GB, approaching maxmemory limit", "trace_id": "tr-3c02", "event_type": "metric"},
+  {"timestamp": "2026-08-20T03:15:00Z", "service": "redis-cache",   "level": "ERROR", "message": "Out of memory: cannot allocate 256KB for new key, all eviction attempts failed", "trace_id": "tr-3c03", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:05Z", "service": "redis-cache",   "level": "FATAL", "message": "Process crashed: OOM killer invoked, Redis server terminated", "trace_id": "tr-3c04", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:10Z", "service": "auth-service",  "level": "ERROR", "message": "Redis connection refused: Connection reset by peer (redis-cache:6379)", "trace_id": "tr-3c05", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:12Z", "service": "auth-service",  "level": "ERROR", "message": "Session cache unavailable, cannot validate user tokens", "trace_id": "tr-3c06", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:15Z", "service": "auth-service",  "level": "ERROR", "message": "Fallback to database auth failed: user-db query timeout after 3000ms under load", "trace_id": "tr-3c07", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:20Z", "service": "user-service",  "level": "ERROR", "message": "Auth validation failed: auth-service returned HTTP 503", "trace_id": "tr-3c08", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:22Z", "service": "checkout-api",  "level": "ERROR", "message": "Auth validation failed: auth-service returned HTTP 503", "trace_id": "tr-3c09", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:25Z", "service": "order-service", "level": "INFO",  "message": "Processing internal order ORD-9012 (no auth required for internal batch)", "trace_id": "tr-3c10", "event_type": "metric"},
+  {"timestamp": "2026-08-20T03:15:30Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway from auth-service for POST /api/login", "trace_id": "tr-3c11", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:35Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway from checkout-api for POST /api/checkout (auth dependency)", "trace_id": "tr-3c12", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:15:40Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway from user-service for GET /api/users/me (auth dependency)", "trace_id": "tr-3c13", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:16:00Z", "service": "auth-service",  "level": "ERROR", "message": "Redis connection refused, retry attempt 1/3", "trace_id": "tr-3c14", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:16:30Z", "service": "auth-service",  "level": "ERROR", "message": "Redis connection refused, retry attempt 2/3", "trace_id": "tr-3c15", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:17:00Z", "service": "auth-service",  "level": "ERROR", "message": "Redis connection refused, retry attempt 3/3 — giving up, all auth requests will fail", "trace_id": "tr-3c16", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:17:15Z", "service": "web-frontend",  "level": "ERROR", "message": "All API calls returning 502, site unusable for end users", "trace_id": "tr-3c17", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:18:00Z", "service": "api-gateway",   "level": "ERROR", "message": "Error rate at 89%, 234 failed requests in last 60s", "trace_id": "tr-3c18", "event_type": "metric"},
+  {"timestamp": "2026-08-20T03:19:00Z", "service": "auth-service",  "level": "ERROR", "message": "Redis still unreachable at redis-cache:6379, all auth requests failing", "trace_id": "tr-3c19", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:20:00Z", "service": "notification-service", "level": "INFO", "message": "Email queue processing normally, 3 emails sent in last 5 min", "trace_id": "tr-3c20", "event_type": "metric"},
+  {"timestamp": "2026-08-20T03:20:30Z", "service": "payments-db",   "level": "INFO",  "message": "Database healthy, connections 4/20, avg query time 8ms", "trace_id": "tr-3c21", "event_type": "health_check"},
+  {"timestamp": "2026-08-20T03:21:00Z", "service": "api-gateway",   "level": "ERROR", "message": "Circuit breaker OPEN for auth-service, rejecting all authenticated requests", "trace_id": "tr-3c22", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:21:30Z", "service": "api-gateway",   "level": "ERROR", "message": "All routes requiring authentication are returning 502", "trace_id": "tr-3c23", "event_type": "error"},
+  {"timestamp": "2026-08-20T03:22:00Z", "service": "api-gateway",   "level": "ERROR", "message": "ALERT TRIGGERED: error_rate_high, current value: 92%", "trace_id": "tr-3c24", "event_type": "alert"},
+
+  {"_comment": "═══ SCENARIO 4: ALRT-004 — order-service — config-induced timeout ═══"},
+
+  {"timestamp": "2026-08-21T11:35:00Z", "service": "order-service",  "level": "INFO",  "message": "Config update applied: payments_db_timeout_ms changed from 5000 to 50", "trace_id": "tr-4d01", "event_type": "config_change"},
+  {"timestamp": "2026-08-21T11:35:10Z", "service": "order-service",  "level": "INFO",  "message": "Config version updated: v3.1.2 -> v3.1.3 (applied by ops-mwilson)", "trace_id": "tr-4d02", "event_type": "config_change"},
+  {"timestamp": "2026-08-21T11:36:00Z", "service": "order-service",  "level": "INFO",  "message": "Order ORD-9101 created successfully (simple query, 12ms)", "trace_id": "tr-4d03", "event_type": "metric"},
+  {"timestamp": "2026-08-21T11:37:00Z", "service": "checkout-api",   "level": "INFO",  "message": "Payment processed for ORD-9101 in 230ms", "trace_id": "tr-4d04", "event_type": "metric"},
+  {"timestamp": "2026-08-21T11:38:00Z", "service": "order-service",  "level": "INFO",  "message": "Order ORD-9102 created successfully (simple query, 18ms)", "trace_id": "tr-4d05", "event_type": "metric"},
+  {"timestamp": "2026-08-21T11:39:00Z", "service": "order-service",  "level": "ERROR", "message": "Query timeout to payments-db after 50ms for order ORD-9103 (complex join query)", "trace_id": "tr-4d06", "event_type": "error"},
+  {"timestamp": "2026-08-21T11:39:05Z", "service": "order-service",  "level": "ERROR", "message": "Failed to verify payment status for ORD-9103: database query timeout", "trace_id": "tr-4d07", "event_type": "error"},
+  {"timestamp": "2026-08-21T11:39:30Z", "service": "payments-db",    "level": "INFO",  "message": "Query executed in 85ms: SELECT status FROM payments WHERE order_id='ORD-9103' (complex join)", "trace_id": "tr-4d08", "event_type": "metric"},
+  {"timestamp": "2026-08-21T11:40:00Z", "service": "order-service",  "level": "ERROR", "message": "Query timeout to payments-db after 50ms for order ORD-9104", "trace_id": "tr-4d09", "event_type": "error"},
+  {"timestamp": "2026-08-21T11:40:15Z", "service": "order-service",  "level": "WARN",  "message": "Payment verification failure rate: 34% in last 5 minutes", "trace_id": "tr-4d10", "event_type": "metric"},
+  {"timestamp": "2026-08-21T11:40:30Z", "service": "payments-db",    "level": "INFO",  "message": "Database healthy: avg query time 65ms, connections 8/20, no errors", "trace_id": "tr-4d11", "event_type": "health_check"},
+  {"timestamp": "2026-08-21T11:41:00Z", "service": "order-service",  "level": "ERROR", "message": "Query timeout to payments-db after 50ms for order ORD-9105", "trace_id": "tr-4d12", "event_type": "error"},
+  {"timestamp": "2026-08-21T11:41:15Z", "service": "notification-service", "level": "INFO", "message": "Order confirmation email queued for ORD-9101", "trace_id": "tr-4d13", "event_type": "metric"},
+  {"timestamp": "2026-08-21T11:41:30Z", "service": "order-service",  "level": "ERROR", "message": "3 consecutive payment verification failures for complex queries", "trace_id": "tr-4d14", "event_type": "error"},
+  {"timestamp": "2026-08-21T11:42:00Z", "service": "order-service",  "level": "WARN",  "message": "Falling back to async payment verification for new orders", "trace_id": "tr-4d15", "event_type": "error"},
+  {"timestamp": "2026-08-21T11:42:30Z", "service": "user-service",   "level": "INFO",  "message": "User profile updated for U-5501 in 28ms", "trace_id": "tr-4d16", "event_type": "metric"},
+  {"timestamp": "2026-08-21T11:43:00Z", "service": "order-service",  "level": "ERROR", "message": "Async verification also timing out at 50ms threshold", "trace_id": "tr-4d17", "event_type": "error"},
+  {"timestamp": "2026-08-21T11:43:30Z", "service": "order-service",  "level": "ERROR", "message": "Error rate at 45%, 23 failed orders in last 5 minutes", "trace_id": "tr-4d18", "event_type": "metric"},
+  {"timestamp": "2026-08-21T11:44:00Z", "service": "auth-service",   "level": "INFO",  "message": "Token refresh successful for session S-8821", "trace_id": "tr-4d19", "event_type": "health_check"},
+  {"timestamp": "2026-08-21T11:44:30Z", "service": "order-service",  "level": "ERROR", "message": "Circuit breaker OPEN for payments-db queries from order-service", "trace_id": "tr-4d20", "event_type": "error"},
+  {"timestamp": "2026-08-21T11:45:00Z", "service": "order-service",  "level": "ERROR", "message": "ALERT TRIGGERED: error_rate_high, current value: 52%", "trace_id": "tr-4d21", "event_type": "alert"},
+  {"timestamp": "2026-08-21T11:45:30Z", "service": "api-gateway",    "level": "WARN",  "message": "order-service returning elevated 5xx, 15 errors in last 60s", "trace_id": "tr-4d22", "event_type": "metric"},
+
+  {"_comment": "═══ SCENARIO 5: ALRT-005 — web-frontend — auth-service TLS cert expired ═══"},
+
+  {"timestamp": "2026-08-22T16:00:00Z", "service": "auth-service",  "level": "WARN",  "message": "TLS certificate expires in 0 days (expiry: 2026-08-22T16:00:00Z, CN=auth-service.internal)", "trace_id": "tr-5e01", "event_type": "metric"},
+  {"timestamp": "2026-08-22T16:00:05Z", "service": "auth-service",  "level": "ERROR", "message": "TLS handshake failed: certificate has expired (NotAfter: 2026-08-22T16:00:00Z)", "trace_id": "tr-5e02", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:00:10Z", "service": "user-service",  "level": "ERROR", "message": "HTTPS request to auth-service failed: SSL certificate has expired", "trace_id": "tr-5e03", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:00:12Z", "service": "checkout-api",  "level": "ERROR", "message": "HTTPS request to auth-service failed: SSL certificate has expired", "trace_id": "tr-5e04", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:00:15Z", "service": "order-service", "level": "INFO",  "message": "Internal batch processing continues normally (no auth dependency for internal jobs)", "trace_id": "tr-5e05", "event_type": "metric"},
+  {"timestamp": "2026-08-22T16:00:20Z", "service": "api-gateway",   "level": "ERROR", "message": "auth-service health check failed: TLS handshake error", "trace_id": "tr-5e06", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:00:30Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway for POST /api/login: auth-service unreachable (TLS)", "trace_id": "tr-5e07", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:00:45Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway for GET /api/users/me: upstream auth dependency failed", "trace_id": "tr-5e08", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:01:00Z", "service": "user-service",  "level": "ERROR", "message": "Cannot authenticate requests: auth-service TLS certificate expired", "trace_id": "tr-5e09", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:01:15Z", "service": "checkout-api",  "level": "ERROR", "message": "Payment flow blocked: cannot reach auth-service for token validation", "trace_id": "tr-5e10", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:01:30Z", "service": "web-frontend",  "level": "ERROR", "message": "All authenticated pages returning 502 to users", "trace_id": "tr-5e11", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:02:00Z", "service": "web-frontend",  "level": "ERROR", "message": "Login page returning connection refused errors", "trace_id": "tr-5e12", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:02:30Z", "service": "api-gateway",   "level": "ERROR", "message": "Error rate 95%, all auth-dependent routes failing", "trace_id": "tr-5e13", "event_type": "metric"},
+  {"timestamp": "2026-08-22T16:03:00Z", "service": "redis-cache",   "level": "INFO",  "message": "Cache hit rate dropped to 0% — no new sessions being created", "trace_id": "tr-5e14", "event_type": "metric"},
+  {"timestamp": "2026-08-22T16:03:30Z", "service": "notification-service", "level": "INFO", "message": "Email delivery operating normally, 5 emails processed", "trace_id": "tr-5e15", "event_type": "metric"},
+  {"timestamp": "2026-08-22T16:04:00Z", "service": "payments-db",   "level": "INFO",  "message": "Database idle, connections 2/20, no active queries", "trace_id": "tr-5e16", "event_type": "health_check"},
+  {"timestamp": "2026-08-22T16:04:30Z", "service": "user-db",       "level": "INFO",  "message": "Database healthy, connections 3/20, avg query time 5ms", "trace_id": "tr-5e17", "event_type": "health_check"},
+  {"timestamp": "2026-08-22T16:05:00Z", "service": "web-frontend",  "level": "ERROR", "message": "Site completely unavailable for all authenticated users", "trace_id": "tr-5e18", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:05:30Z", "service": "auth-service",  "level": "ERROR", "message": "TLS certificate expired at 16:00:00Z, all inbound HTTPS connections rejected", "trace_id": "tr-5e19", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:06:00Z", "service": "api-gateway",   "level": "ERROR", "message": "Circuit breaker OPEN for auth-service (TLS failure)", "trace_id": "tr-5e20", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:06:30Z", "service": "user-service",  "level": "ERROR", "message": "Retry attempt 5/5 to auth-service failed: SSL certificate has expired", "trace_id": "tr-5e21", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:07:00Z", "service": "checkout-api",  "level": "ERROR", "message": "All checkout attempts failing, no auth validation available", "trace_id": "tr-5e22", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:07:30Z", "service": "web-frontend",  "level": "ERROR", "message": "0 successful requests in last 7 minutes, complete outage", "trace_id": "tr-5e23", "event_type": "error"},
+  {"timestamp": "2026-08-22T16:08:00Z", "service": "web-frontend",  "level": "ERROR", "message": "ALERT TRIGGERED: service_unavailable, success rate: 0%", "trace_id": "tr-5e24", "event_type": "alert"},
+
+  {"_comment": "═══ BACKGROUND NOISE — normal operations across all days ═══"},
+
+  {"timestamp": "2026-08-18T06:00:00Z", "service": "api-gateway",   "level": "INFO",  "message": "Daily health check: all upstream services responding normally", "trace_id": "tr-bg01", "event_type": "health_check"},
+  {"timestamp": "2026-08-18T06:01:00Z", "service": "payments-db",   "level": "INFO",  "message": "Automated backup completed successfully (size: 2.3GB)", "trace_id": "tr-bg02", "event_type": "metric"},
+  {"timestamp": "2026-08-19T06:00:00Z", "service": "redis-cache",   "level": "INFO",  "message": "Memory usage: 2.1GB/4GB (52%), eviction rate: 0/s", "trace_id": "tr-bg03", "event_type": "health_check"},
+  {"timestamp": "2026-08-19T06:01:00Z", "service": "user-db",       "level": "INFO",  "message": "Automated backup completed successfully (size: 1.8GB)", "trace_id": "tr-bg04", "event_type": "metric"},
+  {"timestamp": "2026-08-20T06:00:00Z", "service": "notification-service", "level": "INFO", "message": "Daily digest: 1,247 notifications sent in last 24h, 0 failures", "trace_id": "tr-bg05", "event_type": "metric"},
+  {"timestamp": "2026-08-20T12:00:00Z", "service": "api-gateway",   "level": "INFO",  "message": "Traffic report: 45,231 requests in last hour, avg latency 89ms", "trace_id": "tr-bg06", "event_type": "metric"},
+  {"timestamp": "2026-08-21T06:00:00Z", "service": "checkout-api",  "level": "INFO",  "message": "Daily health check: payments-db connection pool 5/20 active", "trace_id": "tr-bg07", "event_type": "health_check"},
+  {"timestamp": "2026-08-21T06:01:00Z", "service": "auth-service",  "level": "INFO",  "message": "TLS certificate valid, expires in 1 day (2026-08-22T16:00:00Z)", "trace_id": "tr-bg08", "event_type": "health_check"},
+  {"timestamp": "2026-08-22T06:00:00Z", "service": "auth-service",  "level": "WARN",  "message": "TLS certificate expiring today at 16:00:00Z — renewal required", "trace_id": "tr-bg09", "event_type": "metric"},
+  {"timestamp": "2026-08-22T12:00:00Z", "service": "order-service", "level": "INFO",  "message": "Daily summary: 892 orders processed, 2 refunds issued", "trace_id": "tr-bg10", "event_type": "metric"}
 ]

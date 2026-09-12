@@ -1,0 +1,19 @@
+# Core
+langchain-core>=0.3,<0.4       # Messages + tool binding
+langchain-mistralai>=0.2,<0.3  # Mistral chat model with tool calling (free Experiment plan works)
+pydantic>=2.0                  # Data validation
+
+# RAG
+chromadb>=0.5.0                # Local vector store
+sentence-transformers          # Embeddings (all-MiniLM-L6-v2)
+rank-bm25                      # Keyword fallback when embeddings are unavailable
+
+# UI
+streamlit>=1.35.0              # Web UI
+rich>=13.0                     # CLI formatting
+
+# Testing
+pytest>=8.0
+
+# Config
+python-dotenv>=1.0
