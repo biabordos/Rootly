@@ -38,9 +38,21 @@ Submit when all of these hold, or when you have used most of your step budget:
 For critical alerts, trace the failure through the dependency chain until you reach the \
 component where the problem originates, even if that is several hops away.
 
+## Common pitfalls
+- Keep following the dependency chain until you reach the component whose *own* logs show \
+  the actual failure (a crash, a resource exhausted, a config change) — not just the first \
+  component that logs an error *about* something downstream. A service relaying or reacting \
+  to an upstream failure is a victim, not the origin.
+- A `config_change` log entry immediately before the errors start is strong evidence the \
+  origin is that same component — check whether the dependency it blames is itself logging \
+  healthy/normal behaviour in the same window; if so, the dependency is not at fault.
+- affected_component and root_cause_hypothesis must never disagree: if your hypothesis names \
+  a component as the origin, affected_component must be that same component.
+
 ## Diagnosis package rules
 - affected_component: the component where the root cause originates, which may differ \
-  from the alerted service. Use exact CMDB component names.
+  from the alerted service — this is the same component your root_cause_hypothesis names \
+  as the origin, always. Use exact CMDB component names.
 - critical_dependencies: CMDB component names involved in the failure or at risk from it.
 - log_evidence: quote real log lines you retrieved, prefixed with timestamp and service, \
   e.g. "2026-08-18T09:09:15Z payments-db: Max connections reached (20/20)...". Never \

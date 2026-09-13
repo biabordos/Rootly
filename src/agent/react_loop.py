@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
+import string
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable
@@ -30,7 +32,7 @@ from src.agent.tool_registry import ToolRegistry
 from src.data_loader import load_cmdb, load_incidents
 from src.models.schemas import Alert, DiagnosisPackage, Severity
 
-DEFAULT_MODEL = "mistral-large-latest"
+DEFAULT_MODEL = "codestral-latest"
 DEFAULT_MAX_STEPS = 15
 RATE_LIMIT_RETRIES = 4
 RETRY_BASE_SECONDS = 2.0  # backoff: 2s, 4s, 8s, 16s — the free tier allows roughly 1 request/second
@@ -178,6 +180,9 @@ def build_llm(model: str):
         )
     from langchain_mistralai import ChatMistralAI
 
+    from src.agent import mistral_compat
+
+    mistral_compat.apply()
     return ChatMistralAI(model=model, temperature=0, max_retries=2, timeout=120)
 
 
@@ -199,6 +204,33 @@ def _invoke(llm, messages: list[BaseMessage]) -> AIMessage:
         except httpx.RequestError as exc:
             raise DiagnosisError(f"Could not reach the Mistral API: {exc}") from exc
     raise AssertionError("unreachable")
+
+
+_TOOL_CALL_ID_ALPHABET = string.ascii_letters + string.digits
+
+
+def _fresh_tool_call_id() -> str:
+    # Mistral requires exactly 9 alphanumeric characters.
+    return "".join(secrets.choice(_TOOL_CALL_ID_ALPHABET) for _ in range(9))
+
+
+def _dedupe_tool_call_ids(response: AIMessage, used_ids: set[str]) -> None:
+    """
+    Some models (observed with codestral-latest) reuse the same short tool_call id
+    across calls — within one turn's parallel calls, or across separate turns, since
+    the full conversation (all prior AIMessages) is resent every request. Either way
+    Mistral's API rejects the message outright with 'Duplicate tool call id in
+    assistant message'. Track every id used so far in this run and reassign a fresh
+    one to any repeat, so each call is always matched to its own tool result.
+    """
+    for call in [*response.tool_calls, *response.invalid_tool_calls]:
+        call_id = call.get("id")
+        if not call_id or call_id in used_ids:
+            call_id = _fresh_tool_call_id()
+            while call_id in used_ids:
+                call_id = _fresh_tool_call_id()
+            call["id"] = call_id
+        used_ids.add(call_id)
 
 
 def _text(message: AIMessage) -> str:
@@ -238,6 +270,7 @@ def run_diagnosis(
     trace: list[dict] = []
     usage = {"input_tokens": 0, "output_tokens": 0}
     tool_calls = 0
+    used_tool_call_ids: set[str] = set()
     started = time.perf_counter()
 
     def emit(event: TraceEvent) -> None:
@@ -256,6 +289,7 @@ def run_diagnosis(
             usage[key] += (response.usage_metadata or {}).get(key, 0)
         if response.response_metadata.get("finish_reason") == "length":
             raise DiagnosisError(f"Model output was cut off (finish_reason=length) at step {step}.")
+        _dedupe_tool_call_ids(response, used_tool_call_ids)
 
         thought = _text(response)
         if thought:

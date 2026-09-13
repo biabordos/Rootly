@@ -144,6 +144,45 @@ def test_missing_submit_is_nudged_and_budget_exhaustion_raises():
     assert any("budget" in n for n in notes)
 
 
+def test_duplicate_tool_call_ids_within_one_turn_are_deduplicated():
+    # Reproduces an observed codestral-latest quirk: two parallel tool calls in the
+    # same turn sharing one id. Mistral's API rejects that message outright, so the
+    # loop must repair it before the next request goes out.
+    clash = turn(
+        "Checking two dependencies at once.",
+        ("cmdb_lookup", {"component_name": "payments-db"}),
+        ("cmdb_lookup", {"component_name": "auth-service"}),
+    )
+    clash.tool_calls[1]["id"] = clash.tool_calls[0]["id"]
+
+    llm = FakeLLM([clash, *scripted_alrt_001()[1:]])
+    result = run_diagnosis(get_alert("ALRT-001"), llm=llm)
+
+    first_request_after = llm.calls[1]
+    tool_messages = [m for m in first_request_after if isinstance(m, ToolMessage)]
+    assert len(tool_messages) == 2
+    assert len({m.tool_call_id for m in tool_messages}) == 2  # no longer clashing
+    assert result.diagnosis.affected_component == "payments-db"
+
+
+def test_duplicate_tool_call_ids_across_turns_are_deduplicated():
+    # The full conversation (every prior AIMessage) is resent each request, so a model
+    # that reuses the same id in a later turn is just as fatal as reusing it within one.
+    step1 = turn("Start.", ("cmdb_lookup", {"component_name": "checkout-api"}))
+    step2 = turn("Next.", ("log_search", {"service": "payments-db", "start_time": "2026-08-18T08:55:00Z", "end_time": "2026-08-18T09:14:00Z"}))
+    step2.tool_calls[0]["id"] = step1.tool_calls[0]["id"]  # reuse across turns, not within one
+
+    llm = FakeLLM([step1, step2, *scripted_alrt_001()[2:]])
+    result = run_diagnosis(get_alert("ALRT-001"), llm=llm)
+
+    # The full history is resent every request, so check the final snapshot (every
+    # AIMessage + ToolMessage the model ever saw) rather than concatenating requests.
+    final_history = llm.calls[-1]
+    tool_call_ids = [m.tool_call_id for m in final_history if isinstance(m, ToolMessage)]
+    assert len(tool_call_ids) == len(set(tool_call_ids))  # never collided
+    assert result.diagnosis.affected_component == "payments-db"
+
+
 def test_rate_limit_is_retried_then_succeeds():
     llm = FakeLLM([http_error(429), *scripted_alrt_001()])
     result = run_diagnosis(get_alert("ALRT-001"), llm=llm)

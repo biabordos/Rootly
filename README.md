@@ -409,11 +409,13 @@ A manual evaluation checklist can be applied to a fixed set of test scenarios to
 ## Getting started
 
 ```bash
+python -m venv .venv
+.venv\Scripts\activate        # Windows — macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # then set MISTRAL_API_KEY
+cp .env.example .env          # then set MISTRAL_API_KEY
 ```
 
-A free Mistral API key is available on the **Experiment** plan at [console.mistral.ai](https://console.mistral.ai) (phone verification required). It is rate-limited to roughly one request per second; the agent retries automatically when it hits the limit.
+A free Mistral API key is available on the **Experiment** plan at [console.mistral.ai](https://console.mistral.ai) (phone verification required). `mistral-large-latest` and `mistral-small-latest` were unreliable on that plan in testing (403 tier-not-allowed, and a request quota reported as 0/minute until a plan is explicitly activated); `codestral-latest`, the default in `.env.example`, worked reliably.
 
 ```bash
 python run_cli.py                      # list scenarios
