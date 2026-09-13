@@ -12,13 +12,13 @@ The MVP focuses on investigation and diagnosis only. It does not perform automat
 
 The proposed high-level architecture of the system is illustrated below.
 
-![Architecture](./diagrame_imagini/architecture.png)
+![Architecture](./docs/diagrams/architecture.png)
 
 ## ReAct Reasoning Loop
 
 The investigation process follows a ReAct-style **Thought → Action → Observation** loop, allowing the agent to iteratively gather information from the available tools before producing the final diagnosis.
 
-![ReAct Reasoning Loop](./diagrame_imagini/react-reasoning-loop.png)
+![ReAct Reasoning Loop](./docs/diagrams/react-reasoning-loop.png)
 
 ---
 
@@ -400,7 +400,7 @@ A manual evaluation checklist can be applied to a fixed set of test scenarios to
 
 | Component | Implementation |
 | --- | --- |
-| Mock data | 5 alert scenarios, 10 CMDB components, 124 logs, 10 historical incidents (see `MOCK_DATA_README.md`) |
+| Mock data | 5 alert scenarios, 10 CMDB components, 124 logs, 10 historical incidents (see [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md)) |
 | Tools | `cmdb_lookup`, `log_search`, `similar_incidents_search` (RAG: ChromaDB + all-MiniLM-L6-v2, BM25 fallback) |
 | Agent | ReAct loop on Mistral tool calling via LangChain (`langchain-mistralai`); the diagnosis is submitted through a `submit_diagnosis` tool |
 | Guardrail | The package may only reference CMDB components and historical incidents that exist, and must cite log evidence |
@@ -435,18 +435,14 @@ Configuration lives in `.env`: `MISTRAL_MODEL` (default `mistral-large-latest`) 
 
 # 9. Future Development
 
-Planned extensions may include:
+The MVP covers investigation and diagnosis end-to-end (§8). Beyond it:
 
-* implementation of the ReAct orchestrator;
-* mock CMDB and dependency graph;
-* mock log search;
-* historical incident retrieval using RAG;
-* ChromaDB integration;
-* web-based investigation interface;
-* diagnosis package export;
-* automated KPI collection;
-* multi-agent architecture;
-* integration with real observability and ticketing systems in a future version.
+* automated KPI collection over many runs, not just the single-run summary `evaluate.py` produces today;
+* multi-agent architecture (specialized CMDB/log/synthesis agents behind the current single orchestrator);
+* integration with real observability and ticketing systems (Datadog/Splunk/ServiceNow) in a future version;
+* real automated remediation — out of scope by design (§1.4), an explicit later decision, not an oversight.
+
+See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase plan this MVP followed.
 
 ---
 
@@ -462,10 +458,19 @@ Rootly/
 │   ├── agent/                   # system prompt, tool registry, ReAct loop, report export
 │   └── ui/streamlit_app.py      # Streamlit interface
 ├── tests/                       # tool tests + offline agent tests (+ optional live test)
-├── diagrame_imagini/            # architecture diagrams
+├── docs/
+│   ├── diagrams/                 # architecture + ReAct loop diagrams
+│   ├── MOCK_DATA_README.md       # scenario design and ground truth
+│   ├── ROADMAP.md                # phased implementation plan
+│   └── Rootly_Plan_Implementare.txt  # team task split (RO)
 ├── run_cli.py                   # CLI entry point
 ├── evaluate.py                  # runs all scenarios, writes EVAL_RESULTS.md
-├── MOCK_DATA_README.md          # scenario design and ground truth
 ├── requirements.txt
 └── .env.example
 ```
+
+## Documentation
+
+* [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md) — the 5 scenarios, CMDB topology, and each one's ground truth.
+* [`docs/ROADMAP.md`](./docs/ROADMAP.md) — the phased plan this MVP followed, and what's still ahead.
+* [`docs/Rootly_Plan_Implementare.txt`](./docs/Rootly_Plan_Implementare.txt) — the team's task split for the MVP build.
