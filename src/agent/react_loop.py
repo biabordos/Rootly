@@ -21,6 +21,7 @@ import secrets
 import string
 import time
 from dataclasses import asdict, dataclass, field
+from datetime import timedelta
 from typing import Any, Callable
 
 import httpx
@@ -29,11 +30,17 @@ from pydantic import ValidationError
 
 from src.agent.system_prompt import SYSTEM_PROMPT, format_alert
 from src.agent.tool_registry import ToolRegistry
-from src.data_loader import load_cmdb, load_incidents
+from src.data_loader import load_cmdb, load_incidents, load_logs
 from src.models.schemas import Alert, DiagnosisPackage, Severity
 
 DEFAULT_MODEL = "codestral-latest"
 DEFAULT_MAX_STEPS = 15
+# Bounds each model response. A tool call or the full diagnosis package needs well under
+# 1k tokens; without a cap codestral occasionally generates without end until the read
+# timeout (observed: 120s+ hangs, reproduced on every retry because temperature is 0).
+MAX_OUTPUT_TOKENS = 2048
+REQUEST_TIMEOUT_SECONDS = 60
+MAX_TRUNCATED_RESPONSES = 3
 RATE_LIMIT_RETRIES = 4
 RETRY_BASE_SECONDS = 2.0  # backoff: 2s, 4s, 8s, 16s — the free tier allows roughly 1 request/second
 
@@ -75,6 +82,10 @@ MISSING_SUBMIT_NOTE = (
     f"You ended your turn without calling {SUBMIT_TOOL_NAME}. The diagnosis is only "
     f"delivered through that tool: call {SUBMIT_TOOL_NAME} now."
 )
+TRUNCATED_NOTE = (
+    "Your previous response was too long and was cut off, so it was discarded. "
+    "Reply with at most two short sentences of reasoning followed by the next tool call."
+)
 
 
 class DiagnosisError(RuntimeError):
@@ -114,10 +125,50 @@ def _component_name(reference: str) -> str:
     return (match.group(1) if match else reference).strip().lower()
 
 
-def check_package(alert: Alert, package_input: dict[str, Any], steps: int, elapsed: float) -> tuple[DiagnosisPackage | None, list[str]]:
+ORIGIN_CHECK_BEFORE_ALERT = timedelta(minutes=30)
+ORIGIN_CHECK_AFTER_ALERT = timedelta(minutes=10)
+
+
+def _unexamined_blamed_dependencies(alert: Alert, affected: str, investigated_services: set[str]) -> list[str]:
+    """
+    Origin check: a component is only accepted as where the failure originates once the
+    agent has searched the logs of every upstream dependency (CMDB depends_on) that the
+    component's own ERROR/FATAL logs around the alert name. Otherwise the agent may be
+    stopping at a component that is only relaying an upstream failure.
+    """
+    component = next(c for c in load_cmdb() if c.name == affected)
+    dependencies = [_component_name(ref) for ref in component.depends_on]
+    start, end = alert.timestamp - ORIGIN_CHECK_BEFORE_ALERT, alert.timestamp + ORIGIN_CHECK_AFTER_ALERT
+    blamed: dict[str, str] = {}
+    for entry in load_logs():
+        if entry.service != affected or entry.level.value not in ("ERROR", "FATAL"):
+            continue
+        if not start <= entry.timestamp <= end:
+            continue
+        for dependency in dependencies:
+            if dependency not in investigated_services and dependency not in blamed and dependency in entry.message.lower():
+                blamed[dependency] = entry.message
+    if not blamed:
+        return []
+    quoted = "; ".join(f'{dependency} ("{message}")' for dependency, message in blamed.items())
+    return [
+        f"{affected}'s own error logs around the alert point at its dependencies {quoted}, but you have "
+        f"not searched those dependencies' logs. Run log_search on them first. If one of them shows its "
+        f"own failure, that dependency is where the problem originates and belongs in affected_component."
+    ]
+
+
+def check_package(
+    alert: Alert,
+    package_input: dict[str, Any],
+    steps: int,
+    elapsed: float,
+    investigated_services: set[str] | None = None,
+) -> tuple[DiagnosisPackage | None, list[str]]:
     """
     Guardrail: the package may only reference components that exist in the CMDB and
-    historical incidents that exist in the corpus, and must cite log evidence.
+    historical incidents that exist in the corpus, and must cite log evidence. When
+    investigated_services is given, the origin check above is applied as well.
     """
     component_names = {c.name for c in load_cmdb()}
     incident_ids = {i.id for i in load_incidents()}
@@ -138,6 +189,11 @@ def check_package(alert: Alert, package_input: dict[str, Any], steps: int, elaps
 
     if not package_input.get("log_evidence"):
         problems.append("log_evidence is empty; quote the log lines that support the hypothesis.")
+
+    if not problems and investigated_services is not None:
+        origin_problems = _unexamined_blamed_dependencies(alert, affected, investigated_services)
+        if origin_problems:
+            return None, origin_problems
 
     if problems:
         return None, problems + [f"Valid CMDB components: {', '.join(sorted(component_names))}."]
@@ -183,7 +239,13 @@ def build_llm(model: str):
     from src.agent import mistral_compat
 
     mistral_compat.apply()
-    return ChatMistralAI(model=model, temperature=0, max_retries=2, timeout=120)
+    return ChatMistralAI(
+        model=model,
+        temperature=0,
+        max_tokens=MAX_OUTPUT_TOKENS,
+        timeout=REQUEST_TIMEOUT_SECONDS,
+        max_retries=1,
+    )
 
 
 def _invoke(llm, messages: list[BaseMessage]) -> AIMessage:
@@ -271,6 +333,8 @@ def run_diagnosis(
     usage = {"input_tokens": 0, "output_tokens": 0}
     tool_calls = 0
     used_tool_call_ids: set[str] = set()
+    truncated_responses = 0
+    investigated_services: set[str] = set()
     started = time.perf_counter()
 
     def emit(event: TraceEvent) -> None:
@@ -288,7 +352,16 @@ def run_diagnosis(
         for key in usage:
             usage[key] += (response.usage_metadata or {}).get(key, 0)
         if response.response_metadata.get("finish_reason") == "length":
-            raise DiagnosisError(f"Model output was cut off (finish_reason=length) at step {step}.")
+            # A cut-off response may hold partial tool calls, so it is never added to the
+            # history. The note changes the next input, which breaks a deterministic loop.
+            truncated_responses += 1
+            if truncated_responses > MAX_TRUNCATED_RESPONSES:
+                raise DiagnosisError(
+                    f"Model output was cut off (finish_reason=length) {truncated_responses} times; giving up at step {step}."
+                )
+            _append_note(messages, TRUNCATED_NOTE)
+            emit(TraceEvent(step, "note", content="Model response was too long and got cut off — asking for a shorter one.", is_error=True))
+            continue
         _dedupe_tool_call_ids(response, used_tool_call_ids)
 
         thought = _text(response)
@@ -312,7 +385,9 @@ def run_diagnosis(
         for call in response.tool_calls:
             name, args, call_id = call["name"], call["args"], call["id"]
             if name == SUBMIT_TOOL_NAME:
-                package, problems = check_package(alert, args, step, time.perf_counter() - started)
+                package, problems = check_package(
+                    alert, args, step, time.perf_counter() - started, investigated_services
+                )
                 if package:
                     accepted = package
                     emit(TraceEvent(step, "guardrail", content="Diagnosis package passed the CMDB guardrail."))
@@ -328,6 +403,8 @@ def run_diagnosis(
             tool_calls += 1
             emit(TraceEvent(step, "action", tool=name, input=dict(args)))
             record = registry.execute(name, dict(args))
+            if name == "log_search" and not record.is_error:
+                investigated_services.add(str(args.get("service", "")).strip().lower())
             emit(TraceEvent(step, "observation", tool=name, result=record.result,
                             duration_ms=round(record.duration_ms, 1), is_error=record.is_error))
             messages.append(ToolMessage(

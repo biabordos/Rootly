@@ -1,0 +1,7 @@
+[server]
+# The default file watcher walks every imported module, including transformers'
+# optional vision models, and floods the log with torchvision ImportErrors.
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false

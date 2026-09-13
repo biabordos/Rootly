@@ -403,7 +403,7 @@ A manual evaluation checklist can be applied to a fixed set of test scenarios to
 | Mock data | 5 alert scenarios, 10 CMDB components, 124 logs, 10 historical incidents (see [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md)) |
 | Tools | `cmdb_lookup`, `log_search`, `similar_incidents_search` (RAG: ChromaDB + all-MiniLM-L6-v2, BM25 fallback) |
 | Agent | ReAct loop on Mistral tool calling via LangChain (`langchain-mistralai`); the diagnosis is submitted through a `submit_diagnosis` tool |
-| Guardrail | The package may only reference CMDB components and historical incidents that exist, and must cite log evidence |
+| Guardrail | The package may only reference CMDB components and historical incidents that exist, and must cite log evidence. A component is only accepted as the origin once the agent has searched the logs of every upstream dependency that the component's own error logs blame |
 | Interfaces | `run_cli.py` (Rich) and `src/ui/streamlit_app.py` |
 
 ## Getting started
@@ -430,6 +430,8 @@ python evaluate.py                     # run all 5 scenarios and write EVAL_RESU
 ```
 
 The first run downloads the embedding model (~80 MB) and builds the local vector index in `.chroma/`.
+
+On Windows, start Streamlit with UTF-8 console output (`set PYTHONUTF8=1` in cmd, `$env:PYTHONUTF8=1` in PowerShell). Otherwise Streamlit's own background helpers can crash while printing symbols like `⚠` to the legacy cp1252 console; the app keeps working, but the log fills with `UnicodeEncodeError` tracebacks.
 
 Configuration lives in `.env`: `MISTRAL_MODEL` (default `mistral-large-latest`) and `MAX_REACT_STEPS` (default 15).
 

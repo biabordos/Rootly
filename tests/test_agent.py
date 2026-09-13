@@ -126,6 +126,45 @@ def test_tools_are_bound_in_function_format_and_system_prompt_comes_first():
     assert isinstance(llm.calls[0][0], SystemMessage)
 
 
+def test_origin_check_requires_searching_dependencies_the_logs_blame():
+    # Reproduces the live ALRT-003 failure: the agent read auth-service's logs ("Redis
+    # connection refused (redis-cache:6379)") but submitted auth-service as the origin
+    # without ever looking at redis-cache, where the actual OOM crash is logged.
+    window = {"start_time": "2026-08-20T03:00:00Z", "end_time": "2026-08-20T03:30:00Z"}
+    stops_one_hop_short = {
+        "summary": "Authentication is down across api-gateway.",
+        "affected_component": "auth-service",
+        "severity_assessed": "critical",
+        "critical_dependencies": ["api-gateway"],
+        "log_evidence": ["2026-08-20T03:15:10Z auth-service: Redis connection refused"],
+        "root_cause_hypothesis": "auth-service cannot reach Redis.",
+        "confidence": 0.9,
+        "escalation_recommendation": "Page security-team.",
+        "similar_incidents": ["INC-2025-156"],
+    }
+    llm = FakeLLM([
+        turn("", ("log_search", {"service": "auth-service", **window})),
+        turn("", (SUBMIT_TOOL_NAME, stops_one_hop_short)),
+        turn("", ("log_search", {"service": "redis-cache", **window}), ("log_search", {"service": "user-db", **window})),
+        turn("", (SUBMIT_TOOL_NAME, {**stops_one_hop_short, "affected_component": "redis-cache",
+                                     "critical_dependencies": ["auth-service", "api-gateway"]})),
+    ])
+    events: list[dict] = []
+
+    result = run_diagnosis(get_alert("ALRT-003"), llm=llm, on_event=events.append)
+
+    rejection = next(e for e in events if e["kind"] == "guardrail")
+    assert rejection["is_error"]
+    assert "redis-cache" in rejection["content"] and "user-db" in rejection["content"]
+    assert result.diagnosis.affected_component == "redis-cache"
+
+
+def test_origin_check_does_not_fire_when_the_origin_blames_no_dependency():
+    # payments-db has no upstream dependencies, so ALRT-001's normal flow is unaffected.
+    result = run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()))
+    assert result.steps == 5
+
+
 def test_agent_never_sees_evaluation_taxonomy():
     prompt = format_alert(get_alert("ALRT-003"))
     assert "RC-06" not in prompt and "FM-01" not in prompt and "root_cause_category" not in prompt
@@ -200,9 +239,26 @@ def test_missing_api_key_is_reported_before_any_call(monkeypatch):
         run_diagnosis(get_alert("ALRT-001"))
 
 
-def test_truncated_output_raises():
+def test_truncated_response_is_discarded_and_the_run_recovers():
+    # Reproduces the codestral runaway generation seen on ALRT-005: a response cut off at
+    # max_tokens must not end the run or pollute the history with partial tool calls.
+    runaway = turn("x" * 50, ("cmdb_lookup", {"component_name": "api-ga"}), finish_reason="length")
+    llm = FakeLLM([runaway, *scripted_alrt_001()])
+    events: list[dict] = []
+
+    result = run_diagnosis(get_alert("ALRT-001"), llm=llm, on_event=events.append)
+
+    assert result.diagnosis.affected_component == "payments-db"
+    assert any("cut off" in e.get("content", "") for e in events if e["kind"] == "note")
+    second_request = llm.calls[1]
+    assert runaway not in second_request
+    assert "too long" in str(second_request[-1].content)
+
+
+def test_repeated_truncation_gives_up():
+    llm = FakeLLM([turn("partial", finish_reason="length") for _ in range(4)])
     with pytest.raises(DiagnosisError, match="cut off"):
-        run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM([turn("partial", finish_reason="length")]))
+        run_diagnosis(get_alert("ALRT-001"), llm=llm)
 
 
 @pytest.mark.live
