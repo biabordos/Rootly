@@ -43,8 +43,8 @@ TOOL_DEFINITION = {
             "query": {
                 "type": "string",
                 "description": (
-                    "Description of the current issue to find similar past incidents "
-                    "(e.g. 'checkout-api connection timeouts to payments-db')"
+                    "Your root-cause hypothesis plus the key log symptoms, not just the alert "
+                    "(e.g. 'message broker disk full, producers timing out on publish')"
                 ),
             },
             "top_k": {

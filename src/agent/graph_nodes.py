@@ -166,11 +166,13 @@ def check_package(
     steps: int,
     elapsed: float,
     investigated_services: set[str] | None = None,
+    searched_similar_incidents: bool | None = None,
 ) -> tuple[DiagnosisPackage | None, list[str]]:
     """
     Guardrail: the package may only reference components that exist in the CMDB and
     historical incidents that exist in the corpus, and must cite log evidence. When
-    investigated_services is given, the origin check above is applied as well.
+    investigated_services is given, the origin check above is applied as well; when
+    searched_similar_incidents is given, similar_incidents_search must have been called.
     """
     component_names = {c.name for c in load_cmdb()}
     incident_ids = {i.id for i in load_incidents()}
@@ -192,10 +194,20 @@ def check_package(
     if not package_input.get("log_evidence"):
         problems.append("log_evidence is empty; quote the log lines that support the hypothesis.")
 
-    if not problems and investigated_services is not None:
-        origin_problems = _unexamined_blamed_dependencies(alert, affected, investigated_services)
-        if origin_problems:
-            return None, origin_problems
+    if not problems:
+        # Checked here, not only in the prompt: after a "call submit_diagnosis now" nudge the
+        # model was observed skipping the historical search (live ALRT-001 and ALRT-004).
+        workflow_problems = []
+        if investigated_services is not None:
+            workflow_problems += _unexamined_blamed_dependencies(alert, affected, investigated_services)
+        if searched_similar_incidents is False:
+            workflow_problems.append(
+                "You have not searched for similar historical incidents. Call similar_incidents_search "
+                "with your root-cause hypothesis first, then submit again with the matching incident IDs "
+                "(or an empty list if none match)."
+            )
+        if workflow_problems:
+            return None, workflow_problems
 
     if problems:
         return None, problems + [f"Valid CMDB components: {', '.join(sorted(component_names))}."]
@@ -448,9 +460,10 @@ def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
     messages: list[BaseMessage] = []
     trace: list[dict] = []
     accepted: DiagnosisPackage | None = None
+    searched = any(e["kind"] == "action" and e.get("tool") == "similar_incidents_search" for e in state["trace"])
 
     for call in _submit_calls(state):
-        package, problems = check_package(alert, call["args"], step, elapsed, set(state["investigated_services"]))
+        package, problems = check_package(alert, call["args"], step, elapsed, set(state["investigated_services"]), searched)
         if package:
             accepted = package
             trace += _emit(runtime, TraceEvent(step, "guardrail", content="Diagnosis package passed the CMDB guardrail."))

@@ -107,6 +107,7 @@ def scripted_alrt_002():
         turn("", ("log_search", {"service": "user-service", **window}),
              ("log_search", {"service": "user-db", **window}),
              ("log_search", {"service": "auth-service", **window})),
+        turn("", ("similar_incidents_search", {"query": "memory leak after deployment, OOMKilled"})),
         turn("", (SUBMIT_TOOL_NAME, package)),
     ]
 
@@ -182,7 +183,8 @@ def test_origin_check_requires_searching_dependencies_the_logs_blame():
         "similar_incidents": ["INC-2025-156"],
     }
     llm = FakeLLM([
-        turn("", ("log_search", {"service": "auth-service", **window})),
+        turn("", ("log_search", {"service": "auth-service", **window}),
+             ("similar_incidents_search", {"query": "redis-cache OOM crash, auth-service outage"})),
         turn("", (SUBMIT_TOOL_NAME, stops_one_hop_short)),
         turn("", ("log_search", {"service": "redis-cache", **window}), ("log_search", {"service": "user-db", **window})),
         turn("", (SUBMIT_TOOL_NAME, {**stops_one_hop_short, "affected_component": "redis-cache",
@@ -202,6 +204,21 @@ def test_origin_check_does_not_fire_when_the_origin_blames_no_dependency():
     # payments-db has no upstream dependencies, so ALRT-001's normal flow is unaffected.
     result = run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()))
     assert result.steps == 5
+
+
+def test_submit_without_similar_incidents_search_is_rejected():
+    # Reproduces live ALRT-001/ALRT-004: after a nudge the model submitted without ever
+    # calling similar_incidents_search, so the matching past incident was never cited.
+    script = scripted_alrt_001()
+    llm = FakeLLM([*script[:2], script[4], script[2], turn("Resubmitting.", (SUBMIT_TOOL_NAME, VALID_PACKAGE))])
+    events: list[dict] = []
+
+    result = run_diagnosis(get_alert("ALRT-001"), llm=llm, on_event=events.append)
+
+    guardrail = [e for e in events if e["kind"] == "guardrail"]
+    assert guardrail[0]["is_error"] and "similar_incidents_search" in guardrail[0]["content"]
+    assert not guardrail[1]["is_error"]
+    assert result.diagnosis.similar_incidents == ["INC-2025-114"]
 
 
 def test_agent_never_sees_evaluation_taxonomy():
