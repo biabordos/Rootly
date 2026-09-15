@@ -7,9 +7,9 @@ from src.tools import cmdb_lookup, log_search, similar_incidents_search
 # ── Dataset integrity ────────────────────────────────────────────────────
 
 def test_datasets_load_and_validate():
-    assert len(load_alerts()) == 5
-    assert len(load_cmdb()) == 10
-    assert len(load_logs()) == 124
+    assert len(load_alerts()) == 10
+    assert len(load_cmdb()) == 11
+    assert len(load_logs()) == 201
     assert len(load_incidents()) == 10
 
 

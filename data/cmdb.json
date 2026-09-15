@@ -22,7 +22,8 @@
       "CI-003 (checkout-api)",
       "CI-004 (user-service)",
       "CI-005 (auth-service)",
-      "CI-010 (order-service)"
+      "CI-010 (order-service)",
+      "CI-011 (cdn-provider)"
     ],
     "depended_by": [
       "CI-001 (web-frontend)"
@@ -161,5 +162,19 @@
     "criticality": "high",
     "last_deploy": "2026-08-21T09:00:00Z — v3.4.0",
     "config_version": "v3.1.3"
+  },
+  {
+    "id": "CI-011",
+    "name": "cdn-provider",
+    "type": "microservice",
+    "owner_team": "vendor-cdn",
+    "depends_on": [],
+    "depended_by": [
+      "CI-002 (api-gateway)"
+    ],
+    "environment": "production",
+    "criticality": "medium",
+    "last_deploy": null,
+    "config_version": "CDN edge config — provider: VendorCDN Co, plan: enterprise"
   }
 ]

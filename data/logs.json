@@ -1,144 +1,1646 @@
 [
-
-  {"_comment": "═══ SCENARIO 1: ALRT-001 — checkout-api — payments-db pool exhaustion ═══"},
-
-  {"timestamp": "2026-08-18T09:05:12Z", "service": "checkout-api",  "level": "INFO",  "message": "Processing order ORD-8847, payment validation started", "trace_id": "tr-1a01", "event_type": "metric"},
-  {"timestamp": "2026-08-18T09:05:45Z", "service": "payments-db",   "level": "INFO",  "message": "Query executed in 12ms: SELECT balance FROM accounts WHERE user_id='U-4410'", "trace_id": "tr-1a02", "event_type": "metric"},
-  {"timestamp": "2026-08-18T09:07:22Z", "service": "payments-db",   "level": "WARN",  "message": "Connection pool usage at 85% (17/20 active connections)", "trace_id": "tr-1a03", "event_type": "metric"},
-  {"timestamp": "2026-08-18T09:08:01Z", "service": "checkout-api",  "level": "INFO",  "message": "Payment validation started for ORD-8851", "trace_id": "tr-1a04", "event_type": "metric"},
-  {"timestamp": "2026-08-18T09:08:33Z", "service": "payments-db",   "level": "WARN",  "message": "Connection pool usage at 95% (19/20 active connections)", "trace_id": "tr-1a05", "event_type": "metric"},
-  {"timestamp": "2026-08-18T09:09:15Z", "service": "payments-db",   "level": "ERROR", "message": "Max connections reached (20/20), rejecting new connection requests", "trace_id": "tr-1a06", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:09:18Z", "service": "checkout-api",  "level": "ERROR", "message": "Connection timeout to payments-db after 5000ms", "trace_id": "tr-1a07", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:09:22Z", "service": "checkout-api",  "level": "ERROR", "message": "Failed to process payment for ORD-8852: database connection unavailable", "trace_id": "tr-1a08", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:09:45Z", "service": "payments-db",   "level": "ERROR", "message": "Connection pool exhausted, 12 requests queued and waiting", "trace_id": "tr-1a09", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:10:01Z", "service": "checkout-api",  "level": "ERROR", "message": "Connection timeout to payments-db after 5000ms", "trace_id": "tr-1a10", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:10:05Z", "service": "order-service", "level": "WARN",  "message": "Checkout callback delayed for ORD-8852, retrying in 2s", "trace_id": "tr-1a11", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:10:32Z", "service": "checkout-api",  "level": "ERROR", "message": "5xx error rate at 7.4% (threshold: 5%)", "trace_id": "tr-1a12", "event_type": "metric"},
-  {"timestamp": "2026-08-18T09:10:45Z", "service": "auth-service",  "level": "INFO",  "message": "Token validation successful for user U-4421", "trace_id": "tr-1a13", "event_type": "health_check"},
-  {"timestamp": "2026-08-18T09:11:00Z", "service": "payments-db",   "level": "ERROR", "message": "Max connections reached (20/20), 23 requests queued", "trace_id": "tr-1a14", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:11:15Z", "service": "checkout-api",  "level": "ERROR", "message": "Connection timeout to payments-db after 5000ms", "trace_id": "tr-1a15", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:11:22Z", "service": "checkout-api",  "level": "ERROR", "message": "Circuit breaker OPEN for payments-db — all requests short-circuited", "trace_id": "tr-1a16", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:11:30Z", "service": "notification-service", "level": "INFO", "message": "Email sent: order confirmation ORD-8849", "trace_id": "tr-1a17", "event_type": "metric"},
-  {"timestamp": "2026-08-18T09:11:45Z", "service": "checkout-api",  "level": "ERROR", "message": "All payment requests failing, circuit breaker open for payments-db", "trace_id": "tr-1a18", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:12:00Z", "service": "checkout-api",  "level": "ERROR", "message": "ALERT TRIGGERED: error_rate_high, current value: 7.4%", "trace_id": "tr-1a19", "event_type": "alert"},
-  {"timestamp": "2026-08-18T09:12:15Z", "service": "web-frontend",  "level": "WARN",  "message": "Checkout page returning 502 errors to users", "trace_id": "tr-1a20", "event_type": "error"},
-  {"timestamp": "2026-08-18T09:12:30Z", "service": "user-service",  "level": "INFO",  "message": "User profile fetched for U-4421 in 23ms", "trace_id": "tr-1a21", "event_type": "metric"},
-  {"timestamp": "2026-08-18T09:13:00Z", "service": "api-gateway",   "level": "WARN",  "message": "Elevated 5xx from downstream checkout-api, 12 errors in last 60s", "trace_id": "tr-1a22", "event_type": "metric"},
-
-  {"_comment": "═══ SCENARIO 2: ALRT-002 — user-service — deploy-induced memory leak ═══"},
-
-  {"timestamp": "2026-08-19T14:25:00Z", "service": "user-service",  "level": "INFO",  "message": "Deployment started: v2.4.1 -> v2.5.0 (commit abc123f, author: dev-jsmith)", "trace_id": "tr-2b01", "event_type": "deploy"},
-  {"timestamp": "2026-08-19T14:25:30Z", "service": "user-service",  "level": "INFO",  "message": "Deployment completed: v2.5.0 running on 3/3 pods", "trace_id": "tr-2b02", "event_type": "deploy"},
-  {"timestamp": "2026-08-19T14:26:00Z", "service": "user-service",  "level": "INFO",  "message": "Health check passed, all endpoints responding", "trace_id": "tr-2b03", "event_type": "health_check"},
-  {"timestamp": "2026-08-19T14:27:15Z", "service": "user-service",  "level": "INFO",  "message": "GET /api/users/profile responded in 45ms", "trace_id": "tr-2b04", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:28:30Z", "service": "checkout-api",  "level": "INFO",  "message": "Processing order ORD-8901, payment flow normal", "trace_id": "tr-2b05", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:29:00Z", "service": "user-service",  "level": "INFO",  "message": "GET /api/users/profile responded in 120ms (degrading)", "trace_id": "tr-2b06", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:30:00Z", "service": "user-service",  "level": "WARN",  "message": "Memory usage at 72% (1.44GB/2GB)", "trace_id": "tr-2b07", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:30:45Z", "service": "user-service",  "level": "INFO",  "message": "GET /api/users/profile responded in 340ms (further degradation)", "trace_id": "tr-2b08", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:31:15Z", "service": "user-db",       "level": "INFO",  "message": "Query executed in 3ms: SELECT * FROM users WHERE id='U-4421'", "trace_id": "tr-2b09", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:31:30Z", "service": "user-service",  "level": "WARN",  "message": "Memory usage at 81% (1.62GB/2GB)", "trace_id": "tr-2b10", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:32:00Z", "service": "user-service",  "level": "WARN",  "message": "GC pause detected: 450ms, heap pressure increasing", "trace_id": "tr-2b11", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:32:30Z", "service": "auth-service",  "level": "INFO",  "message": "Token validated for user U-3301 in 8ms", "trace_id": "tr-2b12", "event_type": "health_check"},
-  {"timestamp": "2026-08-19T14:33:00Z", "service": "user-service",  "level": "WARN",  "message": "Memory usage at 89% (1.78GB/2GB)", "trace_id": "tr-2b13", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:33:15Z", "service": "user-service",  "level": "ERROR", "message": "Response time exceeded SLO: GET /api/users/profile 1200ms (SLO: 500ms)", "trace_id": "tr-2b14", "event_type": "error"},
-  {"timestamp": "2026-08-19T14:33:45Z", "service": "user-service",  "level": "WARN",  "message": "GC pause detected: 890ms, severe heap pressure", "trace_id": "tr-2b15", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:34:00Z", "service": "user-service",  "level": "ERROR", "message": "Memory usage critical at 94% (1.88GB/2GB)", "trace_id": "tr-2b16", "event_type": "error"},
-  {"timestamp": "2026-08-19T14:34:15Z", "service": "user-service",  "level": "ERROR", "message": "OOMKilled: pod user-service-7d8f9 terminated by kernel, restarting", "trace_id": "tr-2b17", "event_type": "error"},
-  {"timestamp": "2026-08-19T14:34:30Z", "service": "user-service",  "level": "INFO",  "message": "Pod restarting (1/3 pods down), health check pending", "trace_id": "tr-2b18", "event_type": "health_check"},
-  {"timestamp": "2026-08-19T14:34:45Z", "service": "api-gateway",   "level": "WARN",  "message": "user-service returning 503, 5 requests failed in last 30s", "trace_id": "tr-2b19", "event_type": "error"},
-  {"timestamp": "2026-08-19T14:35:00Z", "service": "user-service",  "level": "ERROR", "message": "ALERT TRIGGERED: latency_high, p99 latency: 1850ms", "trace_id": "tr-2b20", "event_type": "alert"},
-  {"timestamp": "2026-08-19T14:35:30Z", "service": "user-service",  "level": "WARN",  "message": "Memory usage at 45% after restart — already climbing again", "trace_id": "tr-2b21", "event_type": "metric"},
-  {"timestamp": "2026-08-19T14:36:00Z", "service": "notification-service", "level": "INFO", "message": "Push notification sent to U-3301", "trace_id": "tr-2b22", "event_type": "metric"},
-
-  {"_comment": "═══ SCENARIO 3: ALRT-003 — api-gateway — redis crash → auth cascade ═══"},
-
-  {"timestamp": "2026-08-20T03:14:00Z", "service": "redis-cache",   "level": "INFO",  "message": "Memory usage: 3.8GB/4GB (95%)", "trace_id": "tr-3c01", "event_type": "metric"},
-  {"timestamp": "2026-08-20T03:14:30Z", "service": "redis-cache",   "level": "WARN",  "message": "Memory usage critical: 3.95GB/4GB, approaching maxmemory limit", "trace_id": "tr-3c02", "event_type": "metric"},
-  {"timestamp": "2026-08-20T03:15:00Z", "service": "redis-cache",   "level": "ERROR", "message": "Out of memory: cannot allocate 256KB for new key, all eviction attempts failed", "trace_id": "tr-3c03", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:05Z", "service": "redis-cache",   "level": "FATAL", "message": "Process crashed: OOM killer invoked, Redis server terminated", "trace_id": "tr-3c04", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:10Z", "service": "auth-service",  "level": "ERROR", "message": "Redis connection refused: Connection reset by peer (redis-cache:6379)", "trace_id": "tr-3c05", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:12Z", "service": "auth-service",  "level": "ERROR", "message": "Session cache unavailable, cannot validate user tokens", "trace_id": "tr-3c06", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:15Z", "service": "auth-service",  "level": "ERROR", "message": "Fallback to database auth failed: user-db query timeout after 3000ms under load", "trace_id": "tr-3c07", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:20Z", "service": "user-service",  "level": "ERROR", "message": "Auth validation failed: auth-service returned HTTP 503", "trace_id": "tr-3c08", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:22Z", "service": "checkout-api",  "level": "ERROR", "message": "Auth validation failed: auth-service returned HTTP 503", "trace_id": "tr-3c09", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:25Z", "service": "order-service", "level": "INFO",  "message": "Processing internal order ORD-9012 (no auth required for internal batch)", "trace_id": "tr-3c10", "event_type": "metric"},
-  {"timestamp": "2026-08-20T03:15:30Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway from auth-service for POST /api/login", "trace_id": "tr-3c11", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:35Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway from checkout-api for POST /api/checkout (auth dependency)", "trace_id": "tr-3c12", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:15:40Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway from user-service for GET /api/users/me (auth dependency)", "trace_id": "tr-3c13", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:16:00Z", "service": "auth-service",  "level": "ERROR", "message": "Redis connection refused, retry attempt 1/3", "trace_id": "tr-3c14", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:16:30Z", "service": "auth-service",  "level": "ERROR", "message": "Redis connection refused, retry attempt 2/3", "trace_id": "tr-3c15", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:17:00Z", "service": "auth-service",  "level": "ERROR", "message": "Redis connection refused, retry attempt 3/3 — giving up, all auth requests will fail", "trace_id": "tr-3c16", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:17:15Z", "service": "web-frontend",  "level": "ERROR", "message": "All API calls returning 502, site unusable for end users", "trace_id": "tr-3c17", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:18:00Z", "service": "api-gateway",   "level": "ERROR", "message": "Error rate at 89%, 234 failed requests in last 60s", "trace_id": "tr-3c18", "event_type": "metric"},
-  {"timestamp": "2026-08-20T03:19:00Z", "service": "auth-service",  "level": "ERROR", "message": "Redis still unreachable at redis-cache:6379, all auth requests failing", "trace_id": "tr-3c19", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:20:00Z", "service": "notification-service", "level": "INFO", "message": "Email queue processing normally, 3 emails sent in last 5 min", "trace_id": "tr-3c20", "event_type": "metric"},
-  {"timestamp": "2026-08-20T03:20:30Z", "service": "payments-db",   "level": "INFO",  "message": "Database healthy, connections 4/20, avg query time 8ms", "trace_id": "tr-3c21", "event_type": "health_check"},
-  {"timestamp": "2026-08-20T03:21:00Z", "service": "api-gateway",   "level": "ERROR", "message": "Circuit breaker OPEN for auth-service, rejecting all authenticated requests", "trace_id": "tr-3c22", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:21:30Z", "service": "api-gateway",   "level": "ERROR", "message": "All routes requiring authentication are returning 502", "trace_id": "tr-3c23", "event_type": "error"},
-  {"timestamp": "2026-08-20T03:22:00Z", "service": "api-gateway",   "level": "ERROR", "message": "ALERT TRIGGERED: error_rate_high, current value: 92%", "trace_id": "tr-3c24", "event_type": "alert"},
-
-  {"_comment": "═══ SCENARIO 4: ALRT-004 — order-service — config-induced timeout ═══"},
-
-  {"timestamp": "2026-08-21T11:35:00Z", "service": "order-service",  "level": "INFO",  "message": "Config update applied: payments_db_timeout_ms changed from 5000 to 50", "trace_id": "tr-4d01", "event_type": "config_change"},
-  {"timestamp": "2026-08-21T11:35:10Z", "service": "order-service",  "level": "INFO",  "message": "Config version updated: v3.1.2 -> v3.1.3 (applied by ops-mwilson)", "trace_id": "tr-4d02", "event_type": "config_change"},
-  {"timestamp": "2026-08-21T11:36:00Z", "service": "order-service",  "level": "INFO",  "message": "Order ORD-9101 created successfully (simple query, 12ms)", "trace_id": "tr-4d03", "event_type": "metric"},
-  {"timestamp": "2026-08-21T11:37:00Z", "service": "checkout-api",   "level": "INFO",  "message": "Payment processed for ORD-9101 in 230ms", "trace_id": "tr-4d04", "event_type": "metric"},
-  {"timestamp": "2026-08-21T11:38:00Z", "service": "order-service",  "level": "INFO",  "message": "Order ORD-9102 created successfully (simple query, 18ms)", "trace_id": "tr-4d05", "event_type": "metric"},
-  {"timestamp": "2026-08-21T11:39:00Z", "service": "order-service",  "level": "ERROR", "message": "Query timeout to payments-db after 50ms for order ORD-9103 (complex join query)", "trace_id": "tr-4d06", "event_type": "error"},
-  {"timestamp": "2026-08-21T11:39:05Z", "service": "order-service",  "level": "ERROR", "message": "Failed to verify payment status for ORD-9103: database query timeout", "trace_id": "tr-4d07", "event_type": "error"},
-  {"timestamp": "2026-08-21T11:39:30Z", "service": "payments-db",    "level": "INFO",  "message": "Query executed in 85ms: SELECT status FROM payments WHERE order_id='ORD-9103' (complex join)", "trace_id": "tr-4d08", "event_type": "metric"},
-  {"timestamp": "2026-08-21T11:40:00Z", "service": "order-service",  "level": "ERROR", "message": "Query timeout to payments-db after 50ms for order ORD-9104", "trace_id": "tr-4d09", "event_type": "error"},
-  {"timestamp": "2026-08-21T11:40:15Z", "service": "order-service",  "level": "WARN",  "message": "Payment verification failure rate: 34% in last 5 minutes", "trace_id": "tr-4d10", "event_type": "metric"},
-  {"timestamp": "2026-08-21T11:40:30Z", "service": "payments-db",    "level": "INFO",  "message": "Database healthy: avg query time 65ms, connections 8/20, no errors", "trace_id": "tr-4d11", "event_type": "health_check"},
-  {"timestamp": "2026-08-21T11:41:00Z", "service": "order-service",  "level": "ERROR", "message": "Query timeout to payments-db after 50ms for order ORD-9105", "trace_id": "tr-4d12", "event_type": "error"},
-  {"timestamp": "2026-08-21T11:41:15Z", "service": "notification-service", "level": "INFO", "message": "Order confirmation email queued for ORD-9101", "trace_id": "tr-4d13", "event_type": "metric"},
-  {"timestamp": "2026-08-21T11:41:30Z", "service": "order-service",  "level": "ERROR", "message": "3 consecutive payment verification failures for complex queries", "trace_id": "tr-4d14", "event_type": "error"},
-  {"timestamp": "2026-08-21T11:42:00Z", "service": "order-service",  "level": "WARN",  "message": "Falling back to async payment verification for new orders", "trace_id": "tr-4d15", "event_type": "error"},
-  {"timestamp": "2026-08-21T11:42:30Z", "service": "user-service",   "level": "INFO",  "message": "User profile updated for U-5501 in 28ms", "trace_id": "tr-4d16", "event_type": "metric"},
-  {"timestamp": "2026-08-21T11:43:00Z", "service": "order-service",  "level": "ERROR", "message": "Async verification also timing out at 50ms threshold", "trace_id": "tr-4d17", "event_type": "error"},
-  {"timestamp": "2026-08-21T11:43:30Z", "service": "order-service",  "level": "ERROR", "message": "Error rate at 45%, 23 failed orders in last 5 minutes", "trace_id": "tr-4d18", "event_type": "metric"},
-  {"timestamp": "2026-08-21T11:44:00Z", "service": "auth-service",   "level": "INFO",  "message": "Token refresh successful for session S-8821", "trace_id": "tr-4d19", "event_type": "health_check"},
-  {"timestamp": "2026-08-21T11:44:30Z", "service": "order-service",  "level": "ERROR", "message": "Circuit breaker OPEN for payments-db queries from order-service", "trace_id": "tr-4d20", "event_type": "error"},
-  {"timestamp": "2026-08-21T11:45:00Z", "service": "order-service",  "level": "ERROR", "message": "ALERT TRIGGERED: error_rate_high, current value: 52%", "trace_id": "tr-4d21", "event_type": "alert"},
-  {"timestamp": "2026-08-21T11:45:30Z", "service": "api-gateway",    "level": "WARN",  "message": "order-service returning elevated 5xx, 15 errors in last 60s", "trace_id": "tr-4d22", "event_type": "metric"},
-
-  {"_comment": "═══ SCENARIO 5: ALRT-005 — web-frontend — auth-service TLS cert expired ═══"},
-
-  {"timestamp": "2026-08-22T16:00:00Z", "service": "auth-service",  "level": "WARN",  "message": "TLS certificate expires in 0 days (expiry: 2026-08-22T16:00:00Z, CN=auth-service.internal)", "trace_id": "tr-5e01", "event_type": "metric"},
-  {"timestamp": "2026-08-22T16:00:05Z", "service": "auth-service",  "level": "ERROR", "message": "TLS handshake failed: certificate has expired (NotAfter: 2026-08-22T16:00:00Z)", "trace_id": "tr-5e02", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:00:10Z", "service": "user-service",  "level": "ERROR", "message": "HTTPS request to auth-service failed: SSL certificate has expired", "trace_id": "tr-5e03", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:00:12Z", "service": "checkout-api",  "level": "ERROR", "message": "HTTPS request to auth-service failed: SSL certificate has expired", "trace_id": "tr-5e04", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:00:15Z", "service": "order-service", "level": "INFO",  "message": "Internal batch processing continues normally (no auth dependency for internal jobs)", "trace_id": "tr-5e05", "event_type": "metric"},
-  {"timestamp": "2026-08-22T16:00:20Z", "service": "api-gateway",   "level": "ERROR", "message": "auth-service health check failed: TLS handshake error", "trace_id": "tr-5e06", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:00:30Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway for POST /api/login: auth-service unreachable (TLS)", "trace_id": "tr-5e07", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:00:45Z", "service": "api-gateway",   "level": "ERROR", "message": "502 Bad Gateway for GET /api/users/me: upstream auth dependency failed", "trace_id": "tr-5e08", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:01:00Z", "service": "user-service",  "level": "ERROR", "message": "Cannot authenticate requests: auth-service TLS certificate expired", "trace_id": "tr-5e09", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:01:15Z", "service": "checkout-api",  "level": "ERROR", "message": "Payment flow blocked: cannot reach auth-service for token validation", "trace_id": "tr-5e10", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:01:30Z", "service": "web-frontend",  "level": "ERROR", "message": "All authenticated pages returning 502 to users", "trace_id": "tr-5e11", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:02:00Z", "service": "web-frontend",  "level": "ERROR", "message": "Login page returning connection refused errors", "trace_id": "tr-5e12", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:02:30Z", "service": "api-gateway",   "level": "ERROR", "message": "Error rate 95%, all auth-dependent routes failing", "trace_id": "tr-5e13", "event_type": "metric"},
-  {"timestamp": "2026-08-22T16:03:00Z", "service": "redis-cache",   "level": "INFO",  "message": "Cache hit rate dropped to 0% — no new sessions being created", "trace_id": "tr-5e14", "event_type": "metric"},
-  {"timestamp": "2026-08-22T16:03:30Z", "service": "notification-service", "level": "INFO", "message": "Email delivery operating normally, 5 emails processed", "trace_id": "tr-5e15", "event_type": "metric"},
-  {"timestamp": "2026-08-22T16:04:00Z", "service": "payments-db",   "level": "INFO",  "message": "Database idle, connections 2/20, no active queries", "trace_id": "tr-5e16", "event_type": "health_check"},
-  {"timestamp": "2026-08-22T16:04:30Z", "service": "user-db",       "level": "INFO",  "message": "Database healthy, connections 3/20, avg query time 5ms", "trace_id": "tr-5e17", "event_type": "health_check"},
-  {"timestamp": "2026-08-22T16:05:00Z", "service": "web-frontend",  "level": "ERROR", "message": "Site completely unavailable for all authenticated users", "trace_id": "tr-5e18", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:05:30Z", "service": "auth-service",  "level": "ERROR", "message": "TLS certificate expired at 16:00:00Z, all inbound HTTPS connections rejected", "trace_id": "tr-5e19", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:06:00Z", "service": "api-gateway",   "level": "ERROR", "message": "Circuit breaker OPEN for auth-service (TLS failure)", "trace_id": "tr-5e20", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:06:30Z", "service": "user-service",  "level": "ERROR", "message": "Retry attempt 5/5 to auth-service failed: SSL certificate has expired", "trace_id": "tr-5e21", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:07:00Z", "service": "checkout-api",  "level": "ERROR", "message": "All checkout attempts failing, no auth validation available", "trace_id": "tr-5e22", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:07:30Z", "service": "web-frontend",  "level": "ERROR", "message": "0 successful requests in last 7 minutes, complete outage", "trace_id": "tr-5e23", "event_type": "error"},
-  {"timestamp": "2026-08-22T16:08:00Z", "service": "web-frontend",  "level": "ERROR", "message": "ALERT TRIGGERED: service_unavailable, success rate: 0%", "trace_id": "tr-5e24", "event_type": "alert"},
-
-  {"_comment": "═══ BACKGROUND NOISE — normal operations across all days ═══"},
-
-  {"timestamp": "2026-08-18T06:00:00Z", "service": "api-gateway",   "level": "INFO",  "message": "Daily health check: all upstream services responding normally", "trace_id": "tr-bg01", "event_type": "health_check"},
-  {"timestamp": "2026-08-18T06:01:00Z", "service": "payments-db",   "level": "INFO",  "message": "Automated backup completed successfully (size: 2.3GB)", "trace_id": "tr-bg02", "event_type": "metric"},
-  {"timestamp": "2026-08-19T06:00:00Z", "service": "redis-cache",   "level": "INFO",  "message": "Memory usage: 2.1GB/4GB (52%), eviction rate: 0/s", "trace_id": "tr-bg03", "event_type": "health_check"},
-  {"timestamp": "2026-08-19T06:01:00Z", "service": "user-db",       "level": "INFO",  "message": "Automated backup completed successfully (size: 1.8GB)", "trace_id": "tr-bg04", "event_type": "metric"},
-  {"timestamp": "2026-08-20T06:00:00Z", "service": "notification-service", "level": "INFO", "message": "Daily digest: 1,247 notifications sent in last 24h, 0 failures", "trace_id": "tr-bg05", "event_type": "metric"},
-  {"timestamp": "2026-08-20T12:00:00Z", "service": "api-gateway",   "level": "INFO",  "message": "Traffic report: 45,231 requests in last hour, avg latency 89ms", "trace_id": "tr-bg06", "event_type": "metric"},
-  {"timestamp": "2026-08-21T06:00:00Z", "service": "checkout-api",  "level": "INFO",  "message": "Daily health check: payments-db connection pool 5/20 active", "trace_id": "tr-bg07", "event_type": "health_check"},
-  {"timestamp": "2026-08-21T06:01:00Z", "service": "auth-service",  "level": "INFO",  "message": "TLS certificate valid, expires in 1 day (2026-08-22T16:00:00Z)", "trace_id": "tr-bg08", "event_type": "health_check"},
-  {"timestamp": "2026-08-22T06:00:00Z", "service": "auth-service",  "level": "WARN",  "message": "TLS certificate expiring today at 16:00:00Z — renewal required", "trace_id": "tr-bg09", "event_type": "metric"},
-  {"timestamp": "2026-08-22T12:00:00Z", "service": "order-service", "level": "INFO",  "message": "Daily summary: 892 orders processed, 2 refunds issued", "trace_id": "tr-bg10", "event_type": "metric"}
+  {
+    "_comment": "═══ SCENARIO 1: ALRT-001 — checkout-api — payments-db pool exhaustion ═══"
+  },
+  {
+    "timestamp": "2026-08-18T09:05:12Z",
+    "service": "checkout-api",
+    "level": "INFO",
+    "message": "Processing order ORD-8847, payment validation started",
+    "trace_id": "tr-1a01",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-18T09:05:45Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Query executed in 12ms: SELECT balance FROM accounts WHERE user_id='U-4410'",
+    "trace_id": "tr-1a02",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-18T09:07:22Z",
+    "service": "payments-db",
+    "level": "WARN",
+    "message": "Connection pool usage at 85% (17/20 active connections)",
+    "trace_id": "tr-1a03",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-18T09:08:01Z",
+    "service": "checkout-api",
+    "level": "INFO",
+    "message": "Payment validation started for ORD-8851",
+    "trace_id": "tr-1a04",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-18T09:08:33Z",
+    "service": "payments-db",
+    "level": "WARN",
+    "message": "Connection pool usage at 95% (19/20 active connections)",
+    "trace_id": "tr-1a05",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-18T09:09:15Z",
+    "service": "payments-db",
+    "level": "ERROR",
+    "message": "Max connections reached (20/20), rejecting new connection requests",
+    "trace_id": "tr-1a06",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:09:18Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Connection timeout to payments-db after 5000ms",
+    "trace_id": "tr-1a07",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:09:22Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Failed to process payment for ORD-8852: database connection unavailable",
+    "trace_id": "tr-1a08",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:09:45Z",
+    "service": "payments-db",
+    "level": "ERROR",
+    "message": "Connection pool exhausted, 12 requests queued and waiting",
+    "trace_id": "tr-1a09",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:10:01Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Connection timeout to payments-db after 5000ms",
+    "trace_id": "tr-1a10",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:10:05Z",
+    "service": "order-service",
+    "level": "WARN",
+    "message": "Checkout callback delayed for ORD-8852, retrying in 2s",
+    "trace_id": "tr-1a11",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:10:32Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "5xx error rate at 7.4% (threshold: 5%)",
+    "trace_id": "tr-1a12",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-18T09:10:45Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "Token validation successful for user U-4421",
+    "trace_id": "tr-1a13",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-18T09:11:00Z",
+    "service": "payments-db",
+    "level": "ERROR",
+    "message": "Max connections reached (20/20), 23 requests queued",
+    "trace_id": "tr-1a14",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:11:15Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Connection timeout to payments-db after 5000ms",
+    "trace_id": "tr-1a15",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:11:22Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Circuit breaker OPEN for payments-db — all requests short-circuited",
+    "trace_id": "tr-1a16",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:11:30Z",
+    "service": "notification-service",
+    "level": "INFO",
+    "message": "Email sent: order confirmation ORD-8849",
+    "trace_id": "tr-1a17",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-18T09:11:45Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "All payment requests failing, circuit breaker open for payments-db",
+    "trace_id": "tr-1a18",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:12:00Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: error_rate_high, current value: 7.4%",
+    "trace_id": "tr-1a19",
+    "event_type": "alert"
+  },
+  {
+    "timestamp": "2026-08-18T09:12:15Z",
+    "service": "web-frontend",
+    "level": "WARN",
+    "message": "Checkout page returning 502 errors to users",
+    "trace_id": "tr-1a20",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-18T09:12:30Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "User profile fetched for U-4421 in 23ms",
+    "trace_id": "tr-1a21",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-18T09:13:00Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "Elevated 5xx from downstream checkout-api, 12 errors in last 60s",
+    "trace_id": "tr-1a22",
+    "event_type": "metric"
+  },
+  {
+    "_comment": "═══ SCENARIO 2: ALRT-002 — user-service — deploy-induced memory leak ═══"
+  },
+  {
+    "timestamp": "2026-08-19T14:25:00Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "Deployment started: v2.4.1 -> v2.5.0 (commit abc123f, author: dev-jsmith)",
+    "trace_id": "tr-2b01",
+    "event_type": "deploy"
+  },
+  {
+    "timestamp": "2026-08-19T14:25:30Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "Deployment completed: v2.5.0 running on 3/3 pods",
+    "trace_id": "tr-2b02",
+    "event_type": "deploy"
+  },
+  {
+    "timestamp": "2026-08-19T14:26:00Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "Health check passed, all endpoints responding",
+    "trace_id": "tr-2b03",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-19T14:27:15Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "GET /api/users/profile responded in 45ms",
+    "trace_id": "tr-2b04",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:28:30Z",
+    "service": "checkout-api",
+    "level": "INFO",
+    "message": "Processing order ORD-8901, payment flow normal",
+    "trace_id": "tr-2b05",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:29:00Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "GET /api/users/profile responded in 120ms (degrading)",
+    "trace_id": "tr-2b06",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:30:00Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "Memory usage at 72% (1.44GB/2GB)",
+    "trace_id": "tr-2b07",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:30:45Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "GET /api/users/profile responded in 340ms (further degradation)",
+    "trace_id": "tr-2b08",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:31:15Z",
+    "service": "user-db",
+    "level": "INFO",
+    "message": "Query executed in 3ms: SELECT * FROM users WHERE id='U-4421'",
+    "trace_id": "tr-2b09",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:31:30Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "Memory usage at 81% (1.62GB/2GB)",
+    "trace_id": "tr-2b10",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:32:00Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "GC pause detected: 450ms, heap pressure increasing",
+    "trace_id": "tr-2b11",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:32:30Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "Token validated for user U-3301 in 8ms",
+    "trace_id": "tr-2b12",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-19T14:33:00Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "Memory usage at 89% (1.78GB/2GB)",
+    "trace_id": "tr-2b13",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:33:15Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Response time exceeded SLO: GET /api/users/profile 1200ms (SLO: 500ms)",
+    "trace_id": "tr-2b14",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-19T14:33:45Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "GC pause detected: 890ms, severe heap pressure",
+    "trace_id": "tr-2b15",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:34:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Memory usage critical at 94% (1.88GB/2GB)",
+    "trace_id": "tr-2b16",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-19T14:34:15Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "OOMKilled: pod user-service-7d8f9 terminated by kernel, restarting",
+    "trace_id": "tr-2b17",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-19T14:34:30Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "Pod restarting (1/3 pods down), health check pending",
+    "trace_id": "tr-2b18",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-19T14:34:45Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "user-service returning 503, 5 requests failed in last 30s",
+    "trace_id": "tr-2b19",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-19T14:35:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: latency_high, p99 latency: 1850ms",
+    "trace_id": "tr-2b20",
+    "event_type": "alert"
+  },
+  {
+    "timestamp": "2026-08-19T14:35:30Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "Memory usage at 45% after restart — already climbing again",
+    "trace_id": "tr-2b21",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T14:36:00Z",
+    "service": "notification-service",
+    "level": "INFO",
+    "message": "Push notification sent to U-3301",
+    "trace_id": "tr-2b22",
+    "event_type": "metric"
+  },
+  {
+    "_comment": "═══ SCENARIO 3: ALRT-003 — api-gateway — redis crash → auth cascade ═══"
+  },
+  {
+    "timestamp": "2026-08-20T03:14:00Z",
+    "service": "redis-cache",
+    "level": "INFO",
+    "message": "Memory usage: 3.8GB/4GB (95%)",
+    "trace_id": "tr-3c01",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-20T03:14:30Z",
+    "service": "redis-cache",
+    "level": "WARN",
+    "message": "Memory usage critical: 3.95GB/4GB, approaching maxmemory limit",
+    "trace_id": "tr-3c02",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:00Z",
+    "service": "redis-cache",
+    "level": "ERROR",
+    "message": "Out of memory: cannot allocate 256KB for new key, all eviction attempts failed",
+    "trace_id": "tr-3c03",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:05Z",
+    "service": "redis-cache",
+    "level": "FATAL",
+    "message": "Process crashed: OOM killer invoked, Redis server terminated",
+    "trace_id": "tr-3c04",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:10Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "Redis connection refused: Connection reset by peer (redis-cache:6379)",
+    "trace_id": "tr-3c05",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:12Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "Session cache unavailable, cannot validate user tokens",
+    "trace_id": "tr-3c06",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:15Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "Fallback to database auth failed: user-db query timeout after 3000ms under load",
+    "trace_id": "tr-3c07",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:20Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Auth validation failed: auth-service returned HTTP 503",
+    "trace_id": "tr-3c08",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:22Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Auth validation failed: auth-service returned HTTP 503",
+    "trace_id": "tr-3c09",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:25Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "Processing internal order ORD-9012 (no auth required for internal batch)",
+    "trace_id": "tr-3c10",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:30Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "502 Bad Gateway from auth-service for POST /api/login",
+    "trace_id": "tr-3c11",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:35Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "502 Bad Gateway from checkout-api for POST /api/checkout (auth dependency)",
+    "trace_id": "tr-3c12",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:15:40Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "502 Bad Gateway from user-service for GET /api/users/me (auth dependency)",
+    "trace_id": "tr-3c13",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:16:00Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "Redis connection refused, retry attempt 1/3",
+    "trace_id": "tr-3c14",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:16:30Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "Redis connection refused, retry attempt 2/3",
+    "trace_id": "tr-3c15",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:17:00Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "Redis connection refused, retry attempt 3/3 — giving up, all auth requests will fail",
+    "trace_id": "tr-3c16",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:17:15Z",
+    "service": "web-frontend",
+    "level": "ERROR",
+    "message": "All API calls returning 502, site unusable for end users",
+    "trace_id": "tr-3c17",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:18:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "Error rate at 89%, 234 failed requests in last 60s",
+    "trace_id": "tr-3c18",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-20T03:19:00Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "Redis still unreachable at redis-cache:6379, all auth requests failing",
+    "trace_id": "tr-3c19",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:20:00Z",
+    "service": "notification-service",
+    "level": "INFO",
+    "message": "Email queue processing normally, 3 emails sent in last 5 min",
+    "trace_id": "tr-3c20",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-20T03:20:30Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Database healthy, connections 4/20, avg query time 8ms",
+    "trace_id": "tr-3c21",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-20T03:21:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "Circuit breaker OPEN for auth-service, rejecting all authenticated requests",
+    "trace_id": "tr-3c22",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:21:30Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "All routes requiring authentication are returning 502",
+    "trace_id": "tr-3c23",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-20T03:22:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: error_rate_high, current value: 92%",
+    "trace_id": "tr-3c24",
+    "event_type": "alert"
+  },
+  {
+    "_comment": "═══ SCENARIO 4: ALRT-004 — order-service — config-induced timeout ═══"
+  },
+  {
+    "timestamp": "2026-08-21T11:35:00Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "Config update applied: payments_db_timeout_ms changed from 5000 to 50",
+    "trace_id": "tr-4d01",
+    "event_type": "config_change"
+  },
+  {
+    "timestamp": "2026-08-21T11:35:10Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "Config version updated: v3.1.2 -> v3.1.3 (applied by ops-mwilson)",
+    "trace_id": "tr-4d02",
+    "event_type": "config_change"
+  },
+  {
+    "timestamp": "2026-08-21T11:36:00Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "Order ORD-9101 created successfully (simple query, 12ms)",
+    "trace_id": "tr-4d03",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T11:37:00Z",
+    "service": "checkout-api",
+    "level": "INFO",
+    "message": "Payment processed for ORD-9101 in 230ms",
+    "trace_id": "tr-4d04",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T11:38:00Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "Order ORD-9102 created successfully (simple query, 18ms)",
+    "trace_id": "tr-4d05",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T11:39:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Query timeout to payments-db after 50ms for order ORD-9103 (complex join query)",
+    "trace_id": "tr-4d06",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-21T11:39:05Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Failed to verify payment status for ORD-9103: database query timeout",
+    "trace_id": "tr-4d07",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-21T11:39:30Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Query executed in 85ms: SELECT status FROM payments WHERE order_id='ORD-9103' (complex join)",
+    "trace_id": "tr-4d08",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T11:40:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Query timeout to payments-db after 50ms for order ORD-9104",
+    "trace_id": "tr-4d09",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-21T11:40:15Z",
+    "service": "order-service",
+    "level": "WARN",
+    "message": "Payment verification failure rate: 34% in last 5 minutes",
+    "trace_id": "tr-4d10",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T11:40:30Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Database healthy: avg query time 65ms, connections 8/20, no errors",
+    "trace_id": "tr-4d11",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-21T11:41:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Query timeout to payments-db after 50ms for order ORD-9105",
+    "trace_id": "tr-4d12",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-21T11:41:15Z",
+    "service": "notification-service",
+    "level": "INFO",
+    "message": "Order confirmation email queued for ORD-9101",
+    "trace_id": "tr-4d13",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T11:41:30Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "3 consecutive payment verification failures for complex queries",
+    "trace_id": "tr-4d14",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-21T11:42:00Z",
+    "service": "order-service",
+    "level": "WARN",
+    "message": "Falling back to async payment verification for new orders",
+    "trace_id": "tr-4d15",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-21T11:42:30Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "User profile updated for U-5501 in 28ms",
+    "trace_id": "tr-4d16",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T11:43:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Async verification also timing out at 50ms threshold",
+    "trace_id": "tr-4d17",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-21T11:43:30Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Error rate at 45%, 23 failed orders in last 5 minutes",
+    "trace_id": "tr-4d18",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T11:44:00Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "Token refresh successful for session S-8821",
+    "trace_id": "tr-4d19",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-21T11:44:30Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Circuit breaker OPEN for payments-db queries from order-service",
+    "trace_id": "tr-4d20",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-21T11:45:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: error_rate_high, current value: 52%",
+    "trace_id": "tr-4d21",
+    "event_type": "alert"
+  },
+  {
+    "timestamp": "2026-08-21T11:45:30Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "order-service returning elevated 5xx, 15 errors in last 60s",
+    "trace_id": "tr-4d22",
+    "event_type": "metric"
+  },
+  {
+    "_comment": "═══ SCENARIO 5: ALRT-005 — web-frontend — auth-service TLS cert expired ═══"
+  },
+  {
+    "timestamp": "2026-08-22T16:00:00Z",
+    "service": "auth-service",
+    "level": "WARN",
+    "message": "TLS certificate expires in 0 days (expiry: 2026-08-22T16:00:00Z, CN=auth-service.internal)",
+    "trace_id": "tr-5e01",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-22T16:00:05Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "TLS handshake failed: certificate has expired (NotAfter: 2026-08-22T16:00:00Z)",
+    "trace_id": "tr-5e02",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:00:10Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "HTTPS request to auth-service failed: SSL certificate has expired",
+    "trace_id": "tr-5e03",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:00:12Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "HTTPS request to auth-service failed: SSL certificate has expired",
+    "trace_id": "tr-5e04",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:00:15Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "Internal batch processing continues normally (no auth dependency for internal jobs)",
+    "trace_id": "tr-5e05",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-22T16:00:20Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "auth-service health check failed: TLS handshake error",
+    "trace_id": "tr-5e06",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:00:30Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "502 Bad Gateway for POST /api/login: auth-service unreachable (TLS)",
+    "trace_id": "tr-5e07",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:00:45Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "502 Bad Gateway for GET /api/users/me: upstream auth dependency failed",
+    "trace_id": "tr-5e08",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:01:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Cannot authenticate requests: auth-service TLS certificate expired",
+    "trace_id": "tr-5e09",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:01:15Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Payment flow blocked: cannot reach auth-service for token validation",
+    "trace_id": "tr-5e10",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:01:30Z",
+    "service": "web-frontend",
+    "level": "ERROR",
+    "message": "All authenticated pages returning 502 to users",
+    "trace_id": "tr-5e11",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:02:00Z",
+    "service": "web-frontend",
+    "level": "ERROR",
+    "message": "Login page returning connection refused errors",
+    "trace_id": "tr-5e12",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:02:30Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "Error rate 95%, all auth-dependent routes failing",
+    "trace_id": "tr-5e13",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-22T16:03:00Z",
+    "service": "redis-cache",
+    "level": "INFO",
+    "message": "Cache hit rate dropped to 0% — no new sessions being created",
+    "trace_id": "tr-5e14",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-22T16:03:30Z",
+    "service": "notification-service",
+    "level": "INFO",
+    "message": "Email delivery operating normally, 5 emails processed",
+    "trace_id": "tr-5e15",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-22T16:04:00Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Database idle, connections 2/20, no active queries",
+    "trace_id": "tr-5e16",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-22T16:04:30Z",
+    "service": "user-db",
+    "level": "INFO",
+    "message": "Database healthy, connections 3/20, avg query time 5ms",
+    "trace_id": "tr-5e17",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-22T16:05:00Z",
+    "service": "web-frontend",
+    "level": "ERROR",
+    "message": "Site completely unavailable for all authenticated users",
+    "trace_id": "tr-5e18",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:05:30Z",
+    "service": "auth-service",
+    "level": "ERROR",
+    "message": "TLS certificate expired at 16:00:00Z, all inbound HTTPS connections rejected",
+    "trace_id": "tr-5e19",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:06:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "Circuit breaker OPEN for auth-service (TLS failure)",
+    "trace_id": "tr-5e20",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:06:30Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Retry attempt 5/5 to auth-service failed: SSL certificate has expired",
+    "trace_id": "tr-5e21",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:07:00Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "All checkout attempts failing, no auth validation available",
+    "trace_id": "tr-5e22",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:07:30Z",
+    "service": "web-frontend",
+    "level": "ERROR",
+    "message": "0 successful requests in last 7 minutes, complete outage",
+    "trace_id": "tr-5e23",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-22T16:08:00Z",
+    "service": "web-frontend",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: service_unavailable, success rate: 0%",
+    "trace_id": "tr-5e24",
+    "event_type": "alert"
+  },
+  {
+    "_comment": "═══ BACKGROUND NOISE — normal operations across all days ═══"
+  },
+  {
+    "timestamp": "2026-08-18T06:00:00Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "Daily health check: all upstream services responding normally",
+    "trace_id": "tr-bg01",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-18T06:01:00Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Automated backup completed successfully (size: 2.3GB)",
+    "trace_id": "tr-bg02",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-19T06:00:00Z",
+    "service": "redis-cache",
+    "level": "INFO",
+    "message": "Memory usage: 2.1GB/4GB (52%), eviction rate: 0/s",
+    "trace_id": "tr-bg03",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-19T06:01:00Z",
+    "service": "user-db",
+    "level": "INFO",
+    "message": "Automated backup completed successfully (size: 1.8GB)",
+    "trace_id": "tr-bg04",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-20T06:00:00Z",
+    "service": "notification-service",
+    "level": "INFO",
+    "message": "Daily digest: 1,247 notifications sent in last 24h, 0 failures",
+    "trace_id": "tr-bg05",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-20T12:00:00Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "Traffic report: 45,231 requests in last hour, avg latency 89ms",
+    "trace_id": "tr-bg06",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-21T06:00:00Z",
+    "service": "checkout-api",
+    "level": "INFO",
+    "message": "Daily health check: payments-db connection pool 5/20 active",
+    "trace_id": "tr-bg07",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-21T06:01:00Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "TLS certificate valid, expires in 1 day (2026-08-22T16:00:00Z)",
+    "trace_id": "tr-bg08",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-22T06:00:00Z",
+    "service": "auth-service",
+    "level": "WARN",
+    "message": "TLS certificate expiring today at 16:00:00Z — renewal required",
+    "trace_id": "tr-bg09",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-22T12:00:00Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "Daily summary: 892 orders processed, 2 refunds issued",
+    "trace_id": "tr-bg10",
+    "event_type": "metric"
+  },
+  {
+    "_comment": "═══ SCENARIO 6: ALRT-006 — order-service — payments-db batch job contention ═══"
+  },
+  {
+    "timestamp": "2026-08-31T22:45:00Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Monthly reconciliation batch job started (job_id=BATCH-2026-08), acquiring dedicated connections",
+    "trace_id": "tr-6f01",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T22:50:00Z",
+    "service": "payments-db",
+    "level": "WARN",
+    "message": "Connection pool usage at 75% (15/20 active), 15 held by batch job BATCH-2026-08",
+    "trace_id": "tr-6f02",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T22:55:00Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "Order ORD-9301 created successfully (18ms)",
+    "trace_id": "tr-6f03",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T23:00:00Z",
+    "service": "order-service",
+    "level": "WARN",
+    "message": "Payment verification query queued, payments-db pool usage high",
+    "trace_id": "tr-6f04",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T23:02:00Z",
+    "service": "payments-db",
+    "level": "WARN",
+    "message": "Connection pool usage at 90% (18/20 active), batch job still running",
+    "trace_id": "tr-6f05",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T23:05:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Query timeout to payments-db after 5000ms for order ORD-9305, connection pool saturated",
+    "trace_id": "tr-6f06",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-31T23:06:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Payment verification failed for ORD-9306: no available connection to payments-db",
+    "trace_id": "tr-6f07",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-31T23:07:00Z",
+    "service": "payments-db",
+    "level": "ERROR",
+    "message": "Connection pool exhausted: 18/20 held by batch job BATCH-2026-08, 6 real-time requests queued",
+    "trace_id": "tr-6f08",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-31T23:08:00Z",
+    "service": "checkout-api",
+    "level": "WARN",
+    "message": "Payment confirmation delayed for ORD-9305, retrying",
+    "trace_id": "tr-6f09",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-31T23:09:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "Query timeout to payments-db after 5000ms for order ORD-9308",
+    "trace_id": "tr-6f10",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-31T23:10:00Z",
+    "service": "notification-service",
+    "level": "INFO",
+    "message": "Order confirmation queued for ORD-9301",
+    "trace_id": "tr-6f11",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T23:11:00Z",
+    "service": "order-service",
+    "level": "WARN",
+    "message": "Payment verification failure rate: 28% in last 5 minutes",
+    "trace_id": "tr-6f12",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T23:12:00Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Batch job BATCH-2026-08 still running: 82% complete, holding 17/20 connections",
+    "trace_id": "tr-6f13",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T23:13:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "3 consecutive payment verification failures, real-time orders backing up",
+    "trace_id": "tr-6f14",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-31T23:14:00Z",
+    "service": "order-service",
+    "level": "WARN",
+    "message": "Falling back to async payment verification",
+    "trace_id": "tr-6f15",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-31T23:14:30Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "order-service returning elevated 5xx, 9 errors in last 60s",
+    "trace_id": "tr-6f16",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-31T23:15:00Z",
+    "service": "order-service",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: resource_exhaustion, current value: 85%",
+    "trace_id": "tr-6f17",
+    "event_type": "alert"
+  },
+  {
+    "_comment": "═══ SCENARIO 7: ALRT-007 — user-service — unindexed query CPU exhaustion after deploy ═══"
+  },
+  {
+    "timestamp": "2026-08-25T09:40:00Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "Deployment started: v2.5.0 -> v2.6.0 (commit d4e5f6a, author: dev-agarcia)",
+    "trace_id": "tr-7g01",
+    "event_type": "deploy"
+  },
+  {
+    "timestamp": "2026-08-25T09:40:30Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "Deployment completed: v2.6.0 running on 3/3 pods",
+    "trace_id": "tr-7g02",
+    "event_type": "deploy"
+  },
+  {
+    "timestamp": "2026-08-25T09:41:00Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "Health check passed, all endpoints responding",
+    "trace_id": "tr-7g03",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-25T09:42:00Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "GET /api/users/search responded in 60ms",
+    "trace_id": "tr-7g04",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-25T09:45:00Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "GET /api/users/search responded in 850ms (degrading)",
+    "trace_id": "tr-7g05",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-25T09:47:00Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "CPU usage at 78%",
+    "trace_id": "tr-7g06",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-25T09:49:00Z",
+    "service": "user-db",
+    "level": "INFO",
+    "message": "Query executed in 4ms: SELECT * FROM users WHERE id='U-6601'",
+    "trace_id": "tr-7g07",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-25T09:50:00Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "GET /api/users/search responded in 1400ms, full table scan detected on new search endpoint",
+    "trace_id": "tr-7g08",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-25T09:52:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "CPU usage critical at 95%",
+    "trace_id": "tr-7g09",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-25T09:53:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Response time exceeded SLO: GET /api/users/search 2100ms (SLO: 500ms)",
+    "trace_id": "tr-7g10",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-25T09:55:00Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "Token validated for user U-6601 in 6ms",
+    "trace_id": "tr-7g11",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-25T09:56:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Thread pool exhausted: all worker threads blocked on /api/users/search queries",
+    "trace_id": "tr-7g12",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-25T09:57:00Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "user-service returning elevated latency, p99 2400ms",
+    "trace_id": "tr-7g13",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-25T09:58:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "CPU usage at 96%, request queue depth 45",
+    "trace_id": "tr-7g14",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-25T09:59:00Z",
+    "service": "user-service",
+    "level": "WARN",
+    "message": "3 pods showing sustained CPU >90% since deploy of v2.6.0",
+    "trace_id": "tr-7g15",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-25T10:00:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: resource_exhaustion, current value: 95%",
+    "trace_id": "tr-7g16",
+    "event_type": "alert"
+  },
+  {
+    "_comment": "═══ SCENARIO 8: ALRT-008 — api-gateway — CDN third-party degradation ═══"
+  },
+  {
+    "timestamp": "2026-08-26T13:40:00Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "Health check passed: all upstream services responding normally",
+    "trace_id": "tr-8h01",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-26T13:45:00Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "Static asset requests via CDN edge showing elevated latency (avg 1800ms)",
+    "trace_id": "tr-8h02",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-26T13:48:00Z",
+    "service": "cdn-provider",
+    "level": "WARN",
+    "message": "Edge node eu-west-2 reporting elevated origin fetch latency",
+    "trace_id": "tr-8h03",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-26T13:50:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "504 Gateway Timeout for GET /static/checkout-bundle.js (CDN origin fetch)",
+    "trace_id": "tr-8h04",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-26T13:52:00Z",
+    "service": "cdn-provider",
+    "level": "ERROR",
+    "message": "Routing anomaly detected in EU-West region, 40% of requests affected",
+    "trace_id": "tr-8h05",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-26T13:53:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "504 Gateway Timeout for GET /static/main.css (CDN origin fetch)",
+    "trace_id": "tr-8h06",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-26T13:55:00Z",
+    "service": "web-frontend",
+    "level": "WARN",
+    "message": "Page load degraded, static assets timing out intermittently",
+    "trace_id": "tr-8h07",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-26T13:57:00Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "checkout-api API responses normal (89ms avg), only static asset routes affected",
+    "trace_id": "tr-8h08",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-26T13:58:00Z",
+    "service": "checkout-api",
+    "level": "INFO",
+    "message": "Payment processed for ORD-9401 in 210ms",
+    "trace_id": "tr-8h09",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-26T14:00:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "p95 latency at 2100ms, intermittent 504s on static asset routes",
+    "trace_id": "tr-8h10",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-26T14:01:00Z",
+    "service": "cdn-provider",
+    "level": "ERROR",
+    "message": "Routing anomaly persists, EU-West origin fetch failures continuing",
+    "trace_id": "tr-8h11",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-26T14:02:00Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "Health check still passing (/health does not exercise CDN-dependent paths)",
+    "trace_id": "tr-8h12",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-26T14:03:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: latency_high, p95 latency: 2100ms",
+    "trace_id": "tr-8h13",
+    "event_type": "alert"
+  },
+  {
+    "_comment": "═══ SCENARIO 9: ALRT-009 — web-frontend — payments-db maintenance failover (3-hop chain) ═══"
+  },
+  {
+    "timestamp": "2026-08-27T01:55:00Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Scheduled maintenance window starting: primary node failover for patching",
+    "trace_id": "tr-9i01",
+    "event_type": "config_change"
+  },
+  {
+    "timestamp": "2026-08-27T01:55:30Z",
+    "service": "payments-db",
+    "level": "WARN",
+    "message": "Failover to replica initiated",
+    "trace_id": "tr-9i02",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-27T01:56:00Z",
+    "service": "payments-db",
+    "level": "WARN",
+    "message": "Replication lag detected: 4200ms, above 100ms threshold — failover delayed",
+    "trace_id": "tr-9i03",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-27T01:57:00Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Write query to payments-db failed: no primary available during failover",
+    "trace_id": "tr-9i04",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-27T01:57:30Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "Payment write failed for ORD-9501: payments-db unavailable (failover in progress)",
+    "trace_id": "tr-9i05",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-27T01:58:00Z",
+    "service": "payments-db",
+    "level": "WARN",
+    "message": "Replication lag still high: 3100ms, failover still in progress",
+    "trace_id": "tr-9i06",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-27T01:59:00Z",
+    "service": "checkout-api",
+    "level": "ERROR",
+    "message": "5xx error rate rising on payment confirmation step",
+    "trace_id": "tr-9i07",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-27T02:00:00Z",
+    "service": "api-gateway",
+    "level": "ERROR",
+    "message": "502 Bad Gateway from checkout-api for POST /api/checkout (payments-db dependency)",
+    "trace_id": "tr-9i08",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-27T02:00:30Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "checkout-api returning elevated 5xx, 18 errors in last 60s",
+    "trace_id": "tr-9i09",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-27T02:01:00Z",
+    "service": "web-frontend",
+    "level": "ERROR",
+    "message": "Checkout page failing for users, 502 from api-gateway",
+    "trace_id": "tr-9i10",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-27T02:01:30Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Failover completed: replica promoted to primary after 12 minutes (expected: 30s)",
+    "trace_id": "tr-9i11",
+    "event_type": "config_change"
+  },
+  {
+    "timestamp": "2026-08-27T02:02:00Z",
+    "service": "checkout-api",
+    "level": "INFO",
+    "message": "Payment writes resuming, payments-db reachable",
+    "trace_id": "tr-9i12",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-27T02:02:30Z",
+    "service": "web-frontend",
+    "level": "WARN",
+    "message": "Checkout completion rate recovering",
+    "trace_id": "tr-9i13",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-27T02:03:00Z",
+    "service": "order-service",
+    "level": "INFO",
+    "message": "No impact observed, order writes unaffected during the window",
+    "trace_id": "tr-9i14",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-27T02:03:30Z",
+    "service": "web-frontend",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: error_rate_high, current value: 15%",
+    "trace_id": "tr-9i15",
+    "event_type": "alert"
+  },
+  {
+    "_comment": "═══ SCENARIO 10: ALRT-010 — user-service — auth-service IAM/OAuth scope misconfiguration ═══"
+  },
+  {
+    "timestamp": "2026-08-28T08:50:00Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "IAM policy update applied: enforcing least-privilege OAuth scopes (policy v4.2)",
+    "trace_id": "tr-10j01",
+    "event_type": "config_change"
+  },
+  {
+    "timestamp": "2026-08-28T08:50:15Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "Config version updated: v3.1.7 -> v3.1.8 (applied by security-mchen)",
+    "trace_id": "tr-10j02",
+    "event_type": "config_change"
+  },
+  {
+    "timestamp": "2026-08-28T08:51:00Z",
+    "service": "user-service",
+    "level": "INFO",
+    "message": "Token validated for user U-7701 in 7ms",
+    "trace_id": "tr-10j03",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-28T08:53:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Service-to-service call to auth-service failed: 403 Forbidden (missing scope: user:read)",
+    "trace_id": "tr-10j04",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-28T08:54:00Z",
+    "service": "auth-service",
+    "level": "WARN",
+    "message": "OAuth token rejected: scope 'user:read' not present for service account svc-user-service",
+    "trace_id": "tr-10j05",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-28T08:55:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Cannot fetch user profile: auth-service returned 403",
+    "trace_id": "tr-10j06",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-28T08:56:00Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "TLS certificate valid, expires in 25 days",
+    "trace_id": "tr-10j07",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-28T08:57:00Z",
+    "service": "redis-cache",
+    "level": "INFO",
+    "message": "Memory usage: 2.4GB/4GB (60%), operating normally",
+    "trace_id": "tr-10j08",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-28T08:58:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Service-to-service call to auth-service failed: 403 Forbidden (missing scope: user:read)",
+    "trace_id": "tr-10j09",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-28T08:59:00Z",
+    "service": "auth-service",
+    "level": "WARN",
+    "message": "OAuth token rejected: scope 'user:read' not present for service account svc-user-service",
+    "trace_id": "tr-10j10",
+    "event_type": "error"
+  },
+  {
+    "timestamp": "2026-08-28T09:00:00Z",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "ALERT TRIGGERED: error_rate_high, current value: 18%",
+    "trace_id": "tr-10j11",
+    "event_type": "alert"
+  },
+  {
+    "timestamp": "2026-08-28T09:00:30Z",
+    "service": "api-gateway",
+    "level": "WARN",
+    "message": "user-service returning intermittent 403s, 22 errors in last 60s",
+    "trace_id": "tr-10j12",
+    "event_type": "metric"
+  },
+  {
+    "_comment": "═══ BACKGROUND NOISE (added with scenarios 6-10) ═══"
+  },
+  {
+    "timestamp": "2026-08-24T06:00:00Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "Daily health check: all upstream services responding normally",
+    "trace_id": "tr-bg11",
+    "event_type": "health_check"
+  },
+  {
+    "timestamp": "2026-08-25T06:00:00Z",
+    "service": "cdn-provider",
+    "level": "INFO",
+    "message": "Daily traffic report: 1.2M requests served, 99.98% success rate",
+    "trace_id": "tr-bg12",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-27T06:00:00Z",
+    "service": "payments-db",
+    "level": "INFO",
+    "message": "Automated backup completed successfully (size: 2.5GB)",
+    "trace_id": "tr-bg13",
+    "event_type": "metric"
+  },
+  {
+    "timestamp": "2026-08-28T06:00:00Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "Daily security policy review completed, no issues found",
+    "trace_id": "tr-bg14",
+    "event_type": "health_check"
+  }
 ]

@@ -53,5 +53,60 @@
     "description": "web-frontend completely unavailable, 0% success rate",
     "root_cause_category": "RC-07_auth",
     "failure_mode": "FM-23_hidden_internal_coupling"
+  },
+  {
+    "id": "ALRT-006",
+    "service": "order-service",
+    "alert_type": "resource_exhaustion",
+    "severity_reported": "medium",
+    "timestamp": "2026-08-31T23:15:00Z",
+    "metric_value": 85.0,
+    "description": "order-service payment verification queries queuing, payments-db connection pool at 85% usage",
+    "root_cause_category": "RC-04_capacity_exhaustion",
+    "failure_mode": "FM-13_resource_exhaustion"
+  },
+  {
+    "id": "ALRT-007",
+    "service": "user-service",
+    "alert_type": "resource_exhaustion",
+    "severity_reported": "medium",
+    "timestamp": "2026-08-25T10:00:00Z",
+    "metric_value": 95.0,
+    "description": "user-service CPU utilization critical (95%) on 3/3 pods since the v2.6.0 deploy",
+    "root_cause_category": "RC-01_code_defect",
+    "failure_mode": "FM-09_deploy_induced_regression"
+  },
+  {
+    "id": "ALRT-008",
+    "service": "api-gateway",
+    "alert_type": "latency_high",
+    "severity_reported": "high",
+    "timestamp": "2026-08-26T14:03:00Z",
+    "metric_value": 2100.0,
+    "description": "api-gateway p95 latency at 2100ms, intermittent 504s on static asset routes",
+    "root_cause_category": "RC-08_third_party",
+    "failure_mode": "FM-23_hidden_internal_coupling"
+  },
+  {
+    "id": "ALRT-009",
+    "service": "web-frontend",
+    "alert_type": "error_rate_high",
+    "severity_reported": "high",
+    "timestamp": "2026-08-27T02:03:30Z",
+    "metric_value": 15.0,
+    "description": "web-frontend checkout completion rate dropped, elevated 5xx during a payments-db maintenance window",
+    "root_cause_category": "RC-04_capacity_exhaustion",
+    "failure_mode": "FM-13_resource_exhaustion"
+  },
+  {
+    "id": "ALRT-010",
+    "service": "user-service",
+    "alert_type": "error_rate_high",
+    "severity_reported": "high",
+    "timestamp": "2026-08-28T09:00:00Z",
+    "metric_value": 18.0,
+    "description": "user-service intermittent 403 Forbidden errors on service-to-service calls to auth-service",
+    "root_cause_category": "RC-07_auth",
+    "failure_mode": "FM-10_config_induced_failure"
   }
 ]
