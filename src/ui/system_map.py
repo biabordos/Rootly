@@ -108,11 +108,13 @@ def _node_position(nodes: list[dict[str, Any]]) -> dict[str, tuple[float, float]
     for node in nodes:
         layer = node["layer"] if node["layer"] is not None else max_layer + 1
         layers.setdefault(layer, []).append(node)
+    max_rows = max((len(layer_nodes) for layer_nodes in layers.values()), default=1)
     positions = {}
     for layer, layer_nodes in layers.items():
-        x = 120 + layer * 220
+        x = 140 + layer * 320
+        vertical_offset = (max_rows - len(layer_nodes)) / 2
         for index, node in enumerate(layer_nodes):
-            positions[node["id"]] = (x, 90 + index * 92)
+            positions[node["id"]] = (x, 110 + (vertical_offset + index) * 150)
     return positions
 
 
@@ -122,8 +124,8 @@ def render_system_map(alert: Alert) -> None:
     for node in data["nodes"]:
         node["x"], node["y"] = positions[node["id"]]
     by_id = {node["id"]: node for node in data["nodes"]}
-    width = max((node["x"] for node in data["nodes"]), default=900) + 180
-    height = max((node["y"] for node in data["nodes"]), default=500) + 90
+    width = max((node["x"] for node in data["nodes"]), default=1100) + 300
+    height = max((node["y"] for node in data["nodes"]), default=600) + 130
 
     svg_edges = []
     for edge in data["edges"]:
@@ -137,9 +139,7 @@ def render_system_map(alert: Alert) -> None:
         svg_edges.append(
             f'<g class="edge {"active" if active else "dim"}">'
             f'<line x1="{source["x"]}" y1="{source["y"]}" x2="{target["x"]}" y2="{target["y"]}" '
-            f'data-tooltip="{html.escape(delta_text or "Dependency relationship", quote=True)}" />'
-            f'<text x="{(source["x"] + target["x"]) / 2}" y="{(source["y"] + target["y"]) / 2 - 8}" class="edge-label">'
-            f'{html.escape(delta_text)}</text></g>'
+            f'data-tooltip="{html.escape(delta_text or "Dependency relationship", quote=True)}" /></g>'
         )
 
     svg_nodes = []
@@ -166,7 +166,7 @@ def render_system_map(alert: Alert) -> None:
       .legend {{ color:#8e8e8e; font:11px Consolas,monospace; white-space:nowrap; }} .legend i {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }}
       .legend .green {{ background:#d9ff62; }} .legend .gray {{ background:#555; }} .legend .line {{ width:20px; height:2px; border-radius:0; background:#d9ff62; vertical-align:middle; }}
       svg {{ width:100%; min-width:920px; display:block; }} .edge line {{ stroke:#353535; stroke-width:3; }} .edge.active line {{ stroke:#d9ff62; stroke-width:4; stroke-dasharray:8 10; animation:flow 2.5s linear infinite; }}
-      .edge-label {{ fill:#8e8e8e; font:10px Consolas,monospace; }} .station circle {{ fill:#555; stroke:#050505; stroke-width:4; }} .station .station-core {{ fill:#555; stroke:none; }}
+    .station circle {{ fill:#555; stroke:#050505; stroke-width:4; }} .station .station-core {{ fill:#555; stroke:none; }}
       .station.active circle {{ fill:#d9ff62; }} .station.active .station-core,.station.root .station-core {{ fill:#050505; }} .station.root circle {{ fill:#ff6b6b; }}
       .station text {{ fill:#f5f5f2; font-size:14px; }} .station .node-meta {{ fill:#777; font:10px Consolas,monospace; }} .station.dim {{ opacity:.35; }}
       .station:hover circle {{ stroke:#fff; stroke-width:5; }} .tooltip {{ position:fixed; display:none; max-width:360px; padding:10px 12px; background:#171717; border:1px solid #454545; color:#f5f5f2; font:11px Consolas,monospace; line-height:1.5; pointer-events:none; z-index:2; }}

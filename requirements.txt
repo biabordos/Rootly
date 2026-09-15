@@ -1,8 +1,8 @@
 # Core
-langchain-core>=0.3,<0.4       # Messages + tool binding
-langchain-mistralai>=0.2,<0.3  # Mistral chat model with tool calling (free Experiment plan works)
-langgraph>=0.6,<0.7            # StateGraph orchestration + interrupt() for human approval
-langgraph-checkpoint-sqlite>=2,<3  # Persists paused runs so they can be resumed from another process
+langchain-core==1.6.3          # Messages + tool binding
+langchain-mistralai==0.2.12    # Mistral chat model with tool calling (free Experiment plan works)
+langgraph==1.2.11              # StateGraph orchestration + interrupt() for human approval
+langgraph-checkpoint-sqlite==3.1.1  # Persists paused runs so they can be resumed from another process
 pydantic>=2.0                  # Data validation
 
 # RAG
