@@ -49,7 +49,7 @@ def main(argv: list[str]) -> int:
         try:
             result = run_diagnosis(alert)
         except DiagnosisError as exc:
-            rows.append(f"| {alert_id} | {alert.service} | — | ❌ | — | — | — | — | failed: {exc} |")
+            rows.append(f"| {alert_id} | {alert.service} | — | ❌ | — | — | — | — | — | failed: {exc} |")
             continue
 
         d = result.diagnosis
@@ -65,6 +65,7 @@ def main(argv: list[str]) -> int:
         rows.append(
             f"| {alert_id} | {alert.service} | `{d.affected_component}` (expected `{truth['root']}`) | {mark(component_ok)} "
             f"| {mark(deps_ok)} | {mark(evidence_ok)} | {mark(incident_ok)} | {d.confidence:.2f} "
+            f"| `{d.escalation_decision.value if d.escalation_decision else '—'}` "
             f"| {result.steps} steps {mark(steps_ok)} · {result.elapsed_seconds:.1f}s {mark(time_ok)} |"
         )
         details += [
@@ -85,8 +86,8 @@ def main(argv: list[str]) -> int:
         "",
         f"**Root component correctly identified:** {correct}/{len(alert_ids)}",
         "",
-        "| Alert | Service | Affected component | Correct | Dependencies | Log evidence | Similar incident | Confidence | Steps · Time |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Alert | Service | Affected component | Correct | Dependencies | Log evidence | Similar incident | Confidence | Escalation | Steps · Time |",
+        "|---|---|---|---|---|---|---|---|---|---|",
         *rows,
         "",
         "Targets: steps < 15, time < 30 s. Similar incident = the direct match from MOCK_DATA_README.md was cited.",

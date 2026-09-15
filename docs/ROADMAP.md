@@ -7,6 +7,11 @@
 > "MVP Status" din README.md pentru starea curentă. Stack-ul de LLM a fost `Mistral` (via `langchain-mistralai`)
 > în loc de Claude, pentru că echipa are acces la o cheie gratuită Mistral, nu la una Anthropic — vezi nota din
 > §3 mai jos. Restul planului (structură, tool-uri, guardrail, RAG, UI) a rămas neschimbat față de recomandare.
+>
+> **Actualizare (15 septembrie 2026):** bucla ReAct scrisă manual (`react_loop.py`) a fost migrată la un
+> `StateGraph` LangGraph (`src/agent/graph.py`, `graph_nodes.py`, `graph_state.py`), cu o politică de escaladare
+> deterministă (`src/agent/escalation_policy.py`) și aprobare umană nativă prin `interrupt()` + checkpoint SQLite.
+> Referințele la `react_loop.py` de mai jos descriu starea de la momentul fazelor respective.
 
 ---
 
@@ -153,7 +158,7 @@ Trece de la "documentație" la "cod care rulează" cât mai repede, chiar dacă 
 | Vector store (Faza 5) | ChromaDB (local, zero infra) | ChromaDB, ✓ neschimbat, cu fallback BM25 |
 | UI | Streamlit | Streamlit, ✓ neschimbat |
 | Teste | pytest | pytest, ✓ neschimbat |
-| Orchestrare buclă ReAct | implementare proprie (simplă, ~100 linii) inițial | Buclă proprie în continuare (`src/agent/react_loop.py`) — `langchain-core`/`langchain-mistralai` sunt folosite doar ca binding către modelul Mistral (mesaje + tool calling), nu ca framework de orchestrare tip LangGraph |
+| Orchestrare buclă ReAct | implementare proprie (simplă, ~100 linii) inițial | Buclă proprie în MVP, apoi **migrată la LangGraph** (`StateGraph` manual, nu `create_react_agent`) când au apărut retry custom, guardrail cu buclă de reîncercare și branching pe escaladare cu aprobare umană (`interrupt()`) |
 
 Recomandarea de a nu introduce un framework de orchestrare (LangGraph etc.) de la început a rămas valabilă: bucla ReAct e în continuare scrisă manual, ceea ce o face mai ușor de depanat și de explicat într-o prezentare. `langchain-mistralai` a fost necesar doar pentru că e calea documentată de a vorbi cu API-ul Mistral cu tool calling din Python — nu aduce cu el o buclă de agent.
 

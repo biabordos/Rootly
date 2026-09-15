@@ -1,25 +1,31 @@
 """
 Agent tests.
 
-Offline tests drive the real ReAct loop, real tools and real guardrail with a scripted
-fake chat model, so the orchestration logic is verified without an API key.
-The live test calls the real Mistral API and is skipped unless MISTRAL_API_KEY is set.
+Offline tests drive the real LangGraph graph, real tools, real guardrail and real
+escalation policy with a scripted fake chat model, so the orchestration logic is
+verified without an API key. The live test calls the real Mistral API and is skipped
+unless MISTRAL_API_KEY is set.
 """
 
 from __future__ import annotations
 
 import itertools
 import os
+import sqlite3
 
 import httpx
 import pytest
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
-from src.agent import DiagnosisError, run_diagnosis
-from src.agent import react_loop
-from src.agent.react_loop import SUBMIT_TOOL_NAME
+from src.agent import DiagnosisError, resume_diagnosis, run_diagnosis
+from src.agent import graph as rootly_graph
+from src.agent import graph_nodes
+from src.agent.graph_nodes import SUBMIT_TOOL_NAME
 from src.agent.system_prompt import format_alert
 from src.data_loader import get_alert
+from src.models.schemas import EscalationDecision
 
 _ids = itertools.count(1)
 
@@ -83,12 +89,42 @@ def scripted_alrt_001():
     ]
 
 
+def scripted_alrt_002():
+    # user-service has one dependent (api-gateway); a confident medium diagnosis is auto-resolved.
+    window = {"start_time": "2026-08-19T14:15:00Z", "end_time": "2026-08-19T14:40:00Z"}
+    package = {
+        "summary": "user-service latency is high after the v2.5.0 deploy introduced a memory leak.",
+        "affected_component": "user-service",
+        "severity_assessed": "medium",
+        "critical_dependencies": ["api-gateway"],
+        "log_evidence": ["2026-08-19T14:33:00Z user-service: OOMKilled"],
+        "root_cause_hypothesis": "A memory leak in v2.5.0 drives GC pauses and OOM kills.",
+        "confidence": 0.85,
+        "escalation_recommendation": "identity-team: roll back v2.5.0.",
+        "similar_incidents": ["INC-2025-203"],
+    }
+    return [
+        turn("", ("log_search", {"service": "user-service", **window}),
+             ("log_search", {"service": "user-db", **window}),
+             ("log_search", {"service": "auth-service", **window})),
+        turn("", (SUBMIT_TOOL_NAME, package)),
+    ]
+
+
 @pytest.fixture(autouse=True)
 def no_backoff(monkeypatch):
-    monkeypatch.setattr(react_loop, "RETRY_BASE_SECONDS", 0)
+    monkeypatch.setattr(graph_nodes, "RETRY_BASE_SECONDS", 0)
 
 
-def test_react_loop_runs_tools_applies_guardrail_and_returns_package():
+@pytest.fixture(autouse=True)
+def in_memory_graph(monkeypatch):
+    """One in-memory checkpointed graph per test, so tests never touch .checkpoints/."""
+    compiled = rootly_graph.build_graph(InMemorySaver())
+    monkeypatch.setattr(rootly_graph, "get_graph", lambda: compiled)
+    return compiled
+
+
+def test_graph_runs_tools_applies_guardrail_and_returns_package():
     llm = FakeLLM(scripted_alrt_001())
     events: list[dict] = []
 
@@ -113,6 +149,9 @@ def test_react_loop_runs_tools_applies_guardrail_and_returns_package():
     # The rejected submit was reported back to the model as an error ToolMessage.
     rejections = [m for m in llm.calls[-1] if isinstance(m, ToolMessage) and m.status == "error"]
     assert rejections and "rejected" in rejections[-1].content
+
+    # Streamed events and the trace stored in state are the same.
+    assert result.trace == events
 
 
 def test_tools_are_bound_in_function_format_and_system_prompt_comes_first():
@@ -186,7 +225,7 @@ def test_missing_submit_is_nudged_and_budget_exhaustion_raises():
 def test_duplicate_tool_call_ids_within_one_turn_are_deduplicated():
     # Reproduces an observed codestral-latest quirk: two parallel tool calls in the
     # same turn sharing one id. Mistral's API rejects that message outright, so the
-    # loop must repair it before the next request goes out.
+    # graph must repair it before the next request goes out.
     clash = turn(
         "Checking two dependencies at once.",
         ("cmdb_lookup", {"component_name": "payments-db"}),
@@ -214,8 +253,6 @@ def test_duplicate_tool_call_ids_across_turns_are_deduplicated():
     llm = FakeLLM([step1, step2, *scripted_alrt_001()[2:]])
     result = run_diagnosis(get_alert("ALRT-001"), llm=llm)
 
-    # The full history is resent every request, so check the final snapshot (every
-    # AIMessage + ToolMessage the model ever saw) rather than concatenating requests.
     final_history = llm.calls[-1]
     tool_call_ids = [m.tool_call_id for m in final_history if isinstance(m, ToolMessage)]
     assert len(tool_call_ids) == len(set(tool_call_ids))  # never collided
@@ -261,6 +298,98 @@ def test_repeated_truncation_gives_up():
         run_diagnosis(get_alert("ALRT-001"), llm=llm)
 
 
+# ── Escalation + human-in-the-loop ───────────────────────────────────────
+
+def test_urgent_escalation_pauses_the_graph_for_approval(in_memory_graph):
+    # payments-db has two dependents (checkout-api, order-service): blast radius → urgent.
+    events: list[dict] = []
+    result = run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()), on_event=events.append)
+
+    d = result.diagnosis
+    assert result.needs_approval
+    assert d.escalation_decision == EscalationDecision.ESCALATE_URGENT_NEEDS_APPROVAL
+    assert d.owner_team == "payments-team"
+    assert d.human_decision is None
+    assert result.approval_request["component"] == "payments-db"
+    assert result.approval_request["reason"] == d.escalation_reason
+    assert any(e["kind"] == "escalation" for e in events)
+    assert in_memory_graph.get_state({"configurable": {"thread_id": result.thread_id}}).next == ("human_approval",)
+
+
+def test_approve_resumes_and_keeps_the_escalation_urgent():
+    paused = run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()))
+    events: list[dict] = []
+
+    result = resume_diagnosis(paused.thread_id, "approve", note="Paging payments-team now", on_event=events.append)
+
+    d = result.diagnosis
+    assert not result.needs_approval
+    assert d.escalation_decision == EscalationDecision.ESCALATE_URGENT_NEEDS_APPROVAL
+    assert d.human_decision == "approve"
+    assert d.human_decision_note == "Paging payments-team now"
+    assert [e["kind"] for e in events] == ["human_decision"]
+    assert result.trace[:-1] == paused.trace  # the pre-pause trace is kept
+    assert result.steps == paused.steps and result.elapsed_seconds == paused.elapsed_seconds
+
+
+def test_downgrade_resumes_as_normal_escalation_without_touching_the_diagnosis():
+    paused = run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()))
+
+    result = resume_diagnosis(paused.thread_id, "downgrade", note="Known load test")
+
+    d = result.diagnosis
+    assert d.escalation_decision == EscalationDecision.ESCALATE_NORMAL
+    assert d.human_decision == "downgrade"
+    assert d.escalation_reason == paused.diagnosis.escalation_reason
+    assert d.root_cause_hypothesis == paused.diagnosis.root_cause_hypothesis
+    assert d.affected_component == paused.diagnosis.affected_component
+
+
+def test_resume_rejects_unknown_finished_or_invalid_runs():
+    with pytest.raises(DiagnosisError, match="No run found"):
+        resume_diagnosis("ALRT-001-missing", "approve")
+
+    paused = run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()))
+    with pytest.raises(DiagnosisError, match="Unknown decision"):
+        resume_diagnosis(paused.thread_id, "reject")
+
+    resume_diagnosis(paused.thread_id, "approve")
+    with pytest.raises(DiagnosisError, match="not waiting"):
+        resume_diagnosis(paused.thread_id, "approve")
+
+
+def test_non_urgent_diagnosis_finishes_without_pausing(in_memory_graph):
+    result = run_diagnosis(get_alert("ALRT-002"), llm=FakeLLM(scripted_alrt_002()))
+
+    assert not result.needs_approval
+    assert result.diagnosis.escalation_decision == EscalationDecision.AUTO_RESOLVED
+    assert result.diagnosis.owner_team == "identity-team"
+    assert in_memory_graph.get_state({"configurable": {"thread_id": result.thread_id}}).next == ()
+
+
+def test_paused_run_resumes_from_sqlite_in_a_fresh_graph(tmp_path, monkeypatch):
+    # Simulates `run_cli.py ALRT-001` pausing, then `run_cli.py --resume ...` in a new process.
+    db = tmp_path / "rootly.sqlite"
+    first = rootly_graph.build_graph(SqliteSaver(sqlite3.connect(db, check_same_thread=False)))
+    monkeypatch.setattr(rootly_graph, "get_graph", lambda: first)
+    paused = run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()))
+    assert paused.needs_approval
+
+    second = rootly_graph.build_graph(SqliteSaver(sqlite3.connect(db, check_same_thread=False)))
+    monkeypatch.setattr(rootly_graph, "get_graph", lambda: second)
+    result = resume_diagnosis(paused.thread_id, "downgrade")
+
+    assert result.diagnosis.escalation_decision == EscalationDecision.ESCALATE_NORMAL
+    assert result.diagnosis.affected_component == "payments-db"
+    assert len(result.trace) == len(paused.trace) + 1
+
+
+def test_existing_thread_id_cannot_be_restarted():
+    paused = run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()))
+    with pytest.raises(DiagnosisError, match="already exists"):
+        run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()), thread_id=paused.thread_id)
+
+
 @pytest.mark.live
 @pytest.mark.skipif(not os.getenv("MISTRAL_API_KEY"), reason="requires MISTRAL_API_KEY")
 def test_scenario_1_end_to_end():
@@ -270,4 +399,5 @@ def test_scenario_1_end_to_end():
     assert d.confidence > 0.5
     assert d.log_evidence
     assert "INC-2025-114" in d.similar_incidents
+    assert d.escalation_decision is not None
     assert result.steps < 15

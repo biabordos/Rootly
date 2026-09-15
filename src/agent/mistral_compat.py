@@ -19,7 +19,7 @@ thing for this agent: cmdb_lookup often triggers several log_search calls in
 parallel). The same shadowing bug affects `invalid_tool_calls`.
 
 This has been confirmed against a real turn with 4 tool calls (verified with
-the ids already deduplicated on our side — see react_loop._dedupe_tool_call_ids
+the ids already deduplicated on our side — see graph_nodes._dedupe_tool_call_ids
 — so this is not a duplicate-id issue on our end).
 
 Monkeypatching one function is preferable to vendoring the whole 600-line

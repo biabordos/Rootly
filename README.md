@@ -402,9 +402,48 @@ A manual evaluation checklist can be applied to a fixed set of test scenarios to
 | --- | --- |
 | Mock data | 5 alert scenarios, 10 CMDB components, 124 logs, 10 historical incidents (see [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md)) |
 | Tools | `cmdb_lookup`, `log_search`, `similar_incidents_search` (RAG: ChromaDB + all-MiniLM-L6-v2, BM25 fallback) |
-| Agent | ReAct loop on Mistral tool calling via LangChain (`langchain-mistralai`); the diagnosis is submitted through a `submit_diagnosis` tool |
+| Agent | ReAct agent as a LangGraph `StateGraph` on Mistral tool calling (`langchain-mistralai`); the diagnosis is submitted through a `submit_diagnosis` tool |
 | Guardrail | The package may only reference CMDB components and historical incidents that exist, and must cite log evidence. A component is only accepted as the origin once the agent has searched the logs of every upstream dependency that the component's own error logs blame |
+| Escalation | Deterministic policy after the guardrail (`src/agent/escalation_policy.py`): critical severity, a blast radius of ≥ 2 CMDB dependents, or confidence < 0.70 each force an urgent escalation that needs human approval; a confident low/medium diagnosis is auto-resolved; anything else is a normal escalation |
+| Human-in-the-loop | Urgent escalations pause the graph with `interrupt()`; state is checkpointed to SQLite (`.checkpoints/`), so a human can approve or downgrade (“not urgent”) later, from the CLI or Streamlit, even from another process. The decision and optional note are recorded in the package |
 | Interfaces | `run_cli.py` (Rich) and `src/ui/streamlit_app.py` |
+
+### Diagnosis graph
+
+Generated with `build_graph(...).get_graph().draw_mermaid()` (dashed edges are conditional):
+
+```mermaid
+graph TD;
+	__start__([start]):::first
+	agent(agent)
+	nudge(nudge)
+	tools(tools)
+	guardrail(guardrail)
+	escalation_policy(escalation_policy)
+	human_approval(human_approval)
+	__end__([end]):::last
+	__start__ --> agent;
+	agent -.-> nudge;
+	agent -.-> tools;
+	escalation_policy -.-> __end__;
+	escalation_policy -.-> human_approval;
+	guardrail -.-> agent;
+	guardrail -.-> escalation_policy;
+	nudge --> agent;
+	tools -.-> agent;
+	tools -.-> guardrail;
+	human_approval --> __end__;
+	agent -.-> agent;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+```
+
+* `agent` — one model turn; loops to itself when a truncated response is discarded.
+* `nudge` — the model ended its turn without calling `submit_diagnosis`.
+* `tools` — runs the investigation tools; goes to `guardrail` only if `submit_diagnosis` was called.
+* `guardrail` — a rejected package goes back to the agent with the reasons.
+* `escalation_policy` → `human_approval` only for urgent escalations.
 
 ## Getting started
 
@@ -423,13 +462,17 @@ python run_cli.py ALRT-001             # live Thought → Action → Observation
 python run_cli.py ALRT-001 --verbose   # include full tool observations
 python run_cli.py ALRT-001 --export    # save diagnosis (.json, .md) and trace to exports/
 
+# an urgent escalation pauses the run and prints its thread id; answer it later:
+python run_cli.py --resume ALRT-001-1a2b3c4d --decision approve
+python run_cli.py --resume ALRT-001-1a2b3c4d --decision downgrade --note "known load test"
+
 streamlit run src/ui/streamlit_app.py  # web UI with trace, diagnosis package and exports
 
 python -m pytest                       # tool + agent tests (offline, no API key needed)
 python evaluate.py                     # run all 5 scenarios and write EVAL_RESULTS.md
 ```
 
-The first run downloads the embedding model (~80 MB) and builds the local vector index in `.chroma/`.
+The first run downloads the embedding model (~80 MB) and builds the local vector index in `.chroma/`. Paused runs are checkpointed in `.checkpoints/rootly.sqlite`.
 
 On Windows, start Streamlit with UTF-8 console output (`set PYTHONUTF8=1` in cmd, `$env:PYTHONUTF8=1` in PowerShell). Otherwise Streamlit's own background helpers can crash while printing symbols like `⚠` to the legacy cp1252 console; the app keeps working, but the log fills with `UnicodeEncodeError` tracebacks.
 
@@ -459,9 +502,10 @@ Rootly/
 │   ├── models/schemas.py        # Pydantic schemas incl. DiagnosisPackage
 │   ├── data_loader.py           # cached, validated dataset loading
 │   ├── tools/                   # cmdb_lookup, log_search, incident_search (RAG)
-│   ├── agent/                   # system prompt, tool registry, ReAct loop, report export
+│   ├── agent/                   # LangGraph graph (graph, graph_nodes, graph_state), escalation policy,
+│   │                            #   system prompt, tool registry, report export
 │   └── ui/streamlit_app.py      # Streamlit interface
-├── tests/                       # tool tests + offline agent tests (+ optional live test)
+├── tests/                       # tool, escalation policy and offline graph tests (+ optional live test)
 ├── docs/
 │   ├── diagrams/                 # architecture + ReAct loop diagrams
 │   ├── MOCK_DATA_README.md       # scenario design and ground truth

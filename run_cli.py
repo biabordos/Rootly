@@ -5,6 +5,10 @@ Rootly CLI.
     python run_cli.py ALRT-001            # run the diagnosis, compact live trace
     python run_cli.py ALRT-001 --verbose  # also show full tool observations
     python run_cli.py ALRT-001 --export   # save diagnosis .json/.md and trace .json to exports/
+
+    # an urgent escalation pauses the run; answer it later (even from another terminal):
+    python run_cli.py --resume ALRT-001-1a2b3c4d --decision approve
+    python run_cli.py --resume ALRT-001-1a2b3c4d --decision downgrade --note "known load test"
 """
 
 from __future__ import annotations
@@ -20,7 +24,8 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-from src.agent import DiagnosisError, run_diagnosis
+from src.agent import DiagnosisError, DiagnosisResult, resume_diagnosis, run_diagnosis
+from src.agent.escalation_policy import HUMAN_DECISIONS
 from src.agent.report import diagnosis_dict, to_markdown
 from src.data_loader import get_alert, load_alerts
 
@@ -69,10 +74,38 @@ def make_printer(verbose: bool):
         elif kind == "guardrail":
             style = "red" if event.get("is_error") else "green"
             console.print(f"{prefix} 🛡️  [{style}]Guardrail:[/{style}] {event['content']}")
+        elif kind == "escalation":
+            console.print(f"{prefix} 🚦 [blue]Escalation policy:[/blue] {event['content']}")
+        elif kind == "human_decision":
+            console.print(f"{prefix} 🧑 [bold]Human decision:[/bold] {event['content']}")
         elif kind == "note":
             console.print(f"{prefix} ⚠️  [magenta]{event['content']}[/magenta]")
 
     return on_event
+
+
+def show_result(result: DiagnosisResult, export: bool) -> None:
+    console.rule("Diagnosis Package")
+    console.print(Markdown(to_markdown(result)))
+
+    if result.needs_approval:
+        request = result.approval_request or {}
+        console.print(Panel.fit(
+            f"[bold red]⏸ PAUSED FOR APPROVAL[/bold red]\n"
+            f"Urgent escalation of [bold]{request.get('component')}[/bold] to [bold]{request.get('owner_team')}[/bold]\n"
+            f"{request.get('reason')}\n\n"
+            f"Approve:  python run_cli.py --resume {result.thread_id} --decision approve\n"
+            f"Downgrade — not urgent:  python run_cli.py --resume {result.thread_id} --decision downgrade --note \"why\"",
+            border_style="red",
+        ))
+
+    if export:
+        EXPORT_DIR.mkdir(exist_ok=True)
+        alert_id = result.alert.id
+        (EXPORT_DIR / f"{alert_id}_diagnosis.json").write_text(json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False), encoding="utf-8")
+        (EXPORT_DIR / f"{alert_id}_diagnosis.md").write_text(to_markdown(result), encoding="utf-8")
+        (EXPORT_DIR / f"{alert_id}_trace.json").write_text(json.dumps(result.trace, indent=2, ensure_ascii=False), encoding="utf-8")
+        console.print(f"\n[green]Exported to {EXPORT_DIR}[/green]")
 
 
 def run(alert_id: str, verbose: bool, export: bool) -> int:
@@ -92,17 +125,18 @@ def run(alert_id: str, verbose: bool, export: bool) -> int:
     except DiagnosisError as exc:
         console.print(f"[red]Diagnosis failed:[/red] {exc}")
         return 1
+    show_result(result, export)
+    return 0
 
-    console.rule("Diagnosis Package")
-    console.print(Markdown(to_markdown(result)))
 
-    if export:
-        EXPORT_DIR.mkdir(exist_ok=True)
-        base = EXPORT_DIR / alert.id
-        base.with_name(f"{alert.id}_diagnosis.json").write_text(json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False), encoding="utf-8")
-        base.with_name(f"{alert.id}_diagnosis.md").write_text(to_markdown(result), encoding="utf-8")
-        base.with_name(f"{alert.id}_trace.json").write_text(json.dumps(result.trace, indent=2, ensure_ascii=False), encoding="utf-8")
-        console.print(f"\n[green]Exported to {EXPORT_DIR}[/green]")
+def resume(thread_id: str, decision: str, note: str | None, verbose: bool, export: bool) -> int:
+    console.rule(f"Resuming {thread_id}")
+    try:
+        result = resume_diagnosis(thread_id, decision, note=note, on_event=make_printer(verbose))
+    except DiagnosisError as exc:
+        console.print(f"[red]Resume failed:[/red] {exc}")
+        return 1
+    show_result(result, export)
     return 0
 
 
@@ -112,8 +146,18 @@ def main() -> int:
     parser.add_argument("alert_id", nargs="?", help="Alert scenario to diagnose, e.g. ALRT-001")
     parser.add_argument("--verbose", action="store_true", help="Show full tool observations")
     parser.add_argument("--export", action="store_true", help="Save diagnosis (.json, .md) and trace (.json) to exports/")
+    parser.add_argument("--resume", metavar="THREAD_ID", help="Answer the approval request of a paused run")
+    parser.add_argument("--decision", choices=HUMAN_DECISIONS,
+                        help="With --resume: 'approve' keeps the escalation urgent, 'downgrade' makes it not urgent")
+    parser.add_argument("--note", help="With --resume: optional note recorded in the audit trail")
     args = parser.parse_args()
 
+    if args.resume:
+        if not args.decision:
+            parser.error("--resume requires --decision approve|downgrade")
+        return resume(args.resume, args.decision, args.note, args.verbose, args.export)
+    if args.decision or args.note:
+        parser.error("--decision and --note are only valid with --resume")
     if not args.alert_id:
         list_scenarios()
         return 0

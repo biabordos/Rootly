@@ -1,15 +1,18 @@
 """
-The ReAct loop: Thought → Action → Observation, driven by Mistral tool calling via LangChain.
+Node functions for the Rootly diagnosis graph, plus the helpers they share.
 
-Flow per step:
-  1. Send the conversation (alert + all prior tool calls/results) to the model.
-  2. Record the model's visible text as the agent's Thought.
-  3. Execute every tool call locally and append one ToolMessage per call.
-  4. Stop when the agent calls submit_diagnosis with a package that passes the
-     CMDB guardrail, or fail after MAX_REACT_STEPS model turns.
+Each node takes the current RootlyState and returns a partial update. The logic is
+the former hand-written ReAct loop, split along the graph's edges:
 
-The final package arrives as the arguments of a submit_diagnosis tool call, so it is
-structured JSON rather than free text, and is then validated with DiagnosisPackage.
+  agent             one model turn (retry/backoff, truncation recovery, tool-call id dedup)
+  nudge             the model ended its turn without calling submit_diagnosis
+  tools             run investigation tool calls
+  guardrail         validate submit_diagnosis against the CMDB (incl. the origin check)
+  escalation_policy deterministic escalation decision, no LLM call
+  human_approval    interrupt() until a human approves or downgrades an urgent escalation
+
+Trace events are streamed live through the runtime context's on_event callback and
+also stored in state, so a resumed run keeps its complete trace.
 """
 
 from __future__ import annotations
@@ -20,18 +23,23 @@ import re
 import secrets
 import string
 import time
-from dataclasses import asdict, dataclass, field
+import uuid
+from dataclasses import asdict, dataclass
 from datetime import timedelta
-from typing import Any, Callable
+from typing import Any
 
 import httpx
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langgraph.runtime import Runtime
+from langgraph.types import interrupt
 from pydantic import ValidationError
 
-from src.agent.system_prompt import SYSTEM_PROMPT, format_alert
+from src.agent.escalation_policy import HUMAN_APPROVE, HUMAN_DECISIONS, apply_human_decision, decide_escalation
+from src.agent.graph_state import RootlyContext, RootlyState
 from src.agent.tool_registry import ToolRegistry
-from src.data_loader import load_cmdb, load_incidents, load_logs
+from src.data_loader import get_alert, load_cmdb, load_incidents, load_logs
 from src.models.schemas import Alert, DiagnosisPackage, Severity
+from src.tools.cmdb_lookup import cmdb_lookup
 
 DEFAULT_MODEL = "codestral-latest"
 DEFAULT_MAX_STEPS = 15
@@ -72,6 +80,8 @@ SUBMIT_TOOL = {
         ],
     },
 }
+# Only these keys come from the model; escalation fields are computed after the guardrail.
+SUBMIT_FIELDS = tuple(SUBMIT_TOOL["input_schema"]["properties"])
 
 BUDGET_EXHAUSTED_NOTE = (
     "Step budget nearly exhausted: do not call any more investigation tools. "
@@ -87,6 +97,8 @@ TRUNCATED_NOTE = (
     "Reply with at most two short sentences of reasoning followed by the next tool call."
 )
 
+_registry = ToolRegistry()
+
 
 class DiagnosisError(RuntimeError):
     """The agent could not produce a valid diagnosis package (including model/API failures)."""
@@ -95,7 +107,7 @@ class DiagnosisError(RuntimeError):
 @dataclass
 class TraceEvent:
     step: int
-    kind: str  # thought | action | observation | guardrail | note
+    kind: str  # thought | action | observation | guardrail | note | escalation | human_decision
     content: str | None = None
     tool: str | None = None
     input: dict | None = None
@@ -107,17 +119,7 @@ class TraceEvent:
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
-@dataclass
-class DiagnosisResult:
-    alert: Alert
-    diagnosis: DiagnosisPackage
-    trace: list[dict]
-    steps: int
-    tool_calls: int
-    elapsed_seconds: float
-    model: str
-    usage: dict[str, int] = field(default_factory=dict)
-
+# ── Guardrail ────────────────────────────────────────────────────────────
 
 def _component_name(reference: str) -> str:
     """Accept 'payments-db' or the CMDB reference form 'CI-006 (payments-db)'."""
@@ -201,7 +203,7 @@ def check_package(
     try:
         package = DiagnosisPackage(
             **{
-                **package_input,
+                **{k: v for k, v in package_input.items() if k in SUBMIT_FIELDS},
                 "affected_component": affected,
                 "critical_dependencies": dependencies,
                 "confidence": min(max(float(package_input.get("confidence", 0.0)), 0.0), 1.0),
@@ -215,6 +217,8 @@ def check_package(
     return package, []
 
 
+# ── Model helpers ────────────────────────────────────────────────────────
+
 def to_openai_tool(definition: dict) -> dict:
     """Tool modules define schemas as {name, description, input_schema}; Mistral expects function tools."""
     return {
@@ -225,6 +229,10 @@ def to_openai_tool(definition: dict) -> dict:
             "parameters": definition["input_schema"],
         },
     }
+
+
+def all_tool_schemas() -> list[dict]:
+    return [to_openai_tool(t) for t in _registry.tool_definitions() + [SUBMIT_TOOL]]
 
 
 def build_llm(model: str):
@@ -303,125 +311,198 @@ def _text(message: AIMessage) -> str:
     ).strip()
 
 
-def _append_note(messages: list[BaseMessage], note: str) -> None:
-    # Mistral rejects a user message directly after tool messages, so fold the note into the last tool result.
+def _with_note(messages: list[BaseMessage], note: str) -> tuple[list[BaseMessage], BaseMessage]:
+    """
+    Mistral rejects a user message directly after tool messages, so fold the note into the
+    last tool result (a copy with the same id, which add_messages swaps in). Returns the
+    messages to send and the message to write back to state.
+    """
     last = messages[-1]
     if isinstance(last, ToolMessage):
-        last.content = f"{last.content}\n\n{note}"
-    else:
-        messages.append(HumanMessage(note))
+        noted = last.model_copy(update={"content": f"{last.content}\n\n{note}"})
+        return [*messages[:-1], noted], noted
+    noted = HumanMessage(note, id=str(uuid.uuid4()))
+    return [*messages, noted], noted
 
 
-def run_diagnosis(
-    alert: Alert,
-    *,
-    llm=None,
-    on_event: Callable[[dict], None] | None = None,
-    model: str | None = None,
-    max_steps: int | None = None,
-) -> DiagnosisResult:
-    """Run the ReAct investigation for one alert. on_event receives each trace event as it happens."""
-    model = model or os.getenv("MISTRAL_MODEL", DEFAULT_MODEL)
-    max_steps = max_steps or int(os.getenv("MAX_REACT_STEPS", DEFAULT_MAX_STEPS))
-    llm = llm or build_llm(model)
+def _merge_by_id(updates: list[BaseMessage], message: BaseMessage) -> None:
+    """Keep only the latest version of a message within one node's update."""
+    for index, existing in enumerate(updates):
+        if existing.id is not None and existing.id == message.id:
+            updates[index] = message
+            return
+    updates.append(message)
 
-    registry = ToolRegistry()
-    tools = [to_openai_tool(t) for t in registry.tool_definitions() + [SUBMIT_TOOL]]
-    bound_llm = llm.bind_tools(tools)
-    messages: list[BaseMessage] = [SystemMessage(SYSTEM_PROMPT), HumanMessage(format_alert(alert))]
-    trace: list[dict] = []
-    usage = {"input_tokens": 0, "output_tokens": 0}
-    tool_calls = 0
-    used_tool_call_ids: set[str] = set()
-    truncated_responses = 0
-    investigated_services: set[str] = set()
-    started = time.perf_counter()
 
-    def emit(event: TraceEvent) -> None:
-        record = event.to_dict()
-        trace.append(record)
-        if on_event:
+def _emit(runtime: Runtime[RootlyContext], *events: TraceEvent) -> list[dict]:
+    records = [event.to_dict() for event in events]
+    on_event = runtime.context.on_event if runtime.context else None
+    if on_event:
+        for record in records:
             on_event(record)
+    return records
 
-    for step in range(1, max_steps + 1):
-        if step == max_steps:
-            _append_note(messages, BUDGET_EXHAUSTED_NOTE)
-            emit(TraceEvent(step, "note", content="Step budget reached — asking the agent to submit."))
 
-        response = _invoke(bound_llm, messages)
-        for key in usage:
-            usage[key] += (response.usage_metadata or {}).get(key, 0)
-        if response.response_metadata.get("finish_reason") == "length":
-            # A cut-off response may hold partial tool calls, so it is never added to the
-            # history. The note changes the next input, which breaks a deterministic loop.
-            truncated_responses += 1
-            if truncated_responses > MAX_TRUNCATED_RESPONSES:
-                raise DiagnosisError(
-                    f"Model output was cut off (finish_reason=length) {truncated_responses} times; giving up at step {step}."
-                )
-            _append_note(messages, TRUNCATED_NOTE)
-            emit(TraceEvent(step, "note", content="Model response was too long and got cut off — asking for a shorter one.", is_error=True))
-            continue
-        _dedupe_tool_call_ids(response, used_tool_call_ids)
+def _last_ai(messages: list[BaseMessage]) -> AIMessage:
+    return next(m for m in reversed(messages) if isinstance(m, AIMessage))
 
-        thought = _text(response)
-        if thought:
-            emit(TraceEvent(step, "thought", content=thought))
-        messages.append(response)
 
-        if not response.tool_calls and not response.invalid_tool_calls:
-            _append_note(messages, MISSING_SUBMIT_NOTE)
-            emit(TraceEvent(step, "note", content="Agent stopped without submitting — reminding it to call submit_diagnosis."))
-            continue
+def _submit_calls(state: RootlyState) -> list[dict]:
+    return [c for c in _last_ai(state["messages"]).tool_calls if c["name"] == SUBMIT_TOOL_NAME]
 
-        accepted: DiagnosisPackage | None = None
-        for call in response.invalid_tool_calls:
-            emit(TraceEvent(step, "note", content=f"Malformed arguments for {call.get('name')}: {call.get('error')}", is_error=True))
-            messages.append(ToolMessage(
-                content=f"Error: the arguments for {call.get('name')} were not valid JSON. Call the tool again.",
-                tool_call_id=call["id"], name=call.get("name") or "unknown", status="error",
-            ))
 
-        for call in response.tool_calls:
-            name, args, call_id = call["name"], call["args"], call["id"]
-            if name == SUBMIT_TOOL_NAME:
-                package, problems = check_package(
-                    alert, args, step, time.perf_counter() - started, investigated_services
-                )
-                if package:
-                    accepted = package
-                    emit(TraceEvent(step, "guardrail", content="Diagnosis package passed the CMDB guardrail."))
-                    messages.append(ToolMessage(content="Diagnosis accepted.", tool_call_id=call_id, name=name))
-                else:
-                    emit(TraceEvent(step, "guardrail", content=" ".join(problems), is_error=True))
-                    messages.append(ToolMessage(
-                        content="Diagnosis rejected:\n- " + "\n- ".join(problems),
-                        tool_call_id=call_id, name=name, status="error",
-                    ))
-                continue
+# ── Nodes ────────────────────────────────────────────────────────────────
 
-            tool_calls += 1
-            emit(TraceEvent(step, "action", tool=name, input=dict(args)))
-            record = registry.execute(name, dict(args))
-            if name == "log_search" and not record.is_error:
-                investigated_services.add(str(args.get("service", "")).strip().lower())
-            emit(TraceEvent(step, "observation", tool=name, result=record.result,
-                            duration_ms=round(record.duration_ms, 1), is_error=record.is_error))
-            messages.append(ToolMessage(
-                content=json.dumps(record.result, ensure_ascii=False),
-                tool_call_id=call_id, name=name, status="error" if record.is_error else "success",
-            ))
+def agent_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
+    step, max_steps = state["step_count"] + 1, state["max_steps"]
+    if step > max_steps:
+        raise DiagnosisError(f"No valid diagnosis package after {max_steps} steps.")
 
-        if accepted:
-            return DiagnosisResult(
-                alert=alert,
-                diagnosis=accepted,
-                trace=trace,
-                steps=step,
-                tool_calls=tool_calls,
-                elapsed_seconds=round(time.perf_counter() - started, 2),
-                model=response.response_metadata.get("model_name", model),
-                usage=usage,
+    messages = list(state["messages"])
+    updates: list[BaseMessage] = []
+    trace: list[dict] = []
+    if step == max_steps:
+        messages, noted = _with_note(messages, BUDGET_EXHAUSTED_NOTE)
+        _merge_by_id(updates, noted)
+        trace += _emit(runtime, TraceEvent(step, "note", content="Step budget reached — asking the agent to submit."))
+
+    response = _invoke(runtime.context.llm, messages)
+    usage = {
+        key: state["usage"].get(key, 0) + (response.usage_metadata or {}).get(key, 0)
+        for key in ("input_tokens", "output_tokens")
+    }
+    update: dict = {"step_count": step, "usage": usage}
+
+    if response.response_metadata.get("finish_reason") == "length":
+        # A cut-off response may hold partial tool calls, so it is never added to the
+        # history. The note changes the next input, which breaks a deterministic loop.
+        truncated = state["truncated_responses"] + 1
+        if truncated > MAX_TRUNCATED_RESPONSES:
+            raise DiagnosisError(
+                f"Model output was cut off (finish_reason=length) {truncated} times; giving up at step {step}."
             )
+        messages, noted = _with_note(messages, TRUNCATED_NOTE)
+        _merge_by_id(updates, noted)
+        trace += _emit(runtime, TraceEvent(step, "note", content="Model response was too long and got cut off — asking for a shorter one.", is_error=True))
+        return {**update, "messages": updates, "trace": trace, "truncated_responses": truncated}
 
-    raise DiagnosisError(f"No valid diagnosis package after {max_steps} steps.")
+    used_ids = set(state["used_tool_call_ids"])
+    _dedupe_tool_call_ids(response, used_ids)
+    thought = _text(response)
+    if thought:
+        trace += _emit(runtime, TraceEvent(step, "thought", content=thought))
+    updates.append(response)
+    return {
+        **update,
+        "messages": updates,
+        "trace": trace,
+        "used_tool_call_ids": sorted(used_ids),
+        "model": response.response_metadata.get("model_name", state["model"]),
+    }
+
+
+def nudge_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
+    _, noted = _with_note(list(state["messages"]), MISSING_SUBMIT_NOTE)
+    trace = _emit(runtime, TraceEvent(state["step_count"], "note", content="Agent stopped without submitting — reminding it to call submit_diagnosis."))
+    return {"messages": [noted], "trace": trace}
+
+
+def tools_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
+    step = state["step_count"]
+    response = _last_ai(state["messages"])
+    messages: list[BaseMessage] = []
+    trace: list[dict] = []
+    investigated = set(state["investigated_services"])
+    tool_calls = state["tool_calls"]
+
+    for call in response.invalid_tool_calls:
+        trace += _emit(runtime, TraceEvent(step, "note", content=f"Malformed arguments for {call.get('name')}: {call.get('error')}", is_error=True))
+        messages.append(ToolMessage(
+            content=f"Error: the arguments for {call.get('name')} were not valid JSON. Call the tool again.",
+            tool_call_id=call["id"], name=call.get("name") or "unknown", status="error",
+        ))
+
+    for call in response.tool_calls:
+        name, args, call_id = call["name"], call["args"], call["id"]
+        if name == SUBMIT_TOOL_NAME:
+            continue  # answered by the guardrail node
+        tool_calls += 1
+        trace += _emit(runtime, TraceEvent(step, "action", tool=name, input=dict(args)))
+        record = _registry.execute(name, dict(args))
+        if name == "log_search" and not record.is_error:
+            investigated.add(str(args.get("service", "")).strip().lower())
+        trace += _emit(runtime, TraceEvent(step, "observation", tool=name, result=record.result,
+                                           duration_ms=round(record.duration_ms, 1), is_error=record.is_error))
+        messages.append(ToolMessage(
+            content=json.dumps(record.result, ensure_ascii=False),
+            tool_call_id=call_id, name=name, status="error" if record.is_error else "success",
+        ))
+
+    return {"messages": messages, "trace": trace, "tool_calls": tool_calls, "investigated_services": sorted(investigated)}
+
+
+def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
+    step = state["step_count"]
+    alert = get_alert(state["alert_id"])
+    elapsed = time.time() - state["started_at"]
+    messages: list[BaseMessage] = []
+    trace: list[dict] = []
+    accepted: DiagnosisPackage | None = None
+
+    for call in _submit_calls(state):
+        package, problems = check_package(alert, call["args"], step, elapsed, set(state["investigated_services"]))
+        if package:
+            accepted = package
+            trace += _emit(runtime, TraceEvent(step, "guardrail", content="Diagnosis package passed the CMDB guardrail."))
+            messages.append(ToolMessage(content="Diagnosis accepted.", tool_call_id=call["id"], name=SUBMIT_TOOL_NAME))
+        else:
+            trace += _emit(runtime, TraceEvent(step, "guardrail", content=" ".join(problems), is_error=True))
+            messages.append(ToolMessage(
+                content="Diagnosis rejected:\n- " + "\n- ".join(problems),
+                tool_call_id=call["id"], name=SUBMIT_TOOL_NAME, status="error",
+            ))
+
+    update: dict = {"messages": messages, "trace": trace}
+    if accepted:
+        update["diagnosis"] = accepted.model_dump(mode="json")
+        update["elapsed_seconds"] = round(elapsed, 2)
+    return update
+
+
+def escalation_policy_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
+    diagnosis = DiagnosisPackage.model_validate(state["diagnosis"])
+    component = cmdb_lookup(diagnosis.affected_component)["component"]
+    decision, reason = decide_escalation(diagnosis, len(component["depended_by"]))
+    diagnosis = diagnosis.model_copy(update={
+        "escalation_decision": decision,
+        "escalation_reason": reason,
+        "owner_team": component["owner_team"],
+    })
+    trace = _emit(runtime, TraceEvent(state["step_count"], "escalation", content=f"{decision.value}: {reason}"))
+    return {"diagnosis": diagnosis.model_dump(mode="json"), "trace": trace}
+
+
+def human_approval_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
+    diagnosis = DiagnosisPackage.model_validate(state["diagnosis"])
+    # Nothing with side effects before interrupt(): on resume this node runs again from the top.
+    answer = interrupt({
+        "type": "escalation_approval",
+        "alert_id": state["alert_id"],
+        "component": diagnosis.affected_component,
+        "owner_team": diagnosis.owner_team,
+        "severity": diagnosis.severity_assessed.value,
+        "confidence": diagnosis.confidence,
+        "reason": diagnosis.escalation_reason,
+        "options": list(HUMAN_DECISIONS),
+    })
+    decision, note = (answer.get("decision"), answer.get("note")) if isinstance(answer, dict) else (answer, None)
+    updated = apply_human_decision(diagnosis, decision, note)
+
+    if decision == HUMAN_APPROVE:
+        content = f"Human approved the urgent escalation to {updated.owner_team}."
+    else:
+        content = "Human downgraded the escalation to escalate_normal (not urgent)."
+    if updated.human_decision_note:
+        content += f" Note: {updated.human_decision_note}"
+    trace = _emit(runtime, TraceEvent(state["step_count"], "human_decision", content=content))
+    return {"diagnosis": updated.model_dump(mode="json"), "trace": trace}

@@ -69,6 +69,12 @@ class Criticality(str, Enum):
     CRITICAL = "critical"
 
 
+class EscalationDecision(str, Enum):
+    AUTO_RESOLVED = "auto_resolved"
+    ESCALATE_NORMAL = "escalate_normal"
+    ESCALATE_URGENT_NEEDS_APPROVAL = "escalate_urgent_needs_approval"
+
+
 # ── Root-cause taxonomy (StackGen-inspired) ──────────────────────────────
 
 class RootCauseCategory(str, Enum):
@@ -190,3 +196,11 @@ class DiagnosisPackage(BaseModel):
     similar_incidents: list[str] = Field(default_factory=list)
     investigation_steps: int = Field(0, description="Number of ReAct steps taken")
     time_to_diagnosis_seconds: float = Field(0.0)
+
+    # Computed deterministically after the guardrail (src/agent/escalation_policy.py).
+    # Not part of the submit_diagnosis tool schema: the LLM never fills these in.
+    escalation_decision: EscalationDecision | None = None
+    escalation_reason: str | None = None
+    owner_team: str | None = Field(None, description="CMDB owner team of affected_component")
+    human_decision: str | None = Field(None, description="'approve' or 'downgrade', recorded for the audit trail")
+    human_decision_note: str | None = None

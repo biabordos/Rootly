@@ -1,16 +1,16 @@
 # Rootly — Evaluation Results
 
-Generated 2026-09-13 16:59 UTC by `python evaluate.py`.
+Generated 2026-09-15 14:12 UTC by `python evaluate.py`.
 
 **Root component correctly identified:** 5/5
 
-| Alert | Service | Affected component | Correct | Dependencies | Log evidence | Similar incident | Confidence | Steps · Time |
-|---|---|---|---|---|---|---|---|---|
-| ALRT-001 | checkout-api | `payments-db` (expected `payments-db`) | ✅ | ✅ | ✅ | ✅ | 0.90 | 4 steps ✅ · 39.3s ❌ |
-| ALRT-002 | user-service | `user-service` (expected `user-service`) | ✅ | ✅ | ✅ | ❌ | 0.90 | 6 steps ✅ · 10.1s ✅ |
-| ALRT-003 | api-gateway | `redis-cache` (expected `redis-cache`) | ✅ | ✅ | ✅ | ✅ | 0.95 | 6 steps ✅ · 15.9s ✅ |
-| ALRT-004 | order-service | `order-service` (expected `order-service`) | ✅ | ✅ | ✅ | ✅ | 0.80 | 4 steps ✅ · 9.8s ✅ |
-| ALRT-005 | web-frontend | `auth-service` (expected `auth-service`) | ✅ | ✅ | ✅ | ✅ | 0.90 | 6 steps ✅ · 8.8s ✅ |
+| Alert | Service | Affected component | Correct | Dependencies | Log evidence | Similar incident | Confidence | Escalation | Steps · Time |
+|---|---|---|---|---|---|---|---|---|---|
+| ALRT-001 | checkout-api | `payments-db` (expected `payments-db`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 4 steps ✅ · 21.4s ✅ |
+| ALRT-002 | user-service | `user-service` (expected `user-service`) | ✅ | ✅ | ✅ | ✅ | 0.80 | `auto_resolved` | 4 steps ✅ · 21.5s ✅ |
+| ALRT-003 | api-gateway | `redis-cache` (expected `redis-cache`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 6 steps ✅ · 16.3s ✅ |
+| ALRT-004 | order-service | `order-service` (expected `order-service`) | ✅ | ✅ | ✅ | ❌ | 0.90 | `escalate_urgent_needs_approval` | 4 steps ✅ · 9.6s ✅ |
+| ALRT-005 | web-frontend | `auth-service` (expected `auth-service`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 4 steps ✅ · 9.5s ✅ |
 
 Targets: steps < 15, time < 30 s. Similar incident = the direct match from MOCK_DATA_README.md was cited.
 
@@ -20,7 +20,7 @@ Targets: steps < 15, time < 30 s. Similar incident = the direct match from MOCK_
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** The payments-db connection pool is exhausted due to insufficient connections to handle the current load, causing connection timeouts and failures in checkout-api.
+**Hypothesis:** The payments-db connection pool is exhausted due to insufficient connections for the current load, causing all new payment requests to timeout and the circuit breaker to open.
 
 **Escalation:** Page payments-team to increase the connection pool size in payments-db and implement a circuit breaker pattern in checkout-api to handle connection timeouts gracefully.
 
@@ -28,30 +28,30 @@ Targets: steps < 15, time < 30 s. Similar incident = the direct match from MOCK_
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** A memory leak in the new version of user-service caused excessive memory usage and GC pauses, leading to the pod being OOMKilled and high latency.
+**Hypothesis:** The deployment of v2.5.0 introduced a memory leak, causing the service to consume excessive memory and eventually be terminated by the kernel.
 
-**Escalation:** Page the identity-team to investigate and fix the memory leak in the user-service deployment.
+**Escalation:** Page the identity-team to investigate and optimize memory usage in the user-service, particularly focusing on the deployment of v2.5.0.
 
 ### ALRT-003 — api-gateway
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** redis-cache crashed due to OOM after memory usage exceeded its 4GB limit, causing auth-service to fail user token validation and api-gateway to fail all authenticated requests.
+**Hypothesis:** The Redis cache has crashed due to memory pressure, causing the auth-service to fail all authentication requests. This is a known issue that has occurred before, and the solution involves increasing the Redis memory limit and implementing a fallback mechanism for the auth-service.
 
-**Escalation:** Page platform-team to investigate redis-cache OOM and implement memory alerting at 70% and 85% thresholds.
+**Escalation:** Page the platform-team to investigate the Redis cache crash and implement a fallback mechanism for the auth-service.
 
 ### ALRT-004 — order-service
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** The order-service is experiencing timeouts when querying payments-db due to complex queries that are taking longer than the configured query timeout of 50ms. This is causing the circuit breaker to open, leading to a high error rate.
+**Hypothesis:** A configuration change reduced the timeout for queries to the payments-db, causing complex queries to time out and leading to a cascade of errors.
 
-**Escalation:** Page the orders-team to investigate and potentially adjust the query timeout configuration in the order-service to accommodate the complex queries.
+**Escalation:** Page the orders-team to investigate and potentially revert the configuration change.
 
 ### ALRT-005 — web-frontend
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** The auth-service internal TLS certificate expired, causing all inter-service HTTPS communication to fail, which in turn made the web-frontend service completely unavailable.
+**Hypothesis:** The auth-service internal TLS certificate has expired, causing all inter-service HTTPS communication to fail.
 
-**Escalation:** Page the platform-team to renew the TLS certificate and implement automated renewal for the auth-service.
+**Escalation:** Page the security team to renew the auth-service internal TLS certificate and implement automated renewal. The frontend-team should monitor the service while the security team works on the fix.

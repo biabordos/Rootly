@@ -17,14 +17,16 @@ if str(ROOT) not in sys.path:
 import streamlit as st
 from dotenv import load_dotenv
 
-from src.agent import DiagnosisError, run_diagnosis
-from src.agent.report import diagnosis_dict, to_markdown
+from src.agent import DiagnosisError, resume_diagnosis, run_diagnosis
+from src.agent.escalation_policy import HUMAN_APPROVE, HUMAN_DOWNGRADE
+from src.agent.report import ESCALATION_LABEL, HUMAN_DECISION_LABEL, diagnosis_dict, to_markdown
 from src.data_loader import load_alerts, load_incidents
 
 load_dotenv(ROOT / ".env")
 st.set_page_config(page_title="Rootly — AI Incident Triage", page_icon="🔍", layout="wide")
 
 SEVERITY_ICON = {"low": "🟢", "medium": "🟡", "high": "🟠", "critical": "🔴"}
+ESCALATION_ICON = {"auto_resolved": "🟢", "escalate_normal": "🟠", "escalate_urgent_needs_approval": "🔴"}
 alerts = {a.id: a for a in load_alerts()}
 incidents = {i.id: i for i in load_incidents()}
 results: dict = st.session_state.setdefault("results", {})
@@ -44,6 +46,10 @@ def render_event(event: dict) -> None:
             st.json(event["result"], expanded=False)
     elif kind == "guardrail":
         (st.error if event.get("is_error") else st.success)(f"🛡️ Guardrail: {event['content']}")
+    elif kind == "escalation":
+        st.info(f"🚦 Escalation policy: {event['content']}")
+    elif kind == "human_decision":
+        st.success(f"🧑 Human decision: {event['content']}")
     elif kind == "note":
         st.warning(event["content"])
 
@@ -52,6 +58,10 @@ def step_title(step: int, events: list[dict]) -> str:
     tools = [e["tool"] for e in events if e["kind"] == "action"]
     if any(e["kind"] == "guardrail" for e in events):
         tools.append("submit_diagnosis")
+    if any(e["kind"] == "escalation" for e in events):
+        tools.append("escalation_policy")
+    if any(e["kind"] == "human_decision" for e in events):
+        tools.append("human_approval")
     return f"Step {step}: " + (" → ".join(tools) if tools else "reasoning")
 
 
@@ -72,7 +82,8 @@ alert = alerts[selected]
 
 # ── Header & alert card ──────────────────────────────────────────────────
 st.title("🔍 Rootly — AI Incident Triage Agent")
-st.caption("ReAct agent: Thought → Action → Observation over CMDB, logs and historical incidents.")
+st.caption("LangGraph agent: Thought → Action → Observation over CMDB, logs and historical incidents, "
+           "with human approval for urgent escalations.")
 
 with st.container(border=True):
     st.subheader(f"{SEVERITY_ICON[alert.severity_reported.value]} {alert.id} — {alert.service}")
@@ -112,14 +123,18 @@ if selected in errors:
 result = results.get(selected)
 
 with sidebar_status:
-    if result:
+    if result and result.needs_approval:
+        st.warning("⏸ Waiting for approval")
+    elif result:
         st.success("✅ Complete")
+    if result:
         m1, m2 = st.columns(2)
         m1.metric("Steps", result.steps)
         m2.metric("Time", f"{result.elapsed_seconds:.0f}s")
         m3, m4 = st.columns(2)
         m3.metric("Tool calls", result.tool_calls)
         m4.metric("Confidence", f"{result.diagnosis.confidence:.2f}")
+        st.caption(f"Thread: `{result.thread_id}`")
         st.divider()
         st.subheader("Export")
         st.download_button("⬇ Diagnosis JSON", json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
@@ -134,6 +149,29 @@ with sidebar_status:
 if not result:
     st.stop()
 
+d = result.diagnosis
+
+# ── Human approval ───────────────────────────────────────────────────────
+if result.needs_approval:
+    request = result.approval_request or {}
+    with st.container(border=True):
+        st.subheader("⏸ Human approval required")
+        st.write(f"Urgent escalation of **{request.get('component')}** to **{request.get('owner_team')}**.")
+        st.warning(request.get("reason"))
+        note = st.text_input("Note for the audit trail (optional)", key=f"note-{result.thread_id}")
+        approve_col, downgrade_col = st.columns(2)
+        decision = None
+        if approve_col.button("✅ Approve urgent escalation", type="primary", width="stretch"):
+            decision = HUMAN_APPROVE
+        if downgrade_col.button("⬇ Downgrade — not urgent", width="stretch"):
+            decision = HUMAN_DOWNGRADE
+        if decision:
+            try:
+                results[selected] = resume_diagnosis(result.thread_id, decision, note=note)
+            except DiagnosisError as exc:
+                errors[selected] = f"Resume failed: {exc}"
+            st.rerun()
+
 # ── Trace ────────────────────────────────────────────────────────────────
 st.subheader("Agent reasoning trace")
 by_step: dict[int, list[dict]] = {}
@@ -145,7 +183,6 @@ for step, events in by_step.items():
             render_event(event)
 
 # ── Diagnosis package ────────────────────────────────────────────────────
-d = result.diagnosis
 st.subheader("Diagnosis package")
 with st.container(border=True):
     c1, c2, c3 = st.columns(3)
@@ -160,6 +197,15 @@ with st.container(border=True):
     st.write(d.root_cause_hypothesis)
     st.markdown("**Escalation recommendation**")
     st.info(d.escalation_recommendation)
+
+    if d.escalation_decision:
+        decision_value = d.escalation_decision.value
+        st.markdown("**Escalation decision**")
+        st.write(f"{ESCALATION_ICON[decision_value]} {ESCALATION_LABEL[decision_value]} · owner team `{d.owner_team}`")
+        st.caption(d.escalation_reason)
+        if d.human_decision:
+            st.write(f"🧑 Human {HUMAN_DECISION_LABEL.get(d.human_decision, d.human_decision)}"
+                     + (f" — _{d.human_decision_note}_" if d.human_decision_note else ""))
 
     left, right = st.columns(2)
     with left:
