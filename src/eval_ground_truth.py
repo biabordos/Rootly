@@ -14,4 +14,11 @@ GROUND_TRUTH = {
     "ALRT-003": {"root": "redis-cache", "involved": {"redis-cache", "auth-service"}, "incident": "INC-2025-156"},
     "ALRT-004": {"root": "order-service", "involved": {"order-service", "payments-db"}, "incident": "INC-2025-278"},
     "ALRT-005": {"root": "auth-service", "involved": {"auth-service"}, "incident": "INC-2025-341"},
+    "ALRT-006": {"root": "payments-db", "involved": {"payments-db", "order-service"}, "incident": "INC-2025-089"},
+    "ALRT-007": {"root": "user-service", "involved": {"user-service"}, "incident": "INC-2025-067"},
+    "ALRT-008": {"root": "cdn-provider", "involved": {"cdn-provider", "api-gateway"}, "incident": "INC-2024-301"},
+    # Scenario 9 has two valid investigation paths (via checkout-api or via order-service);
+    # only assert what both paths share instead of picking one.
+    "ALRT-009": {"root": "payments-db", "involved": {"payments-db", "api-gateway"}, "incident": "INC-2024-445"},
+    "ALRT-010": {"root": "auth-service", "involved": {"auth-service"}, "incident": "INC-2024-512"},
 }
