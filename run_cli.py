@@ -30,6 +30,15 @@ from src.agent.observability import tracing_status
 from src.agent.report import diagnosis_dict, to_markdown
 from src.data_loader import get_alert, load_alerts
 
+# The live trace prints emoji (see make_printer below). On Windows, when the terminal
+# doesn't advertise VT/ANSI support, Rich falls back to its legacy console renderer --
+# which still writes through sys.stdout.write, defaulting to the system codepage (e.g.
+# cp1252), and crashes with UnicodeEncodeError on anything outside it. Reconfiguring
+# stdout/stderr to UTF-8 fixes the encoding without changing which renderer Rich picks.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8")
+
 EXPORT_DIR = Path(__file__).resolve().parent / "exports"
 console = Console()
 
