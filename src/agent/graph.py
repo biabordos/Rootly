@@ -121,11 +121,27 @@ def get_graph():
 
 # ── Public API ───────────────────────────────────────────────────────────
 
-def _config(thread_id: str, max_steps: int | None = None) -> dict:
+def _config(
+    thread_id: str,
+    max_steps: int | None = None,
+    *,
+    run_name: str | None = None,
+    tags: list[str] | None = None,
+    metadata: dict | None = None,
+) -> dict:
     config: dict = {"configurable": {"thread_id": thread_id}}
     if max_steps:
         # Each step visits at most agent → tools → guardrail; the extra room covers nudges and escalation.
         config["recursion_limit"] = max_steps * 4 + 10
+    # run_name/tags/metadata are standard LangChain config fields: if LangSmith tracing is
+    # on (see src/agent/observability.py) they show up on the run with no further wiring;
+    # if tracing is off they're simply ignored.
+    if run_name:
+        config["run_name"] = run_name
+    if tags:
+        config["tags"] = tags
+    if metadata:
+        config["metadata"] = metadata
     return config
 
 
@@ -169,7 +185,18 @@ def run_diagnosis(
     thread_id = thread_id or f"{alert.id}-{uuid.uuid4().hex[:8]}"
 
     graph = get_graph()
-    config = _config(thread_id, max_steps)
+    config = _config(
+        thread_id,
+        max_steps,
+        run_name=f"rootly-{alert.id}",
+        tags=["rootly", alert.alert_type.value, model],
+        metadata={
+            "alert_id": alert.id,
+            "service": alert.service,
+            "severity_reported": alert.severity_reported.value,
+            "model": model,
+        },
+    )
     if graph.get_state(config).values:
         raise DiagnosisError(f"Run '{thread_id}' already exists; use resume_diagnosis or a new thread_id.")
 

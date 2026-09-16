@@ -3,6 +3,7 @@ langchain-core==1.6.3          # Messages + tool binding
 langchain-mistralai==0.2.12    # Mistral chat model with tool calling (free Experiment plan works)
 langgraph==1.2.11              # StateGraph orchestration + interrupt() for human approval
 langgraph-checkpoint-sqlite==3.1.1  # Persists paused runs so they can be resumed from another process
+langsmith>=0.1.0               # LangChain-native tracing/observability (opt-in via LANGSMITH_* env vars)
 pydantic>=2.0                  # Data validation
 
 # RAG

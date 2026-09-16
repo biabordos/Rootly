@@ -26,6 +26,7 @@ from rich.table import Table
 
 from src.agent import DiagnosisError, DiagnosisResult, resume_diagnosis, run_diagnosis
 from src.agent.escalation_policy import HUMAN_DECISIONS
+from src.agent.observability import tracing_status
 from src.agent.report import diagnosis_dict, to_markdown
 from src.data_loader import get_alert, load_alerts
 
@@ -142,6 +143,7 @@ def resume(thread_id: str, decision: str, note: str | None, verbose: bool, expor
 
 def main() -> int:
     load_dotenv()
+    console.print(f"[dim]{tracing_status()}[/dim]")
     parser = argparse.ArgumentParser(description="Rootly — AI incident diagnosis agent")
     parser.add_argument("alert_id", nargs="?", help="Alert scenario to diagnose, e.g. ALRT-001")
     parser.add_argument("--verbose", action="store_true", help="Show full tool observations")
