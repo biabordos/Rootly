@@ -7,7 +7,8 @@ the former hand-written ReAct loop, split along the graph's edges:
   agent             one model turn (retry/backoff, truncation recovery, tool-call id dedup)
   nudge             the model ended its turn without calling submit_diagnosis
   tools             run investigation tool calls
-  guardrail         validate submit_diagnosis against the CMDB (incl. the origin check)
+  guardrail         validate submit_diagnosis against the CMDB (incl. the origin check and
+                    the transitive reachability check)
   escalation_policy deterministic escalation decision, no LLM call
   human_approval    interrupt() until a human approves or downgrades an urgent escalation
 
@@ -160,6 +161,45 @@ def _unexamined_blamed_dependencies(alert: Alert, affected: str, investigated_se
     ]
 
 
+def _unreachable_investigated_path(alert: Alert, affected: str, investigated_services: set[str]) -> list[str]:
+    """
+    Transitive guardrail: affected_component must be reachable from alert.service by walking
+    the CMDB depends_on graph through components the agent has actually investigated (log_search
+    called on them). The two endpoints -- alert.service and affected -- don't need their own
+    investigation to count, since the origin check above and the log_evidence requirement already
+    cover the final component; this only closes the gap in between. Without it, the agent could
+    guess a component 3+ hops away (e.g. payments-db from a web-frontend alert) whose own logs
+    happen to look guilty, without ever investigating the intermediate hops that would confirm --
+    or rule out -- that the failure actually propagated that way. See docs/MOCK_DATA_README.md,
+    section "Guardrail-ul tranzitiv".
+    """
+    start = alert.service.strip().lower()
+    if start == affected:
+        return []
+    deps_by_name = {c.name: [_component_name(ref) for ref in c.depends_on] for c in load_cmdb()}
+    visited = {start}
+    frontier = [start]
+    blocked: set[str] = set()
+    while frontier:
+        node = frontier.pop()
+        for dependency in deps_by_name.get(node, []):
+            if dependency == affected:
+                return []
+            if dependency in visited:
+                continue
+            if dependency in investigated_services:
+                visited.add(dependency)
+                frontier.append(dependency)
+            else:
+                blocked.add(dependency)
+    hops = ", ".join(sorted(blocked - visited)) or "the components between them"
+    return [
+        f"No fully-investigated path from {alert.service} to {affected} in the CMDB dependency graph: "
+        f"you have not run log_search on {hops}. Investigate the chain from {alert.service} down to "
+        f"{affected} before submitting, or pick the component where your investigation actually stopped."
+    ]
+
+
 def check_package(
     alert: Alert,
     package_input: dict[str, Any],
@@ -171,8 +211,9 @@ def check_package(
     """
     Guardrail: the package may only reference components that exist in the CMDB and
     historical incidents that exist in the corpus, and must cite log evidence. When
-    investigated_services is given, the origin check above is applied as well; when
-    searched_similar_incidents is given, similar_incidents_search must have been called.
+    investigated_services is given, the origin check and the transitive reachability check
+    above are applied as well; when searched_similar_incidents is given, similar_incidents_search
+    must have been called.
     """
     component_names = {c.name for c in load_cmdb()}
     incident_ids = {i.id for i in load_incidents()}
@@ -200,6 +241,7 @@ def check_package(
         workflow_problems = []
         if investigated_services is not None:
             workflow_problems += _unexamined_blamed_dependencies(alert, affected, investigated_services)
+            workflow_problems += _unreachable_investigated_path(alert, affected, investigated_services)
         if searched_similar_incidents is False:
             workflow_problems.append(
                 "You have not searched for similar historical incidents. Call similar_incidents_search "

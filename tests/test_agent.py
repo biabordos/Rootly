@@ -407,6 +407,143 @@ def test_existing_thread_id_cannot_be_restarted():
         run_diagnosis(get_alert("ALRT-001"), llm=FakeLLM(scripted_alrt_001()), thread_id=paused.thread_id)
 
 
+# ── Transitive guardrail (docs/MOCK_DATA_README.md, "Guardrail-ul tranzitiv") ────────────
+#
+# _unexamined_blamed_dependencies only checks whether the *submitted* component's own logs
+# blame an uninvestigated dependency. That leaves a gap: the agent can jump straight to a
+# leaf component several hops from the alert (e.g. payments-db from a web-frontend alert)
+# and, if that leaf has no dependencies of its own to blame, the origin check never fires.
+# _unreachable_investigated_path closes it by requiring a fully-investigated path from
+# alert.service to affected_component through the CMDB depends_on graph.
+
+def test_transitive_guardrail_leaves_the_five_original_scenarios_unaffected():
+    # ALRT-001/002/003 already run unchanged in the tests above (1 hop and 0 hops, both ends
+    # exempt from the reachability check). This covers the remaining two: another 0-hop
+    # self-origin (ALRT-004) and a 2-hop chain through a single intermediate (ALRT-005).
+    window_004 = {"start_time": "2026-08-21T11:15:00Z", "end_time": "2026-08-21T11:55:00Z"}
+    package_004 = {
+        "summary": "order-service payment verification queries are timing out after a config "
+                   "change lowered the payments-db query timeout to 50ms.",
+        "affected_component": "order-service",
+        "severity_assessed": "high",
+        "critical_dependencies": ["payments-db"],
+        "log_evidence": ["2026-08-21T11:39:00Z order-service: Query timeout to payments-db after 50ms for order ORD-9103 (complex join query)"],
+        "root_cause_hypothesis": "payments_db_timeout_ms was dropped from 5000 to 50, too aggressive for "
+                                  "complex join queries; payments-db itself is healthy.",
+        "confidence": 0.85,
+        "escalation_recommendation": "Page order-team: revert payments_db_timeout_ms to 5000.",
+        "similar_incidents": ["INC-2025-278"],
+    }
+    llm_004 = FakeLLM([
+        turn("", ("log_search", {"service": "order-service", **window_004, "level": "ERROR"})),
+        turn("", ("log_search", {"service": "payments-db", **window_004})),
+        turn("", ("similar_incidents_search", {"query": "order-service payments-db timeout after config change"})),
+        turn("", (SUBMIT_TOOL_NAME, package_004)),
+    ])
+    result_004 = run_diagnosis(get_alert("ALRT-004"), llm=llm_004)
+    assert result_004.diagnosis.affected_component == "order-service"
+
+    window_005 = {"start_time": "2026-08-22T15:45:00Z", "end_time": "2026-08-22T16:15:00Z"}
+    package_005 = {
+        "summary": "auth-service's TLS certificate expired, rejecting all inbound HTTPS connections "
+                   "and cascading through api-gateway to web-frontend.",
+        "affected_component": "auth-service",
+        "severity_assessed": "critical",
+        "critical_dependencies": ["api-gateway"],
+        "log_evidence": ["2026-08-22T16:05:30Z auth-service: TLS certificate expired at 16:00:00Z, all inbound HTTPS connections rejected"],
+        "root_cause_hypothesis": "auth-service's TLS certificate expired at 16:00:00Z; every inbound HTTPS "
+                                  "connection is rejected, cascading to a full outage.",
+        "confidence": 0.9,
+        "escalation_recommendation": "Page security-team: renew the auth-service TLS certificate immediately.",
+        "similar_incidents": ["INC-2025-341"],
+    }
+    llm_005 = FakeLLM([
+        turn("", ("cmdb_lookup", {"component_name": "web-frontend"})),
+        turn("", ("log_search", {"service": "api-gateway", **window_005})),
+        turn("", ("log_search", {"service": "auth-service", **window_005})),
+        turn("", ("similar_incidents_search", {"query": "TLS certificate expired, auth-service outage"})),
+        turn("", (SUBMIT_TOOL_NAME, package_005)),
+    ])
+    result_005 = run_diagnosis(get_alert("ALRT-005"), llm=llm_005)
+    assert result_005.diagnosis.affected_component == "auth-service"
+
+
+def test_transitive_guardrail_rejects_a_shortcut_then_accepts_the_order_service_path():
+    # ALRT-009 (web-frontend, 3 hops to payments-db) is the scenario built specifically for
+    # this guardrail. A submit that jumps straight to payments-db without ever investigating
+    # the intermediate hop (api-gateway) must be rejected, even though payments-db's own logs
+    # look guilty on their own (it has no dependencies to blame, so the origin check alone
+    # would let it through).
+    window = {"start_time": "2026-08-27T01:45:00Z", "end_time": "2026-08-27T02:10:00Z"}
+    shortcut_package = {
+        "summary": "payments-db failover took 12 minutes instead of the expected 30 seconds during a "
+                   "scheduled maintenance window.",
+        "affected_component": "payments-db",
+        "severity_assessed": "high",
+        "critical_dependencies": ["web-frontend"],
+        "log_evidence": ["2026-08-27T01:56:00Z payments-db: Replication lag detected: 4200ms, above 100ms threshold - failover delayed"],
+        "root_cause_hypothesis": "Scheduled payments-db failover suffered abnormal replication lag.",
+        "confidence": 0.9,
+        "escalation_recommendation": "Page payments-team: investigate replication lag during failovers.",
+        "similar_incidents": ["INC-2024-445"],
+    }
+    via_order_service = {
+        **shortcut_package,
+        "critical_dependencies": ["api-gateway", "order-service"],
+        "summary": "payments-db failover took 12 minutes instead of the expected 30 seconds; the same "
+                   "failure propagated to web-frontend through api-gateway and order-service.",
+    }
+    events: list[dict] = []
+    llm = FakeLLM([
+        turn("", ("log_search", {"service": "web-frontend", **window})),
+        turn("", ("log_search", {"service": "payments-db", **window})),
+        turn("", ("similar_incidents_search", {"query": "payments-db failover replication lag"})),
+        turn("Submitting straight to payments-db.", (SUBMIT_TOOL_NAME, shortcut_package)),
+        turn("", ("log_search", {"service": "api-gateway", **window}),
+             ("log_search", {"service": "order-service", **window})),
+        turn("Resubmitting with the investigated path.", (SUBMIT_TOOL_NAME, via_order_service)),
+    ])
+
+    result = run_diagnosis(get_alert("ALRT-009"), llm=llm, on_event=events.append)
+
+    rejections = [e for e in events if e["kind"] == "guardrail" and e["is_error"]]
+    assert len(rejections) == 1
+    assert "No fully-investigated path" in rejections[0]["content"]
+    assert "api-gateway" in rejections[0]["content"]
+    assert result.diagnosis.affected_component == "payments-db"
+    assert result.diagnosis.critical_dependencies == ["api-gateway", "order-service"]
+
+
+def test_transitive_guardrail_accepts_the_checkout_api_path():
+    # The other of the two valid investigated paths to payments-db (via checkout-api instead
+    # of order-service) must also be accepted: the guardrail checks reachability, not one
+    # specific "correct" hop.
+    window = {"start_time": "2026-08-27T01:45:00Z", "end_time": "2026-08-27T02:10:00Z"}
+    package = {
+        "summary": "payments-db failover took 12 minutes instead of the expected 30 seconds; "
+                   "checkout-api's writes failed during the window.",
+        "affected_component": "payments-db",
+        "severity_assessed": "high",
+        "critical_dependencies": ["api-gateway", "checkout-api"],
+        "log_evidence": ["2026-08-27T01:57:00Z checkout-api: Write query to payments-db failed: no primary available during failover"],
+        "root_cause_hypothesis": "Scheduled payments-db failover suffered abnormal replication lag, breaking checkout-api's writes.",
+        "confidence": 0.9,
+        "escalation_recommendation": "Page payments-team: investigate replication lag during failovers.",
+        "similar_incidents": ["INC-2024-445"],
+    }
+    llm = FakeLLM([
+        turn("", ("log_search", {"service": "api-gateway", **window})),
+        turn("", ("log_search", {"service": "checkout-api", **window})),
+        turn("", ("similar_incidents_search", {"query": "payments-db failover replication lag"})),
+        turn("", (SUBMIT_TOOL_NAME, package)),
+    ])
+
+    result = run_diagnosis(get_alert("ALRT-009"), llm=llm)
+
+    assert result.diagnosis.affected_component == "payments-db"
+    assert result.diagnosis.critical_dependencies == ["api-gateway", "checkout-api"]
+
+
 @pytest.mark.live
 @pytest.mark.skipif(not os.getenv("MISTRAL_API_KEY"), reason="requires MISTRAL_API_KEY")
 def test_scenario_1_end_to_end():
