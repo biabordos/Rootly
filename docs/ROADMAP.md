@@ -190,3 +190,11 @@ Cu Fazele 1–6 gata, ce contează acum pentru o prezentare bună:
 - [ ] Dacă un scenariu iese greșit, ajustați `src/agent/system_prompt.py` (nu tool-urile sau datele, care sunt deja validate) și rerulați.
 - [ ] Pregătiți 1–2 rulări demonstrate live (`run_cli.py` sau Streamlit) pentru prezentare, plus `EVAL_RESULTS.md` ca "dovadă" pentru audiență.
 - [ ] Opțional: un slide/paragraf care explică explicit alegerea Mistral în locul Claude — e o decizie justificată (acces la cheie gratuită), nu un compromis de calitate.
+
+## 7. Gap cunoscut — relevanță RAG pe incidente apropiate semantic
+
+Descoperit rulând live scenariul 9 (`ALRT-009`, payments-db failover cu replication lag, `INC-2024-445`) de mai multe ori după ce guardrail-ul tranzitiv a fost adăugat (vezi §2, Faza 3): odată ce `affected_component` a devenit consistent corect (`payments-db`), `similar_incidents_search` a rămas totuși instabil — în unele rulări citează corect `INC-2024-445`, în altele citează `INC-2025-114` (incidentul-țintă al scenariului 1, tot pe payments-db, dar connection-pool exhaustion, nu failover lag).
+
+Cele două incidente sunt apropiate semantic (ambele: payments-db, conexiuni/latență, severitate mare), iar query-ul pe care agentul îl formulează pentru căutare variază de la o rulare la alta — ChromaDB (sau fallback-ul BM25) nu discriminează suficient de fin între ele pe unele formulări. Nu e o eroare de guardrail sau de date — `tests/test_tools.py::test_incident_search_ranks_direct_match_first_for_each_scenario` arată că pentru un query fix, direct-match-ul iese primul; problema e variabilitatea query-ului generat de LLM de la o rulare la alta.
+
+Neremediat încă. Opțiuni pentru cine preia asta: un query mai structurat (ex. include explicit tipul de mecanism — "replication failover lag" vs. "connection pool exhaustion" — nu doar componenta), sau un re-rank/threshold suplimentar când primele două rezultate au scoruri apropiate.
