@@ -19,18 +19,9 @@ from dotenv import load_dotenv
 
 from src.agent import DiagnosisError, run_diagnosis
 from src.data_loader import get_alert, load_alerts
+from src.eval_ground_truth import GROUND_TRUTH
 
 OUTPUT = Path(__file__).resolve().parent / "EVAL_RESULTS.md"
-
-# Ground truth per scenario: where the root cause originates, the components that
-# must appear somewhere in the package, and the directly matching past incident.
-GROUND_TRUTH = {
-    "ALRT-001": {"root": "payments-db", "involved": {"payments-db", "checkout-api"}, "incident": "INC-2025-114"},
-    "ALRT-002": {"root": "user-service", "involved": {"user-service"}, "incident": "INC-2025-203"},
-    "ALRT-003": {"root": "redis-cache", "involved": {"redis-cache", "auth-service"}, "incident": "INC-2025-156"},
-    "ALRT-004": {"root": "order-service", "involved": {"order-service", "payments-db"}, "incident": "INC-2025-278"},
-    "ALRT-005": {"root": "auth-service", "involved": {"auth-service"}, "incident": "INC-2025-341"},
-}
 
 
 def mark(ok: bool) -> str:
