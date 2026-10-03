@@ -202,6 +202,35 @@ def _unreachable_investigated_path(alert: Alert, affected: str, investigated_ser
     ]
 
 
+def _alerted_service_with_no_investigated_dependency(
+    alert: Alert, affected: str, investigated_services: set[str]
+) -> list[str]:
+    """
+    Stop-too-early check: when the agent blames the very service that fired the alert,
+    require that it searched the logs of at least one of that service's CMDB dependencies.
+
+    This complements the origin check above, which only fires when the component's own
+    ERROR/FATAL logs name a dependency. Observed on ALRT-005: web-frontend's logs describe
+    only its own symptoms ("Login page returning connection refused errors") and name no
+    dependency, so the origin check stays silent while the real cause sits two hops
+    upstream in auth-service.
+    """
+    if affected != alert.service.strip().lower():
+        return []
+    component = next((c for c in load_cmdb() if c.name == affected), None)
+    if component is None:
+        return []
+    dependencies = [_component_name(ref) for ref in component.depends_on]
+    if not dependencies or any(d in investigated_services for d in dependencies):
+        return []
+    return [
+        f"affected_component is the alerted service itself ({affected}), but it has "
+        f"{len(dependencies)} dependencies you have not investigated "
+        f"({', '.join(sorted(dependencies))}). Search their logs before concluding the "
+        f"problem originates here."
+    ]
+
+
 def check_package(
     alert: Alert,
     package_input: dict[str, Any],
@@ -244,6 +273,7 @@ def check_package(
         if investigated_services is not None:
             workflow_problems += _unexamined_blamed_dependencies(alert, affected, investigated_services)
             workflow_problems += _unreachable_investigated_path(alert, affected, investigated_services)
+            workflow_problems += _alerted_service_with_no_investigated_dependency(alert, affected, investigated_services)
         if searched_similar_incidents is False:
             workflow_problems.append(
                 "You have not searched for similar historical incidents. Call similar_incidents_search "

@@ -221,6 +221,58 @@ def test_submit_without_similar_incidents_search_is_rejected():
     assert result.diagnosis.similar_incidents == ["INC-2025-114"]
 
 
+def test_alerted_service_is_rejected_until_a_dependency_is_investigated():
+    # Reproduces the live ALRT-005 failure: the agent blamed web-frontend (the service that
+    # fired the alert) after reading only its own logs, which describe symptoms without
+    # naming any dependency -- so the origin check stays silent. The real cause is
+    # auth-service, two hops upstream via api-gateway.
+    window = {"start_time": "2026-08-21T07:30:00Z", "end_time": "2026-08-21T08:10:00Z"}
+    blames_itself = {
+        "summary": "web-frontend is completely unavailable for authenticated users.",
+        "affected_component": "web-frontend",
+        "severity_assessed": "critical",
+        "critical_dependencies": [],
+        "log_evidence": ["2026-08-21T07:55:00Z web-frontend: Site completely unavailable"],
+        "root_cause_hypothesis": "The web-frontend service is down.",
+        "confidence": 1.0,
+        "escalation_recommendation": "Page the web team.",
+        "similar_incidents": ["INC-2025-341"],
+    }
+    reaches_the_origin = {
+        **blames_itself,
+        "affected_component": "auth-service",
+        "critical_dependencies": ["web-frontend", "api-gateway"],
+        "root_cause_hypothesis": "auth-service's TLS certificate expired.",
+    }
+    llm = FakeLLM([
+        # Only the alerted service's own logs, plus the historical search.
+        turn("", ("log_search", {"service": "web-frontend", **window}),
+             ("similar_incidents_search", {"query": "TLS certificate expired, SSL handshake failures"})),
+        turn("", (SUBMIT_TOOL_NAME, blames_itself)),
+        # After the rejection, walk the chain down to the origin.
+        turn("", ("log_search", {"service": "api-gateway", **window}),
+             ("log_search", {"service": "auth-service", **window})),
+        turn("", (SUBMIT_TOOL_NAME, reaches_the_origin)),
+    ])
+    events: list[dict] = []
+
+    result = run_diagnosis(get_alert("ALRT-005"), llm=llm, on_event=events.append)
+
+    rejection = next(e for e in events if e["kind"] == "guardrail")
+    assert rejection["is_error"]
+    assert "alerted service itself (web-frontend)" in rejection["content"]
+    assert "api-gateway" in rejection["content"]
+    assert result.diagnosis.affected_component == "auth-service"
+
+
+def test_alerted_service_is_accepted_once_a_dependency_was_investigated():
+    # The guard must not fire when the agent did look at a dependency and still, correctly,
+    # concluded the alerted service is the origin -- the case for ALRT-002, 004 and 007.
+    result = run_diagnosis(get_alert("ALRT-002"), llm=FakeLLM(scripted_alrt_002()))
+    assert result.diagnosis.affected_component == "user-service"
+    assert result.diagnosis.escalation_decision == EscalationDecision.AUTO_RESOLVED
+
+
 def test_agent_never_sees_evaluation_taxonomy():
     prompt = format_alert(get_alert("ALRT-003"))
     assert "RC-06" not in prompt and "FM-01" not in prompt and "root_cause_category" not in prompt
