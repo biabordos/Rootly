@@ -33,6 +33,8 @@ import httpx
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.runtime import Runtime
 from langgraph.types import interrupt
+# aliased: `trace` is a local variable in six nodes below, so the bare name would shadow it.
+from opentelemetry import trace as otel_trace
 from pydantic import ValidationError
 
 from src.agent.escalation_policy import HUMAN_APPROVE, HUMAN_DECISIONS, apply_human_decision, decide_escalation
@@ -559,5 +561,15 @@ def human_approval_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> 
         content = "Human downgraded the escalation to escalate_normal (not urgent)."
     if updated.human_decision_note:
         content += f" Note: {updated.human_decision_note}"
+
+    # Audit attributes for Phoenix. A no-op when no tracer provider is registered
+    # (see src/agent/observability.setup_phoenix), e.g. in the offline tests.
+    _tracer = otel_trace.get_tracer("rootly")
+    with _tracer.start_as_current_span("human_approval_decision") as _span:
+        _span.set_attribute("rootly.human_decision", decision)
+        _span.set_attribute("rootly.owner_team", updated.owner_team or "")
+        if updated.human_decision_note:
+            _span.set_attribute("rootly.human_note", updated.human_decision_note)
+
     trace = _emit(runtime, TraceEvent(state["step_count"], "human_decision", content=content))
     return {"diagnosis": updated.model_dump(mode="json"), "trace": trace}

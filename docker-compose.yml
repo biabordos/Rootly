@@ -1,0 +1,51 @@
+services:
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"
+    restart: unless-stopped
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006/v1/traces
+      PHOENIX_PROJECT_NAME: rootly
+      PYTHONUTF8: "1"
+      HF_HOME: /cache/huggingface
+    volumes:
+      - checkpoints:/app/.checkpoints
+      - chroma:/app/.chroma
+      - hf_cache:/cache/huggingface
+    depends_on:
+      - phoenix
+
+  ui:
+    build: .
+    command: streamlit run src/ui/streamlit_app.py --server.port=8501 --server.address=0.0.0.0
+    ports:
+      - "8501:8501"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006/v1/traces
+      PYTHONUTF8: "1"
+      HF_HOME: /cache/huggingface
+    volumes:
+      # Nota: .checkpoints/ si .chroma/ sunt partajate cu `api` — vezi "Limitari cunoscute"
+      # din README. Nu rulati o diagnoza simultan din UI si din API.
+      - checkpoints:/app/.checkpoints
+      - chroma:/app/.chroma
+      - hf_cache:/cache/huggingface
+    depends_on:
+      - phoenix
+
+volumes:
+  checkpoints:
+  chroma:
+  hf_cache:

@@ -400,7 +400,7 @@ A manual evaluation checklist can be applied to a fixed set of test scenarios to
 
 | Component | Implementation |
 | --- | --- |
-| Mock data | 5 alert scenarios, 10 CMDB components, 124 logs, 10 historical incidents (see [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md)) |
+| Mock data | 10 alert scenarios, 11 CMDB components, 201 logs, 10 historical incidents (see [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md)) |
 | Tools | `cmdb_lookup`, `log_search`, `similar_incidents_search` (RAG: ChromaDB + all-MiniLM-L6-v2, BM25 fallback) |
 | Agent | ReAct agent as a LangGraph `StateGraph` on Mistral tool calling (`langchain-mistralai`); the diagnosis is submitted through a `submit_diagnosis` tool |
 | Guardrail | The package may only reference CMDB components and historical incidents that exist, and must cite log evidence. A component is only accepted as the origin once the agent has searched the logs of every upstream dependency that the component's own error logs blame |
@@ -445,6 +445,58 @@ graph TD;
 * `guardrail` — a rejected package goes back to the agent with the reasons.
 * `escalation_policy` → `human_approval` only for urgent escalations.
 
+## Handoff-uri între noduri
+
+Rootly e un singur agent LLM, dar are handoff-uri explicite între nodurile LangGraph,
+fiecare cu un contract de date clar:
+
+| Sursă → Destinație | Ce se transferă | Ce validează destinația |
+|---|---|---|
+| agent → tools | `AIMessage` cu `tool_calls` | Dispatch prin `ToolRegistry`; argumentele invalide devin observații de eroare |
+| agent → nudge | Răspuns fără tool calls | Reamintire să apeleze `submit_diagnosis` |
+| agent → agent | Răspuns trunchiat (`finish_reason=length`) | Mesajul e eliminat, se cere unul mai scurt |
+| tools → guardrail | `ToolMessage` + flag `submit_diagnosis` | Doar dacă `submit_diagnosis` a fost apelat |
+| guardrail → agent | Lista de motive ale respingerii | Pachet respins (componentă invalidă, lipsă dovezi, cale neinvestigată) |
+| guardrail → escalation_policy | `DiagnosisPackage` validat | Verificări CMDB + origin check + reachability tranzitiv trecute |
+| escalation_policy → human_approval | Decizie urgentă + `interrupt()` | Severitate critică / blast radius ≥ 2 / confidence < 0.70 |
+| human_approval → END | Decizia umană (`approve`/`downgrade`) | Stare reluată din checkpoint-ul SQLite |
+
+## Quickstart (Docker)
+
+```bash
+cp .env.example .env   # apoi setează MISTRAL_API_KEY
+docker compose up --build
+```
+
+| Serviciu | URL |
+|---|---|
+| Streamlit UI | http://localhost:8501 |
+| FastAPI Swagger | http://localhost:8000/docs |
+| Phoenix (trace-uri) | http://localhost:6006 |
+
+Necesită Docker Compose >= 2.24 (pentru sintaxa `required: false` pe `env_file`).
+
+## Observabilitate (Arize Phoenix)
+
+Phoenix pornește automat cu `docker compose up`. Pentru dezvoltare fără Docker:
+
+```bash
+docker run -d -p 6006:6006 arizephoenix/phoenix:latest
+```
+
+Setează `PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006/v1/traces` în `.env`, apoi:
+
+```bash
+python run_cli.py ALRT-001                 # bash
+```
+
+```powershell
+$env:PHOENIX_COLLECTOR_ENDPOINT="http://localhost:6006/v1/traces"; python run_cli.py ALRT-001
+```
+
+Deschide http://localhost:6006 pentru trace-uri. Fără `PHOENIX_COLLECTOR_ENDPOINT`
+setat, tracing-ul e dezactivat și nimic nu se schimbă.
+
 ## Getting started
 
 ```bash
@@ -469,7 +521,7 @@ python run_cli.py --resume ALRT-001-1a2b3c4d --decision downgrade --note "known 
 streamlit run src/ui/streamlit_app.py  # web UI with trace, diagnosis package and exports
 
 python -m pytest                       # tool + agent tests (offline, no API key needed)
-python evaluate.py                     # run all 5 scenarios and write EVAL_RESULTS.md
+python evaluate.py                     # run all scenarios and write EVAL_RESULTS.md
 ```
 
 The first run downloads the embedding model (~80 MB) and builds the local vector index in `.chroma/`. Paused runs are checkpointed in `.checkpoints/rootly.sqlite`.
@@ -490,6 +542,29 @@ The MVP covers investigation and diagnosis end-to-end (§8). Beyond it:
 * real automated remediation — out of scope by design (§1.4), an explicit later decision, not an oversight.
 
 See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase plan this MVP followed.
+
+---
+
+## Limitări cunoscute
+
+* `.checkpoints/` și `.chroma/` sunt partajate între containerele `api` și `ui`.
+  `SqliteSaver` are un `threading.Lock` (deci thread-urile din `BackgroundTasks` sunt
+  sigure), dar două procese separate care scriu concurent pe același fișier SQLite pot
+  produce conflicte. La scala unui demo (un utilizator, un scenariu la un moment dat)
+  riscul e neglijabil. Pentru producție, Streamlit ar trebui să vorbească cu API-ul în
+  loc să apeleze `run_diagnosis()` direct.
+* Span-ul OTel din `human_approval_node` apare ca trace separat în Phoenix, nu imbricat
+  sub rularea agentului: instrumentorul OpenInference nu propagă contextul OTel activ în
+  corpul nodurilor LangGraph. Atributele de audit sunt corecte, dar legătura vizuală cu
+  rularea lipsește.
+* `_runs`, registry-ul in-process al API-ului, crește nelimitat și se pierde la restart.
+  Checkpoint-ul SQLite supraviețuiește, iar API-ul face fallback pe el pentru rulările
+  care au deja un diagnostic; o rulare întreruptă în zbor se pierde.
+* Containerul Phoenix nu are volum persistent — trace-urile se pierd la restart.
+* Nu există `/healthz` pe API, deci `depends_on` din compose garantează doar că
+  containerul a pornit, nu că serviciul e gata să primească cereri.
+* Evaluarea RAGAS folosește `codestral-latest` ca judecător NLI — un model de cod, nu de
+  raționament. Scorurile sunt orientative, nu de referință.
 
 ---
 
@@ -519,6 +594,6 @@ Rootly/
 
 ## Documentation
 
-* [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md) — the 5 scenarios, CMDB topology, and each one's ground truth.
+* [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md) — the 10 scenarios, CMDB topology, and each one's ground truth.
 * [`docs/ROADMAP.md`](./docs/ROADMAP.md) — the phased plan this MVP followed, and what's still ahead.
 * [`docs/Rootly_Plan_Implementare.txt`](./docs/Rootly_Plan_Implementare.txt) — the team's task split for the MVP build.

@@ -24,7 +24,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from src.agent import DiagnosisError, DiagnosisResult, resume_diagnosis, run_diagnosis
-from src.agent.observability import tracing_status
+from src.agent.observability import setup_phoenix, tracing_status
 from src.data_loader import get_alert, load_alerts, load_cmdb, load_incidents, load_logs
 from src.eval_ground_truth import GROUND_TRUTH
 
@@ -84,6 +84,7 @@ def run_one(alert_id: str, auto_approve: bool) -> tuple[DiagnosisResult | None, 
 
 def main(argv: list[str]) -> int:
     load_dotenv()
+    setup_phoenix()
     print(tracing_status())
 
     parser = argparse.ArgumentParser(description="Rootly end-to-end orchestrator")

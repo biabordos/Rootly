@@ -9,7 +9,10 @@ module only reports whether that's actually wired up, for a startup banner.
 
 from __future__ import annotations
 
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 
 def tracing_status() -> str:
@@ -22,3 +25,28 @@ def tracing_status() -> str:
         return "LangSmith tracing: ON but LANGSMITH_API_KEY is missing -- nothing will be sent"
     project = os.getenv("LANGSMITH_PROJECT") or os.getenv("LANGCHAIN_PROJECT") or "default"
     return f"LangSmith tracing: ON -> project '{project}'"
+
+
+_PHOENIX_INITIALIZED = False
+
+
+def setup_phoenix() -> None:
+    """Send OpenTelemetry traces to a Phoenix collector, if one is configured."""
+    global _PHOENIX_INITIALIZED
+    if _PHOENIX_INITIALIZED:
+        return
+    endpoint = os.getenv("PHOENIX_COLLECTOR_ENDPOINT")
+    if not endpoint:
+        return
+    try:
+        from phoenix.otel import register
+
+        register(
+            project_name=os.getenv("PHOENIX_PROJECT_NAME", "rootly"),
+            endpoint=endpoint,
+            auto_instrument=True,
+        )
+        _PHOENIX_INITIALIZED = True
+        logger.info("Phoenix tracing enabled -> %s", endpoint)
+    except Exception as exc:
+        logger.warning("Phoenix setup failed: %s", exc)
