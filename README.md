@@ -553,10 +553,13 @@ See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase plan this MVP 
   produce conflicte. La scala unui demo (un utilizator, un scenariu la un moment dat)
   riscul e neglijabil. Pentru producție, Streamlit ar trebui să vorbească cu API-ul în
   loc să apeleze `run_diagnosis()` direct.
-* Span-ul OTel din `human_approval_node` apare ca trace separat în Phoenix, nu imbricat
-  sub rularea agentului: instrumentorul OpenInference nu propagă contextul OTel activ în
-  corpul nodurilor LangGraph. Atributele de audit sunt corecte, dar legătura vizuală cu
-  rularea lipsește.
+* Span-ul `human_approval_decision` din `human_approval_node` e frate cu span-ul
+  `LangGraph`, nu copil al nodului `human_approval` pe care îl creează instrumentorul
+  OpenInference — acesta nu propagă contextul OTel activ în corpul nodurilor. Prin API
+  span-ul ajunge totuși în același trace, sub `fastapi.endpoint`, deci auditul e lizibil;
+  rulat din CLI, unde nu există un span HTTP părinte, devine rădăcina propriului trace.
+  Atributele (`rootly.human_decision`, `rootly.owner_team`, `rootly.human_note`) sunt
+  corecte în ambele cazuri.
 * `_runs`, registry-ul in-process al API-ului, crește nelimitat și se pierde la restart.
   Checkpoint-ul SQLite supraviețuiește, iar API-ul face fallback pe el pentru rulările
   care au deja un diagnostic; o rulare întreruptă în zbor se pierde.
