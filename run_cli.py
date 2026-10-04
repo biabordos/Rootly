@@ -73,6 +73,8 @@ def make_printer(verbose: bool):
         prefix = f"[dim][Step {step}][/dim]"
         if kind == "thought":
             console.print(f"{prefix} 💭 [cyan]Thought:[/cyan] {event['content']}")
+        elif kind == "routing":
+            console.print(f"{prefix} 🧭 [bold cyan]Handoff:[/bold cyan] {event['content']}")
         elif kind == "action":
             args = ", ".join(f"{k}={v!r}" for k, v in event["input"].items())
             console.print(f"{prefix} 🔧 [yellow]Action:[/yellow] {event['tool']}({args})")

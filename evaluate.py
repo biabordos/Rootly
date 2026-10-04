@@ -111,9 +111,12 @@ def main(argv: list[str]) -> int:
         ]
 
     report = [
-        "# Rootly — Evaluation Results",
+        "# Rootly — Evaluation Results (multi-agent)",
         "",
         f"Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC by `python evaluate.py`.",
+        "",
+        "Architecture: orchestrator + CMDB/log/synthesis specialists. The single-agent"
+        " reference run is kept in [`EVAL_RESULTS_SINGLE_AGENT_BASELINE.md`](./EVAL_RESULTS_SINGLE_AGENT_BASELINE.md).",
         "",
         f"**Root component correctly identified:** {correct}/{len(alert_ids)}",
         "",

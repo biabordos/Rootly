@@ -1,34 +1,36 @@
-# Rootly — Evaluation Results
+# Rootly — Evaluation Results (multi-agent)
 
-Generated 2026-10-03 08:46 UTC by `python evaluate.py`.
+Generated 2026-10-04 20:57 UTC by `python evaluate.py`.
 
-**Root component correctly identified:** 9/10
+Architecture: orchestrator + CMDB/log/synthesis specialists. The single-agent reference run is kept in [`EVAL_RESULTS_SINGLE_AGENT_BASELINE.md`](./EVAL_RESULTS_SINGLE_AGENT_BASELINE.md).
+
+**Root component correctly identified:** 8/10
 
 | Alert | Service | Affected component | Correct | Dependencies | Log evidence | Similar incident | Confidence | Escalation | Steps · Time |
 |---|---|---|---|---|---|---|---|---|---|
-| ALRT-001 | checkout-api | `payments-db` (expected `payments-db`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 4 steps ✅ · 29.5s ✅ |
-| ALRT-002 | user-service | `user-service` (expected `user-service`) | ✅ | ✅ | ✅ | ✅ | 0.80 | `auto_resolved` | 4 steps ✅ · 7.7s ✅ |
-| ALRT-003 | api-gateway | `redis-cache` (expected `redis-cache`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 6 steps ✅ · 13.7s ✅ |
-| ALRT-004 | order-service | `order-service` (expected `order-service`) | ✅ | ✅ | ✅ | ✅ | 0.80 | `escalate_urgent_needs_approval` | 4 steps ✅ · 6.9s ✅ |
-| ALRT-005 | web-frontend | `web-frontend` (expected `auth-service`) | ❌ | ❌ | ✅ | ✅ | 1.00 | `escalate_urgent_needs_approval` | 7 steps ✅ · 10.9s ✅ |
-| ALRT-006 | order-service | `payments-db` (expected `payments-db`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 4 steps ✅ · 6.1s ✅ |
-| ALRT-007 | user-service | `user-service` (expected `user-service`) | ✅ | ✅ | ✅ | ✅ | 0.80 | `auto_resolved` | 5 steps ✅ · 13.6s ✅ |
-| ALRT-008 | api-gateway | `cdn-provider` (expected `cdn-provider`) | ✅ | ✅ | ✅ | ✅ | 0.80 | `escalate_normal` | 4 steps ✅ · 6.2s ✅ |
-| ALRT-009 | web-frontend | `payments-db` (expected `payments-db`) | ✅ | ✅ | ✅ | ❌ | 0.95 | `escalate_urgent_needs_approval` | 8 steps ✅ · 13.2s ✅ |
-| ALRT-010 | user-service | `auth-service` (expected `auth-service`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 4 steps ✅ · 7.3s ✅ |
+| ALRT-001 | checkout-api | `payments-db` (expected `payments-db`) | ✅ | ✅ | ✅ | ✅ | 0.85 | `escalate_urgent_needs_approval` | 12 steps ✅ · 35.0s ❌ |
+| ALRT-002 | user-service | `user-service` (expected `user-service`) | ✅ | ✅ | ✅ | ✅ | 0.80 | `escalate_normal` | 9 steps ✅ · 12.1s ✅ |
+| ALRT-003 | api-gateway | `redis-cache` (expected `redis-cache`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 15 steps ❌ · 16.5s ✅ |
+| ALRT-004 | order-service | — | ❌ | — | — | — | — | — | failed: No valid diagnosis package after 32 steps. |
+| ALRT-005 | web-frontend | `auth-service` (expected `auth-service`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 16 steps ❌ · 15.8s ✅ |
+| ALRT-006 | order-service | `payments-db` (expected `payments-db`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 9 steps ✅ · 10.9s ✅ |
+| ALRT-007 | user-service | `user-service` (expected `user-service`) | ✅ | ✅ | ✅ | ✅ | 0.80 | `escalate_normal` | 9 steps ✅ · 12.8s ✅ |
+| ALRT-008 | api-gateway | `cdn-provider` (expected `cdn-provider`) | ✅ | ✅ | ✅ | ✅ | 0.80 | `escalate_normal` | 12 steps ✅ · 14.3s ✅ |
+| ALRT-009 | web-frontend | `payments-db` (expected `payments-db`) | ✅ | ✅ | ✅ | ✅ | 0.90 | `escalate_urgent_needs_approval` | 25 steps ❌ · 42.5s ❌ |
+| ALRT-010 | user-service | — | ❌ | — | — | — | — | — | failed: No valid diagnosis package after 32 steps. |
 
 Targets: steps < 15, time < 30 s. Similar incident = the direct match from MOCK_DATA_README.md was cited.
 
 ## KPI Summary — Manual vs. Rootly
 
-Aggregated over the 10 scenario(s) that produced a diagnosis.
+Aggregated over the 8 scenario(s) that produced a diagnosis.
 
 | Metrica | Manual (estimat) | Rootly | Diferenta |
 |---|---|---|---|
-| Timp mediu pana la diagnostic | 20 min | 12s | 99% mai rapid |
-| Cazuri auto-rezolvate | 0% | 2/10 (20%) | +20pp |
-| Cazuri care ajung la un om | 100% | 7/10 (70%) | 30pp mai putin |
-| Acuratete componenta afectata | variabila | 9/10 (90%) | — |
+| Timp mediu pana la diagnostic | 21 min | 20s | 98% mai rapid |
+| Cazuri auto-rezolvate | 0% | 0/8 (0%) | +0pp |
+| Cazuri care ajung la un om | 100% | 5/8 (62%) | 38pp mai putin |
+| Acuratete componenta afectata | variabila | 8/10 (80%) | — |
 
 ## Per-scenario review
 
@@ -36,7 +38,7 @@ Aggregated over the 10 scenario(s) that produced a diagnosis.
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** payments-db connection pool exhausted due to insufficient connections for current load, causing checkout-api to open its circuit breaker and fail all payment requests.
+**Hypothesis:** payments-db max_connections set to 20 is insufficient for current load. Connection pool depleted under sustained high-throughput checkout flow, causing all new payment requests to timeout.
 
 **Escalation:** Page payments-team to increase payments-db connection pool size and implement connection pool partitioning to separate batch and real-time workloads.
 
@@ -44,70 +46,54 @@ Aggregated over the 10 scenario(s) that produced a diagnosis.
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** Memory pressure and GC pauses in user-service after deployment, leading to OOM kills and high latency.
+**Hypothesis:** The user-service was OOMKilled due to high memory usage and severe GC pauses, which were caused by the recent deployment of v2.5.0. The high memory usage and GC pauses led to increased latency, which exceeded the SLO.
 
-**Escalation:** Page identity-team to investigate memory management and GC tuning in user-service.
+**Escalation:** Page the identity-team to investigate the recent deployment of v2.5.0 and address the memory issues and GC pauses.
 
 ### ALRT-003 — api-gateway
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** The redis-cache is out of memory, causing the auth-service to be unable to validate user tokens, which has cascaded to all authenticated endpoints, resulting in a complete outage for users attempting to authenticate.
+**Hypothesis:** The redis-cache service is out of memory and has been terminated by the OOM killer. This is causing the auth-service to fail, which in turn is causing the api-gateway to fail.
 
-**Escalation:** Page the platform-team to investigate the redis-cache outage and increase its memory allocation.
-
-### ALRT-004 — order-service
-
-- [ ] Root cause plausible (manual review)
-
-**Hypothesis:** A configuration change reduced the query timeout to 500ms, which is too aggressive for complex payment verification queries that legitimately take 200-800ms under load.
-
-**Escalation:** Page the orders-team to revert the query timeout to 3000ms and implement a more robust configuration change review process.
+**Escalation:** Page the platform-team to investigate and resolve the redis-cache memory issue.
 
 ### ALRT-005 — web-frontend
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** The web-frontend service is completely down, with no successful requests being processed.
+**Hypothesis:** The auth-service TLS certificate expired at 16:00:00Z, causing TLS handshake failures and a complete outage of the web-frontend.
 
-**Escalation:** Page the web team immediately to investigate and restore the service.
+**Escalation:** Page the security-team to renew the certificate and implement automated renewal.
 
 ### ALRT-006 — order-service
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** Long-running batch job BATCH-2026-08 is consuming most of the payments-db connection pool, starving real-time queries and causing timeouts in order-service and checkout-api.
+**Hypothesis:** The batch job BATCH-2026-08 in payments-db is holding 18 of 20 connections for an extended period, starving real-time queries including order-service payment verifications. This is a classic connection pool exhaustion scenario where batch and OLTP workloads are competing for the same resources.
 
-**Escalation:** Page payments-team to investigate and implement connection pool partitioning to reserve connections for real-time queries, similar to INC-2025-089.
+**Escalation:** Page the orders-team to investigate the batch job BATCH-2026-08 in payments-db and consider connection pool partitioning to reserve connections for real-time queries.
 
 ### ALRT-007 — user-service
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** The new search endpoint in v2.6.0 performs full table scans instead of using indexed queries, causing CPU exhaustion and thread pool exhaustion under normal traffic.
+**Hypothesis:** The new user search feature in v2.6.0 uses a full table scan instead of an indexed query for the /api/users/search endpoint, causing high CPU usage and degraded response times under normal traffic.
 
-**Escalation:** Page identity-team to optimize the search query and add appropriate indexes to user-db.
+**Escalation:** Page the identity-team to investigate and optimize the database query for the /api/users/search endpoint.
 
 ### ALRT-008 — api-gateway
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** The CDN provider experienced a routing anomaly in the EU-West region, causing elevated origin fetch latency and intermittent 504 errors for static asset requests. The api-gateway health check endpoint is not affected, masking the issue.
+**Hypothesis:** The cdn-provider experienced a routing anomaly in the EU-West region, causing 40% of static asset requests to timeout. The api-gateway health checks were passing (they hit /health, not CDN-dependent paths) masking the issue.
 
-**Escalation:** Page the platform-team to investigate the CDN provider routing anomaly and implement multi-CDN failover and synthetic monitoring that tests CDN-dependent paths.
+**Escalation:** Page the platform-team to investigate and resolve the routing anomaly in the cdn-provider, specifically in the EU-West region. Implement multi-CDN failover and add synthetic monitoring that tests CDN-dependent paths to prevent similar issues in the future.
 
 ### ALRT-009 — web-frontend
 
 - [ ] Root cause plausible (manual review)
 
-**Hypothesis:** payments-db max_connections set to 20, insufficient for peak load. Connection pool depleted under sustained high-throughput checkout flow, causing all new payment requests to timeout.
+**Hypothesis:** The payments-db failover took longer than expected due to replication lag, causing the checkout-api to fail and resulting in elevated 5xx errors from the api-gateway and web-frontend.
 
-**Escalation:** Page payments-team to increase payments-db connection pool from 20 to 50, add PgBouncer connection pooler as middleware, implement circuit breaker pattern on checkout-api side.
-
-### ALRT-010 — user-service
-
-- [ ] Root cause plausible (manual review)
-
-**Hypothesis:** The security team updated IAM policies to enforce least-privilege OAuth scopes. The change inadvertently removed the 'user:read' scope from service-to-service tokens used by user-service to call auth-service, causing sporadic 403 Forbidden errors.
-
-**Escalation:** Page the security-team to add the missing 'user:read' scope back to the service account svc-user-service and implement a policy-as-code review process requiring automated scope validation before IAM changes are applied.
+**Escalation:** Page the database-team to implement streaming replication monitoring and add a pre-maintenance replication lag check.

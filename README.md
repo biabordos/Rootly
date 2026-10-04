@@ -58,7 +58,7 @@ The package is designed to be ready for handoff to L2.
   * **CMDB** — component and dependency lookup;
   * **Log Search** — filtering by service and time window;
   * **Historical Incident Search** *(optional)* — RAG over similar past incidents.
-* A ReAct agent that plans investigation steps, calls the appropriate tools, interprets the results, and decides when enough context has been gathered.
+* A team of ReAct agents — an orchestrator that plans the investigation and three specialists (CMDB, logs, synthesis) that each own one part of the toolset, interpret their own results, and hand findings back until enough context has been gathered.
 * Generation of a structured diagnosis package in JSON and/or Markdown containing:
 
   * summary;
@@ -396,17 +396,36 @@ A manual evaluation checklist can be applied to a fixed set of test scenarios to
 
 # 8. MVP Status
 
-> **Current status:** MVP implemented — tools, ReAct agent, CLI and Streamlit UI.
+> **Current status:** MVP implemented — tools, multi-agent diagnosis graph, CLI and Streamlit UI.
 
 | Component | Implementation |
 | --- | --- |
 | Mock data | 10 alert scenarios, 11 CMDB components, 201 logs, 10 historical incidents (see [`docs/MOCK_DATA_README.md`](./docs/MOCK_DATA_README.md)) |
 | Tools | `cmdb_lookup`, `log_search`, `similar_incidents_search` (RAG: ChromaDB + all-MiniLM-L6-v2, BM25 fallback) |
-| Agent | ReAct agent as a LangGraph `StateGraph` on Mistral tool calling (`langchain-mistralai`); the diagnosis is submitted through a `submit_diagnosis` tool |
-| Guardrail | The package may only reference CMDB components and historical incidents that exist, and must cite log evidence. A component is only accepted as the origin once the agent has searched the logs of every upstream dependency that the component's own error logs blame |
+| Agents | Four agents in one LangGraph `StateGraph` on Mistral tool calling (`langchain-mistralai`): an **orchestrator** that only routes, plus **CMDB**, **log** and **synthesis** specialists, each holding exactly one part of the toolset. The diagnosis is submitted through a `submit_diagnosis` tool. See [Agents](#agents) below |
+| Guardrail | The package may only reference CMDB components and historical incidents that exist, and every `log_evidence` line must match a real entry in the log corpus, attributed to the service that actually logged it. A component is only accepted as the origin once the logs of every upstream dependency that the component's own error logs blame have been searched. Unchanged by the multi-agent split: the synthesis agent's `submit_diagnosis` goes through exactly the same `check_package()` |
 | Escalation | Deterministic policy after the guardrail (`src/agent/escalation_policy.py`): critical severity, a blast radius of ≥ 2 CMDB dependents, or confidence < 0.70 each force an urgent escalation that needs human approval; a confident low/medium diagnosis is auto-resolved; anything else is a normal escalation |
 | Human-in-the-loop | Urgent escalations pause the graph with `interrupt()`; state is checkpointed to SQLite (`.checkpoints/`), so a human can approve or downgrade (“not urgent”) later, from the CLI or Streamlit, even from another process. The decision and optional note are recorded in the package |
 | Interfaces | `run_cli.py` (Rich) and `src/ui/streamlit_app.py` |
+
+### Agents
+
+Rootly runs four agents over one shared state. The orchestrator holds no investigation
+tools at all — it only decides who works next — and each specialist is bound to exactly
+one part of the toolset, enforced at dispatch: a call to a tool outside an agent's role is
+refused as an error observation instead of being executed.
+
+| Agent | File | Tools | Produces |
+| --- | --- | --- | --- |
+| Orchestrator | `graph_nodes.orchestrator_node` | `route_to_specialist` only | `next_specialist` + the assignment (targets, time window, reason) |
+| CMDB | `specialists/cmdb_agent.py` | `cmdb_lookup` | `cmdb_context`: dependency chain (`depends_on` = candidate causes), blast radius (`depended_by`), owner team, deploy/config clues |
+| Log | `specialists/log_agent.py` | `log_search` | `log_evidence_gathered`: quoted log lines + a LOCAL / RELAY / HEALTHY verdict per service. The only agent that fills `investigated_services`, which the guardrail's origin and reachability checks are built on |
+| Synthesis | `specialists/synthesis_agent.py` | `similar_incidents_search`, `submit_diagnosis` | the `DiagnosisPackage`, handed to the guardrail |
+
+No agent receives the shared `messages` log. Each is briefed with its own system prompt
+(`src/agent/system_prompt.py`), the alert, and the structured findings gathered so far, so
+every context stays small and role-specific. `messages` remains the run's audit trail and
+is what the guardrail reads the synthesis agent's `submit_diagnosis` call off.
 
 ### Diagnosis graph
 
@@ -415,51 +434,70 @@ Generated with `build_graph(...).get_graph().draw_mermaid()` (dashed edges are c
 ```mermaid
 graph TD;
 	__start__([start]):::first
-	agent(agent)
-	nudge(nudge)
-	tools(tools)
+	orchestrator(orchestrator)
+	cmdb_agent(cmdb_agent)
+	log_agent(log_agent)
+	synthesis_agent(synthesis_agent)
 	guardrail(guardrail)
 	escalation_policy(escalation_policy)
 	human_approval(human_approval)
 	__end__([end]):::last
-	__start__ --> agent;
-	agent -.-> nudge;
-	agent -.-> tools;
+	__start__ --> orchestrator;
+	orchestrator -. cmdb .-> cmdb_agent;
+	orchestrator -. log .-> log_agent;
+	orchestrator -. synthesis .-> synthesis_agent;
+	cmdb_agent --> orchestrator;
+	log_agent --> orchestrator;
+	synthesis_agent -.-> guardrail;
+	synthesis_agent -.-> orchestrator;
+	guardrail -.-> orchestrator;
+	guardrail -.-> escalation_policy;
 	escalation_policy -.-> __end__;
 	escalation_policy -.-> human_approval;
-	guardrail -.-> agent;
-	guardrail -.-> escalation_policy;
-	nudge --> agent;
-	tools -.-> agent;
-	tools -.-> guardrail;
 	human_approval --> __end__;
-	agent -.-> agent;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc
 ```
 
-* `agent` — one model turn; loops to itself when a truncated response is discarded.
-* `nudge` — the model ended its turn without calling `submit_diagnosis`.
-* `tools` — runs the investigation tools; goes to `guardrail` only if `submit_diagnosis` was called.
-* `guardrail` — a rejected package goes back to the agent with the reasons.
+* `orchestrator` — one model turn that must end in `route_to_specialist`. Control returns
+  here after every specialist, so the investigation can keep walking upstream.
+* `cmdb_agent` / `log_agent` — run their one tool, then report their analysis; each loops
+  internally for at most `SPECIALIST_MAX_TURNS` (3) model turns.
+* `synthesis_agent` — searches historical incidents, then calls `submit_diagnosis`. If it
+  ends without a package, control goes back to the orchestrator.
+* `guardrail` — a rejected package goes back to the **orchestrator**, not to the synthesis
+  agent: the rejection reasons name the services whose logs are still missing, and only the
+  log agent can close that gap. This is what makes the multi-hop scenarios reachable.
 * `escalation_policy` → `human_approval` only for urgent escalations.
 
-## Handoff-uri între noduri
+## Handoff-uri între agenți
 
-Rootly e un singur agent LLM, dar are handoff-uri explicite între nodurile LangGraph,
-fiecare cu un contract de date clar:
+Fiecare handoff are un contract de date explicit:
 
 | Sursă → Destinație | Ce se transferă | Ce validează destinația |
 |---|---|---|
-| agent → tools | `AIMessage` cu `tool_calls` | Dispatch prin `ToolRegistry`; argumentele invalide devin observații de eroare |
-| agent → nudge | Răspuns fără tool calls | Reamintire să apeleze `submit_diagnosis` |
-| agent → agent | Răspuns trunchiat (`finish_reason=length`) | Mesajul e eliminat, se cere unul mai scurt |
-| tools → guardrail | `ToolMessage` + flag `submit_diagnosis` | Doar dacă `submit_diagnosis` a fost apelat |
-| guardrail → agent | Lista de motive ale respingerii | Pachet respins (componentă invalidă, lipsă dovezi, cale neinvestigată) |
-| guardrail → escalation_policy | `DiagnosisPackage` validat | Verificări CMDB + origin check + reachability tranzitiv trecute |
-| escalation_policy → human_approval | Decizie urgentă + `interrupt()` | Severitate critică / blast radius ≥ 2 / confidence < 0.70 |
+| orchestrator → cmdb_agent | `assignment.targets` (nume de componente) | Fiecare `cmdb_lookup` e dispatch-uit prin `ToolRegistry`; o componentă inexistentă devine o observație de eroare |
+| orchestrator → log_agent | `assignment.targets` + fereastra `start_time`/`end_time` | O fereastră lipsă e completată din timestamp-ul alertei (−30 min … +10 min); un handoff „log” fără niciun serviciu e respins ca argument invalid |
+| orchestrator → synthesis_agent | Întreg `cmdb_context` + `log_evidence_gathered` | `affected_component` trebuie să fie componenta cu verdict LOCAL, nu una care doar relayează |
+| orchestrator → orchestrator | Răspuns fără `route_to_specialist` | Reamintire, iar la a doua rata CMDB/log/synthesis determinist (recuperare din eroare, nu o a doua politică de routing) |
+| specialist → orchestrator | Analiza proprie + datele brute, ca state structurat | Orchestratorul decide dacă mai e nevoie de un hop upstream |
+| synthesis_agent → guardrail | `AIMessage` cu `submit_diagnosis` | Verificări CMDB + origin check + reachability tranzitiv + căutarea istorică |
+| guardrail → orchestrator | `replan_reasons` (lista motivelor) | Pachet respins; orchestratorul trebuie să dispatch-uiască logurile cerute înainte de o nouă sinteză |
+| guardrail → escalation_policy | `DiagnosisPackage` validat | Severitate critică / blast radius ≥ 2 / confidence < 0.70 |
+| escalation_policy → human_approval | Decizie urgentă + `interrupt()` | Pauză checkpoint-ată în SQLite |
 | human_approval → END | Decizia umană (`approve`/`downgrade`) | Stare reluată din checkpoint-ul SQLite |
+
+### Rate limiting
+
+Multi-agent means more model calls per scenario than the former single agent. Measured over
+the 10 evaluation scenarios: **9 to 25 model turns** (median 12) against 4–8 for the single
+agent — one turn per routing decision plus two per specialist run, and more every time the
+guardrail sends the investigation back for another round. Two scenarios (ALRT-004, ALRT-010)
+exhausted the 32-turn budget entirely; see `EVAL_RESULTS.md`. Mistral's free tier allows about 1 request/second; the backoff in
+`graph_nodes._invoke()` (2s, 4s, 8s, 16s) absorbs the 429s, so a full `evaluate.py` run
+simply takes longer. `MAX_REACT_STEPS` caps the total at `DEFAULT_MAX_STEPS` (32) model
+turns per run.
 
 ## Quickstart (Docker)
 
@@ -534,10 +572,12 @@ Configuration lives in `.env`: `MISTRAL_MODEL` (default `mistral-large-latest`) 
 
 # 9. Future Development
 
-The MVP covers investigation and diagnosis end-to-end (§8). Beyond it:
+The MVP covers investigation and diagnosis end-to-end (§8), multi-agent included. Beyond it:
+
+* LLM-driven routing is new and the orchestrator still makes recoverable mistakes — see
+  the known limitations below for what is guarded deterministically and what is not;
 
 * automated KPI collection over many runs, not just the single-run summary `evaluate.py` produces today;
-* multi-agent architecture (specialized CMDB/log/synthesis agents behind the current single orchestrator);
 * integration with real observability and ticketing systems (Datadog/Splunk/ServiceNow) in a future version;
 * real automated remediation — out of scope by design (§1.4), an explicit later decision, not an oversight.
 
@@ -547,6 +587,24 @@ See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase plan this MVP 
 
 ## Limitări cunoscute
 
+* Routingul e decis de LLM, deci orchestratorul poate greși. Ce e păzit determinist în
+  `_normalise_route`: un specialist necunoscut, un handoff `log` fără niciun serviciu real,
+  un handoff `cmdb` către o componentă inexistentă sau deja citită. Fiecare refuz e
+  întors ca `ToolMessage` de eroare, cu lista numelor valide, și după
+  `ORCHESTRATOR_ROUTE_ATTEMPTS` (2) încercări se cade pe pasul determinist următor. Ambele
+  garduri vin din rulări live: pe ALRT-001 orchestratorul a rutat de două ori la CMDB pe
+  `checkout-api`, iar pe ALRT-005 a inventat `authentication-service` (pentru `auth-service`).
+* Liniile din `log_evidence` sunt verificate contra corpusului de loguri
+  (`_fabricated_log_evidence` din `graph_nodes.py`): fiecare citare trebuie să corespundă
+  unei intrări reale, iar serviciul numit în citare trebuie să fie chiar cel care a logat-o
+  — asta prinde și cazul subtil al unui mesaj real atribuit altei componente. Timestamp-urile
+  nu sunt comparate (modelele le rotunjesc), iar liniuțele sunt normalizate. Pragul de 8
+  caractere pentru un fragment e calibrat pe citările rulărilor reale din `exports/`.
+  Guardrail-ul a fost adăugat după ce, pe o rulare live ALRT-005, agentul de log a raportat
+  o linie **fabricată** pentru un serviciu la care `log_search` răspunsese „Unknown service”.
+* Multi-agent costă mai multe apeluri de model (vezi [Rate limiting](#rate-limiting)), deci
+  `MAX_REACT_STEPS` a crescut de la 15 la 32. Cu vechea valoare de 15, ALRT-005 cade cu
+  „No valid diagnosis package after 15 steps” — dacă ai un `.env` mai vechi, actualizează-l.
 * `.checkpoints/` și `.chroma/` sunt partajate între containerele `api` și `ui`.
   `SqliteSaver` are un `threading.Lock` (deci thread-urile din `BackgroundTasks` sunt
   sigure), dar două procese separate care scriu concurent pe același fișier SQLite pot
@@ -581,9 +639,10 @@ Rootly/
 │   ├── data_loader.py           # cached, validated dataset loading
 │   ├── tools/                   # cmdb_lookup, log_search, incident_search (RAG)
 │   ├── agent/                   # LangGraph graph (graph, graph_nodes, graph_state), escalation policy,
-│   │                            #   system prompt, tool registry, report export
+│   │   │                        #   per-agent system prompts, tool registry, report export
+│   │   └── specialists/         # cmdb_agent, log_agent, synthesis_agent
 │   └── ui/streamlit_app.py      # Streamlit interface
-├── tests/                       # tool, escalation policy and offline graph tests (+ optional live test)
+├── tests/                       # tool, escalation policy and offline multi-agent graph tests (+ optional live test)
 ├── docs/
 │   ├── diagrams/                 # architecture + ReAct loop diagrams
 │   ├── MOCK_DATA_README.md       # scenario design and ground truth

@@ -1,16 +1,17 @@
 """
 Node functions for the Rootly diagnosis graph, plus the helpers they share.
 
-Each node takes the current RootlyState and returns a partial update. The logic is
-the former hand-written ReAct loop, split along the graph's edges:
+Each node takes the current RootlyState and returns a partial update:
 
-  agent             one model turn (retry/backoff, truncation recovery, tool-call id dedup)
-  nudge             the model ended its turn without calling submit_diagnosis
-  tools             run investigation tool calls
+  orchestrator      one model turn that calls route_to_specialist to pick the next agent
   guardrail         validate submit_diagnosis against the CMDB (incl. the origin check and
                     the transitive reachability check)
   escalation_policy deterministic escalation decision, no LLM call
   human_approval    interrupt() until a human approves or downgrades an urgent escalation
+
+The three specialist nodes live in src/agent/specialists/; they are thin wrappers over
+run_specialist() below, which holds the model loop the former single agent_node used to
+own (retry/backoff, truncation recovery, tool-call id dedup, tool dispatch).
 
 Trace events are streamed live through the runtime context's on_event callback and
 also stored in state, so a resumed run keeps its complete trace.
@@ -30,7 +31,7 @@ from datetime import timedelta
 from typing import Any
 
 import httpx
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.runtime import Runtime
 from langgraph.types import interrupt
 # aliased: `trace` is a local variable in six nodes below, so the bare name would shadow it.
@@ -39,13 +40,23 @@ from pydantic import ValidationError
 
 from src.agent.escalation_policy import HUMAN_APPROVE, HUMAN_DECISIONS, apply_human_decision, decide_escalation
 from src.agent.graph_state import RootlyContext, RootlyState
-from src.agent.tool_registry import ToolRegistry
+from src.agent.tool_registry import ToolCallRecord, ToolRegistry
 from src.data_loader import get_alert, load_cmdb, load_incidents, load_logs
 from src.models.schemas import Alert, DiagnosisPackage, Severity
 from src.tools.cmdb_lookup import cmdb_lookup
 
 DEFAULT_MODEL = "codestral-latest"
-DEFAULT_MAX_STEPS = 15
+# One model turn per orchestrator routing decision plus up to SPECIALIST_MAX_TURNS per
+# specialist run. A clean investigation costs roughly 12 turns (orchestrator → cmdb →
+# orchestrator → log → orchestrator → synthesis, two turns per specialist); the rest of
+# the budget covers walking further upstream and one guardrail rejection round.
+DEFAULT_MAX_STEPS = 32
+# A specialist searches in its first turn and reports its analysis in the second. The
+# third exists so a malformed or truncated tool call can be retried without ending the run.
+SPECIALIST_MAX_TURNS = 3
+# How many times the orchestrator may answer without calling route_to_specialist before
+# the node falls back to the deterministic next step.
+ORCHESTRATOR_ROUTE_ATTEMPTS = 2
 # Bounds each model response. A tool call or the full diagnosis package needs well under
 # 1k tokens; without a cap codestral occasionally generates without end until the read
 # timeout (observed: 120s+ hangs, reproduced on every retry because temperature is 0).
@@ -86,10 +97,62 @@ SUBMIT_TOOL = {
 # Only these keys come from the model; escalation fields are computed after the guardrail.
 SUBMIT_FIELDS = tuple(SUBMIT_TOOL["input_schema"]["properties"])
 
+SPECIALISTS = ("cmdb", "log", "synthesis")
+
+ROUTE_TOOL_NAME = "route_to_specialist"
+ROUTE_TOOL = {
+    "name": ROUTE_TOOL_NAME,
+    "description": (
+        "Hand the investigation to one specialist. Call this exactly once per turn. "
+        "Use 'cmdb' to learn a component's dependencies and blast radius, 'log' to search "
+        "the logs of one or more services in a time window, and 'synthesis' to write and "
+        "submit the final diagnosis package once the evidence is sufficient."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "next": {
+                "type": "string",
+                "enum": list(SPECIALISTS),
+                "description": "Which specialist runs next",
+            },
+            "targets": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "CMDB component names for 'cmdb', service names for 'log'. "
+                    "Leave empty for 'synthesis'."
+                ),
+            },
+            "start_time": {
+                "type": "string",
+                "description": "For 'log': start of the window, ISO 8601 (e.g. '2026-08-18T08:55:00Z')",
+            },
+            "end_time": {
+                "type": "string",
+                "description": "For 'log': end of the window, ISO 8601 (e.g. '2026-08-18T09:15:00Z')",
+            },
+            "reason": {
+                "type": "string",
+                "description": "One sentence: why this specialist on these targets, now",
+            },
+        },
+        "required": ["next"],
+    },
+}
+
 BUDGET_EXHAUSTED_NOTE = (
-    "Step budget nearly exhausted: do not call any more investigation tools. "
-    f"Call {SUBMIT_TOOL_NAME} now with the best diagnosis your evidence supports, "
-    "lowering confidence to reflect any gaps."
+    "Step budget nearly exhausted: stop investigating. Route to 'synthesis' now so the "
+    "best diagnosis your evidence supports is submitted, with confidence lowered to "
+    "reflect any gaps."
+)
+SPECIALIST_BUDGET_NOTE = (
+    "Step budget nearly exhausted: do not call any more tools. Report what your evidence "
+    f"already shows, and if you hold the final package call {SUBMIT_TOOL_NAME} now."
+)
+MISSING_ROUTE_NOTE = (
+    f"You ended your turn without calling {ROUTE_TOOL_NAME}. The investigation only moves "
+    f"forward through that tool: call {ROUTE_TOOL_NAME} now with your chosen specialist."
 )
 MISSING_SUBMIT_NOTE = (
     f"You ended your turn without calling {SUBMIT_TOOL_NAME}. The diagnosis is only "
@@ -110,7 +173,7 @@ class DiagnosisError(RuntimeError):
 @dataclass
 class TraceEvent:
     step: int
-    kind: str  # thought | action | observation | guardrail | note | escalation | human_decision
+    kind: str  # thought | routing | action | observation | guardrail | note | escalation | human_decision
     content: str | None = None
     tool: str | None = None
     input: dict | None = None
@@ -231,6 +294,68 @@ def _alerted_service_with_no_investigated_dependency(
     ]
 
 
+# Minimum length of a quoted fragment that still counts as traceable to a real log line.
+# Calibrated against the log_evidence of real agent runs (exports/*_diagnosis.json) and the
+# test fixtures: at 8 characters every genuine citation is accepted, including deliberately
+# short ones like "OOMKilled", while every fabricated line tried is still rejected.
+MIN_EVIDENCE_QUOTE = 8
+# Models routinely substitute an em dash for the hyphen in a log message, so dashes are
+# folded before comparing; otherwise a byte-perfect quote would be rejected over punctuation.
+_EVIDENCE_DASHES = {"—": "-", "–": "-", "−": "-"}
+_EVIDENCE_PREFIXES = ("[error]", "[fatal]", "[warn]", "[info]", "error:", "fatal:", "warn:", "info:")
+
+
+def _normalise_evidence(value: Any) -> str:
+    text = str(value)
+    for dash, plain in _EVIDENCE_DASHES.items():
+        text = text.replace(dash, plain)
+    return re.sub(r"\s+", " ", text.strip().strip("\"'“”")).strip().lower()
+
+
+def _matches_a_log_entry(text: str, entry) -> bool:
+    """
+    Whether one cited line is traceable to this log entry.
+
+    The entry's service must be named in the citation -- that is what stops a real message
+    being attributed to a component that never logged it. Beyond that, either the entry's
+    whole message appears in the citation, or the citation's message part is a fragment of
+    it, since models shorten long lines. Timestamps are deliberately not compared: models
+    round them, and a wrong timestamp on a real message is a citation slip, not an invention.
+    """
+    if entry.service not in text:
+        return False
+    message = _normalise_evidence(entry.message)
+    if not message:
+        return False
+    if message in text:
+        return True
+    marker = f"{entry.service}:"
+    quoted = text.split(marker, 1)[-1] if marker in text else text
+    quoted = quoted.strip().rstrip(".").strip()
+    for prefix in _EVIDENCE_PREFIXES:
+        if quoted.startswith(prefix):
+            quoted = quoted[len(prefix):].strip()
+            break
+    return len(quoted) >= MIN_EVIDENCE_QUOTE and quoted in message
+
+
+def _fabricated_log_evidence(cited: list[Any]) -> list[str]:
+    """
+    Cited log lines that match no entry in the log corpus.
+
+    The prompt tells every agent never to invent a log line, but a prompt is not a
+    guarantee: on a live ALRT-005 run log_search answered "Unknown service" and the log
+    agent still reported a fabricated line for it, which then became the diagnosis's
+    evidence. Checking the corpus here makes the whole package unacceptable instead.
+    """
+    entries = load_logs()
+    return [
+        str(raw)
+        for raw in cited
+        if not (text := _normalise_evidence(raw)) or not any(_matches_a_log_entry(text, e) for e in entries)
+    ]
+
+
 def check_package(
     alert: Alert,
     package_input: dict[str, Any],
@@ -250,14 +375,18 @@ def check_package(
     incident_ids = {i.id for i in load_incidents()}
     problems: list[str] = []
 
+    names_a_bad_component = False
+
     affected = _component_name(str(package_input.get("affected_component", "")))
     if affected not in component_names:
         problems.append(f"affected_component '{package_input.get('affected_component')}' is not a CMDB component.")
+        names_a_bad_component = True
 
     dependencies = [_component_name(str(d)) for d in package_input.get("critical_dependencies", [])]
     unknown_dependencies = [d for d in dependencies if d not in component_names]
     if unknown_dependencies:
         problems.append(f"critical_dependencies contain unknown components: {', '.join(unknown_dependencies)}.")
+        names_a_bad_component = True
 
     unknown_incidents = [i for i in package_input.get("similar_incidents", []) if i not in incident_ids]
     if unknown_incidents:
@@ -265,6 +394,15 @@ def check_package(
 
     if not package_input.get("log_evidence"):
         problems.append("log_evidence is empty; quote the log lines that support the hypothesis.")
+    else:
+        fabricated = _fabricated_log_evidence(package_input["log_evidence"])
+        if fabricated:
+            problems.append(
+                "log_evidence contains lines that match no entry in the log corpus: "
+                + "; ".join(f'"{line}"' for line in fabricated)
+                + ". Quote log lines exactly as log_search returned them, attributed to the "
+                "service that actually logged them. Never write a line you did not retrieve."
+            )
 
     if not problems:
         # Checked here, not only in the prompt: after a "call submit_diagnosis now" nudge the
@@ -284,7 +422,11 @@ def check_package(
             return None, workflow_problems
 
     if problems:
-        return None, problems + [f"Valid CMDB components: {', '.join(sorted(component_names))}."]
+        # The component list only helps when a component name was actually wrong; appending
+        # it to, say, a fabricated-evidence rejection would point the agent at the wrong fix.
+        if names_a_bad_component:
+            problems.append(f"Valid CMDB components: {', '.join(sorted(component_names))}.")
+        return None, problems
 
     try:
         package = DiagnosisPackage(
@@ -317,8 +459,34 @@ def to_openai_tool(definition: dict) -> dict:
     }
 
 
+def _schemas(*names: str) -> list[dict]:
+    """Tool schemas by name, in the order given, so each agent binds only its own tools."""
+    definitions = {d["name"]: d for d in _registry.tool_definitions()}
+    definitions[SUBMIT_TOOL_NAME] = SUBMIT_TOOL
+    definitions[ROUTE_TOOL_NAME] = ROUTE_TOOL
+    return [to_openai_tool(definitions[name]) for name in names]
+
+
+def orchestrator_tool_schemas() -> list[dict]:
+    """The orchestrator has no investigation tools: it only hands off."""
+    return _schemas(ROUTE_TOOL_NAME)
+
+
+def cmdb_tool_schemas() -> list[dict]:
+    return _schemas("cmdb_lookup")
+
+
+def log_tool_schemas() -> list[dict]:
+    return _schemas("log_search")
+
+
+def synthesis_tool_schemas() -> list[dict]:
+    return _schemas("similar_incidents_search", SUBMIT_TOOL_NAME)
+
+
 def all_tool_schemas() -> list[dict]:
-    return [to_openai_tool(t) for t in _registry.tool_definitions() + [SUBMIT_TOOL]]
+    """Every tool in the system. Kept for tooling/docs; no agent binds this set."""
+    return _schemas("cmdb_lookup", "log_search", "similar_incidents_search", SUBMIT_TOOL_NAME, ROUTE_TOOL_NAME)
 
 
 def build_llm(model: str):
@@ -439,67 +607,31 @@ def _submit_calls(state: RootlyState) -> list[dict]:
 
 # ── Nodes ────────────────────────────────────────────────────────────────
 
-def agent_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
-    step, max_steps = state["step_count"] + 1, state["max_steps"]
-    if step > max_steps:
-        raise DiagnosisError(f"No valid diagnosis package after {max_steps} steps.")
+@dataclass
+class SpecialistOutcome:
+    """What one specialist run produced, for the node function to fold into state."""
 
-    messages = list(state["messages"])
-    updates: list[BaseMessage] = []
-    trace: list[dict] = []
-    if step == max_steps:
-        messages, noted = _with_note(messages, BUDGET_EXHAUSTED_NOTE)
-        _merge_by_id(updates, noted)
-        trace += _emit(runtime, TraceEvent(step, "note", content="Step budget reached — asking the agent to submit."))
-
-    response = _invoke(runtime.context.llm, messages)
-    usage = {
-        key: state["usage"].get(key, 0) + (response.usage_metadata or {}).get(key, 0)
-        for key in ("input_tokens", "output_tokens")
-    }
-    update: dict = {"step_count": step, "usage": usage}
-
-    if response.response_metadata.get("finish_reason") == "length":
-        # A cut-off response may hold partial tool calls, so it is never added to the
-        # history. The note changes the next input, which breaks a deterministic loop.
-        truncated = state["truncated_responses"] + 1
-        if truncated > MAX_TRUNCATED_RESPONSES:
-            raise DiagnosisError(
-                f"Model output was cut off (finish_reason=length) {truncated} times; giving up at step {step}."
-            )
-        messages, noted = _with_note(messages, TRUNCATED_NOTE)
-        _merge_by_id(updates, noted)
-        trace += _emit(runtime, TraceEvent(step, "note", content="Model response was too long and got cut off — asking for a shorter one.", is_error=True))
-        return {**update, "messages": updates, "trace": trace, "truncated_responses": truncated}
-
-    used_ids = set(state["used_tool_call_ids"])
-    _dedupe_tool_call_ids(response, used_ids)
-    thought = _text(response)
-    if thought:
-        trace += _emit(runtime, TraceEvent(step, "thought", content=thought))
-    updates.append(response)
-    return {
-        **update,
-        "messages": updates,
-        "trace": trace,
-        "used_tool_call_ids": sorted(used_ids),
-        "model": response.response_metadata.get("model_name", state["model"]),
-    }
+    analysis: str  # the specialist's closing text, after its tools came back
+    records: list[ToolCallRecord]  # every tool call it executed, in order
+    submit_calls: list[dict]  # submit_diagnosis calls, deliberately left for the guardrail
+    update: dict  # the shared state update (messages, trace, counters, usage)
 
 
-def nudge_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
-    _, noted = _with_note(list(state["messages"]), MISSING_SUBMIT_NOTE)
-    trace = _emit(runtime, TraceEvent(state["step_count"], "note", content="Agent stopped without submitting — reminding it to call submit_diagnosis."))
-    return {"messages": [noted], "trace": trace}
-
-
-def tools_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
-    step = state["step_count"]
-    response = _last_ai(state["messages"])
+def _run_tool_calls(
+    response: AIMessage,
+    step: int,
+    runtime: Runtime[RootlyContext],
+    allowed: set[str],
+) -> tuple[list[BaseMessage], list[dict], list[ToolCallRecord], set[str]]:
+    """
+    Execute one turn's tool calls. This is the former tools_node, scoped to a single
+    specialist: a call to a tool the specialist does not own is refused as an error
+    observation rather than executed, so a confused model cannot reach around its role.
+    """
     messages: list[BaseMessage] = []
     trace: list[dict] = []
-    investigated = set(state["investigated_services"])
-    tool_calls = state["tool_calls"]
+    records: list[ToolCallRecord] = []
+    investigated: set[str] = set()
 
     for call in response.invalid_tool_calls:
         trace += _emit(runtime, TraceEvent(step, "note", content=f"Malformed arguments for {call.get('name')}: {call.get('error')}", is_error=True))
@@ -512,9 +644,16 @@ def tools_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
         name, args, call_id = call["name"], call["args"], call["id"]
         if name == SUBMIT_TOOL_NAME:
             continue  # answered by the guardrail node
-        tool_calls += 1
+        if name not in allowed:
+            trace += _emit(runtime, TraceEvent(step, "note", content=f"{name} is not one of this specialist's tools.", is_error=True))
+            messages.append(ToolMessage(
+                content=f"Error: {name} is not available to you. Your tools are: {', '.join(sorted(allowed))}.",
+                tool_call_id=call_id, name=name, status="error",
+            ))
+            continue
         trace += _emit(runtime, TraceEvent(step, "action", tool=name, input=dict(args)))
         record = _registry.execute(name, dict(args))
+        records.append(record)
         if name == "log_search" and not record.is_error:
             investigated.add(str(args.get("service", "")).strip().lower())
         trace += _emit(runtime, TraceEvent(step, "observation", tool=name, result=record.result,
@@ -524,7 +663,315 @@ def tools_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
             tool_call_id=call_id, name=name, status="error" if record.is_error else "success",
         ))
 
-    return {"messages": messages, "trace": trace, "tool_calls": tool_calls, "investigated_services": sorted(investigated)}
+    return messages, trace, records, investigated
+
+
+def run_specialist(
+    state: RootlyState,
+    runtime: Runtime[RootlyContext],
+    *,
+    llm,
+    system_prompt: str,
+    briefing: str,
+    allowed_tools: set[str],
+    label: str,
+    max_turns: int = SPECIALIST_MAX_TURNS,
+    stop_on_submit: bool = False,
+) -> SpecialistOutcome:
+    """
+    Run one specialist to completion: call the model, execute the tool calls it asks for,
+    feed the results back, and stop once it answers with text instead of tools.
+
+    The specialist's conversation is local to this call -- its system prompt, the briefing
+    it was handed, and its own tool results. It never sees the shared `messages` log, which
+    is what keeps each agent's context small and role-specific. The messages it produced
+    are still appended to that log, for the audit trail and for the guardrail to read the
+    synthesis agent's submit_diagnosis call off.
+
+    This is the loop the former single agent_node ran across graph edges: rate-limit
+    backoff (via _invoke), truncation recovery, tool-call id dedup, and the step budget.
+    """
+    messages: list[BaseMessage] = [SystemMessage(system_prompt), HumanMessage(briefing)]
+    audit: list[BaseMessage] = []
+    trace: list[dict] = []
+    records: list[ToolCallRecord] = []
+    investigated = set(state["investigated_services"])
+    used_ids = set(state["used_tool_call_ids"])
+    usage = dict(state["usage"])
+    step = state["step_count"]
+    max_steps = state["max_steps"]
+    truncated_total = state["truncated_responses"]
+    tool_calls = state["tool_calls"]
+    model = state["model"]
+    analysis = ""
+    submit_calls: list[dict] = []
+
+    for turn_index in range(max_turns):
+        step += 1
+        if step > max_steps:
+            raise DiagnosisError(f"No valid diagnosis package after {max_steps} steps.")
+        if step == max_steps:
+            messages, _ = _with_note(messages, SPECIALIST_BUDGET_NOTE)
+            trace += _emit(runtime, TraceEvent(step, "note", content=f"Step budget reached — asking the {label} agent to wrap up."))
+
+        response = _invoke(llm, messages)
+        for key in ("input_tokens", "output_tokens"):
+            usage[key] = usage.get(key, 0) + (response.usage_metadata or {}).get(key, 0)
+        model = response.response_metadata.get("model_name", model)
+
+        if response.response_metadata.get("finish_reason") == "length":
+            # A cut-off response may hold partial tool calls, so it is never added to the
+            # history. The note changes the next input, which breaks a deterministic loop.
+            truncated_total += 1
+            if truncated_total > MAX_TRUNCATED_RESPONSES:
+                raise DiagnosisError(
+                    f"Model output was cut off (finish_reason=length) {truncated_total} times; giving up at step {step}."
+                )
+            messages, _ = _with_note(messages, TRUNCATED_NOTE)
+            trace += _emit(runtime, TraceEvent(step, "note", content="Model response was too long and got cut off — asking for a shorter one.", is_error=True))
+            continue
+
+        _dedupe_tool_call_ids(response, used_ids)
+        thought = _text(response)
+        if thought:
+            analysis = thought
+            trace += _emit(runtime, TraceEvent(step, "thought", content=thought))
+        messages.append(response)
+        audit.append(response)
+
+        if stop_on_submit:
+            submit_calls = [c for c in response.tool_calls if c["name"] == SUBMIT_TOOL_NAME]
+            if submit_calls:
+                break  # the guardrail node answers this call
+
+        if not response.tool_calls and not response.invalid_tool_calls:
+            break  # the specialist is done: its text is the analysis
+
+        turn_messages, turn_trace, turn_records, turn_investigated = _run_tool_calls(
+            response, step, runtime, allowed_tools
+        )
+        messages += turn_messages
+        audit += turn_messages
+        trace += turn_trace
+        records += turn_records
+        investigated |= turn_investigated
+        tool_calls += len(turn_records)
+
+        if stop_on_submit and turn_index == max_turns - 1:
+            # Out of turns without a package: nudge now so the final turn can still submit.
+            messages, _ = _with_note(messages, MISSING_SUBMIT_NOTE)
+
+    update = {
+        "messages": audit,
+        "trace": trace,
+        "step_count": step,
+        "usage": usage,
+        "truncated_responses": truncated_total,
+        "used_tool_call_ids": sorted(used_ids),
+        "investigated_services": sorted(investigated),
+        "tool_calls": tool_calls,
+        "model": model,
+    }
+    return SpecialistOutcome(analysis=analysis, records=records, submit_calls=submit_calls, update=update)
+
+
+# ── Orchestrator ─────────────────────────────────────────────────────────
+
+def _fallback_route(state: RootlyState) -> dict:
+    """
+    Where to go when the orchestrator's model would not call route_to_specialist.
+
+    This is error recovery, not a second routing policy: it mirrors the order the
+    orchestrator prompt asks for, so a malformed turn costs a step instead of the run.
+    """
+    alert = get_alert(state["alert_id"])
+    window = _default_window(alert)
+    if not state.get("cmdb_context"):
+        return {"next": "cmdb", "targets": [alert.service.strip().lower()], "reason": "fallback: CMDB first"}
+    if not state.get("log_evidence_gathered"):
+        return {"next": "log", "targets": [alert.service.strip().lower()], **window, "reason": "fallback: logs next"}
+    pending = _uninvestigated_from_reasons(state)
+    if pending:
+        return {"next": "log", "targets": pending, **window, "reason": "fallback: the guardrail asked for these logs"}
+    return {"next": "synthesis", "targets": [], "reason": "fallback: evidence gathered"}
+
+
+def _default_window(alert: Alert) -> dict:
+    start = alert.timestamp - ORIGIN_CHECK_BEFORE_ALERT
+    end = alert.timestamp + ORIGIN_CHECK_AFTER_ALERT
+    return {
+        "start_time": start.isoformat().replace("+00:00", "Z"),
+        "end_time": end.isoformat().replace("+00:00", "Z"),
+    }
+
+
+def _uninvestigated_from_reasons(state: RootlyState) -> list[str]:
+    """CMDB components named in the guardrail's rejection reasons that still lack a log_search."""
+    reasons = " ".join(state.get("replan_reasons") or [])
+    if not reasons:
+        return []
+    investigated = set(state["investigated_services"])
+    return [c.name for c in load_cmdb() if c.name in reasons and c.name not in investigated]
+
+
+def _looked_up(state: RootlyState) -> set[str]:
+    """Components the CMDB agent has already retrieved in this run."""
+    return {
+        str(component.get("name", "")).strip().lower()
+        for entry in state.get("cmdb_context") or []
+        for component in entry.get("components", [])
+    }
+
+
+def _normalise_route(args: dict, state: RootlyState) -> dict:
+    """Validate the model's routing arguments, filling in a window for a log assignment."""
+    choice = str(args.get("next", "")).strip().lower()
+    if choice not in SPECIALISTS:
+        return {}
+    targets = [str(t).strip().lower() for t in (args.get("targets") or []) if str(t).strip()]
+    assignment: dict = {"next": choice, "targets": targets, "reason": str(args.get("reason") or "").strip()}
+    if choice == "log":
+        window = _default_window(get_alert(state["alert_id"]))
+        assignment["start_time"] = str(args.get("start_time") or window["start_time"])
+        assignment["end_time"] = str(args.get("end_time") or window["end_time"])
+        # Only real services, checked here rather than left to log_search. Observed live on
+        # ALRT-005: the orchestrator invented "authentication-service" (for auth-service),
+        # log_search returned "Unknown service", and the log agent then reported a *fabricated*
+        # log line for it. Refusing the handoff stops that cascade at the source.
+        assignment["targets"] = [t for t in targets if t in {c.name for c in load_cmdb()}]
+        if not assignment["targets"]:
+            return {}  # a log assignment without a known service is not actionable
+    if choice == "cmdb":
+        # CMDB records are static, so looking the same component up twice cannot add
+        # evidence. Observed live on ALRT-001: the orchestrator routed to the CMDB agent
+        # twice for checkout-api, spending a whole round to learn nothing. Drop the
+        # components already held and the ones that do not exist, and refuse the handoff
+        # if that leaves nothing to do. Both names and CI ids are accepted, as cmdb_lookup does.
+        known = {c.name for c in load_cmdb()} | {c.id.lower() for c in load_cmdb()}
+        assignment["targets"] = [t for t in targets if t in known and t not in _looked_up(state)]
+        if not assignment["targets"]:
+            return {}
+    return assignment
+
+
+def orchestrator_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
+    """
+    One routing turn. The orchestrator reads the alert and everything the specialists have
+    found so far, then calls route_to_specialist to pick who runs next. It holds no
+    investigation tools of its own.
+    """
+    from src.agent.system_prompt import (
+        ORCHESTRATOR_PROMPT,
+        format_alert,
+        format_cmdb_context,
+        format_log_evidence,
+        format_replan_reasons,
+    )
+
+    alert = get_alert(state["alert_id"])
+    step = state["step_count"]
+    max_steps = state["max_steps"]
+    briefing_parts = [
+        format_alert(alert),
+        "",
+        format_cmdb_context(state.get("cmdb_context") or []),
+        "",
+        format_log_evidence(state.get("log_evidence_gathered") or []),
+        "",
+        f"Components already looked up in the CMDB: {', '.join(sorted(_looked_up(state))) or 'none yet'}. "
+        "Looking one of them up again cannot add evidence, so do not.",
+        f"Services whose logs have been searched: {', '.join(state['investigated_services']) or 'none yet'}.",
+        f"Model turns used: {step} of {max_steps}.",
+    ]
+    replan = format_replan_reasons(state.get("replan_reasons"))
+    if replan:
+        briefing_parts += ["", replan]
+    if max_steps - step <= SPECIALIST_MAX_TURNS:
+        briefing_parts += ["", BUDGET_EXHAUSTED_NOTE]
+
+    messages: list[BaseMessage] = [
+        SystemMessage(ORCHESTRATOR_PROMPT),
+        HumanMessage("\n".join(briefing_parts)),
+    ]
+    audit: list[BaseMessage] = []
+    trace: list[dict] = []
+    usage = dict(state["usage"])
+    used_ids = set(state["used_tool_call_ids"])
+    truncated_total = state["truncated_responses"]
+    model = state["model"]
+    assignment: dict = {}
+
+    for _ in range(ORCHESTRATOR_ROUTE_ATTEMPTS):
+        step += 1
+        if step > max_steps:
+            raise DiagnosisError(f"No valid diagnosis package after {max_steps} steps.")
+
+        response = _invoke(runtime.context.orchestrator_llm, messages)
+        for key in ("input_tokens", "output_tokens"):
+            usage[key] = usage.get(key, 0) + (response.usage_metadata or {}).get(key, 0)
+        model = response.response_metadata.get("model_name", model)
+
+        if response.response_metadata.get("finish_reason") == "length":
+            truncated_total += 1
+            if truncated_total > MAX_TRUNCATED_RESPONSES:
+                raise DiagnosisError(
+                    f"Model output was cut off (finish_reason=length) {truncated_total} times; giving up at step {step}."
+                )
+            messages, _ = _with_note(messages, TRUNCATED_NOTE)
+            trace += _emit(runtime, TraceEvent(step, "note", content="Model response was too long and got cut off — asking for a shorter one.", is_error=True))
+            continue
+
+        _dedupe_tool_call_ids(response, used_ids)
+        thought = _text(response)
+        if thought:
+            trace += _emit(runtime, TraceEvent(step, "thought", content=thought))
+        messages.append(response)
+        audit.append(response)
+
+        route_calls = [c for c in response.tool_calls if c["name"] == ROUTE_TOOL_NAME]
+        if route_calls:
+            assignment = _normalise_route(dict(route_calls[-1]["args"]), state)
+            # Every routing call is answered, so the audit log keeps valid tool pairs.
+            refusal = (
+                "Unusable routing arguments: 'next' must be cmdb, log or synthesis; 'log' needs "
+                "at least one real service; 'cmdb' needs at least one component that exists and "
+                "has not been looked up already. Valid component names: "
+                f"{', '.join(sorted(c.name for c in load_cmdb()))}. Call the tool again."
+            )
+            for call in route_calls:
+                messages.append(ToolMessage(
+                    content="Routed." if assignment else refusal,
+                    tool_call_id=call["id"], name=ROUTE_TOOL_NAME,
+                    status="success" if assignment else "error",
+                ))
+                audit.append(messages[-1])
+            if assignment:
+                break
+            trace += _emit(runtime, TraceEvent(step, "note", content="Orchestrator's routing arguments were unusable — asking again.", is_error=True))
+            continue
+
+        messages, _ = _with_note(messages, MISSING_ROUTE_NOTE)
+        trace += _emit(runtime, TraceEvent(step, "note", content="Orchestrator did not hand off — reminding it to call route_to_specialist.", is_error=True))
+
+    if not assignment:
+        assignment = _fallback_route(state)
+        trace += _emit(runtime, TraceEvent(step, "note", content=f"Orchestrator did not route; falling back to the {assignment['next']} agent.", is_error=True))
+
+    choice = assignment.pop("next")
+    targets = ", ".join(assignment.get("targets") or []) or "—"
+    trace += _emit(runtime, TraceEvent(step, "routing", content=f"{choice} agent → {targets}", tool=choice,
+                                       input={k: v for k, v in assignment.items() if v}))
+    return {
+        "messages": audit,
+        "trace": trace,
+        "step_count": step,
+        "usage": usage,
+        "truncated_responses": truncated_total,
+        "used_tool_call_ids": sorted(used_ids),
+        "model": model,
+        "next_specialist": choice,
+        "assignment": assignment,
+    }
 
 
 def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
@@ -534,6 +981,7 @@ def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
     messages: list[BaseMessage] = []
     trace: list[dict] = []
     accepted: DiagnosisPackage | None = None
+    rejected_reasons: list[str] = []
     searched = any(e["kind"] == "action" and e.get("tool") == "similar_incidents_search" for e in state["trace"])
 
     for call in _submit_calls(state):
@@ -543,6 +991,7 @@ def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
             trace += _emit(runtime, TraceEvent(step, "guardrail", content="Diagnosis package passed the CMDB guardrail."))
             messages.append(ToolMessage(content="Diagnosis accepted.", tool_call_id=call["id"], name=SUBMIT_TOOL_NAME))
         else:
+            rejected_reasons += problems
             trace += _emit(runtime, TraceEvent(step, "guardrail", content=" ".join(problems), is_error=True))
             messages.append(ToolMessage(
                 content="Diagnosis rejected:\n- " + "\n- ".join(problems),
@@ -553,6 +1002,11 @@ def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
     if accepted:
         update["diagnosis"] = accepted.model_dump(mode="json")
         update["elapsed_seconds"] = round(elapsed, 2)
+        update["replan_reasons"] = []
+    else:
+        # The orchestrator reads these to decide which logs still have to be searched
+        # before the synthesis agent is allowed to submit again.
+        update["replan_reasons"] = rejected_reasons
     return update
 
 
