@@ -140,6 +140,8 @@ def render_event(event: dict) -> None:
     kind = event["kind"]
     if kind == "thought":
         st.markdown(f"**Thought**  \n{event['content']}")
+    elif kind == "routing":
+        st.markdown(f"**Handoff** → `{event['tool']}` agent  \n{event['content']}")
     elif kind == "action":
         args = ", ".join(f"{k}={v!r}" for k, v in event["input"].items())
         st.code(f"{event['tool']}({args})", language="python")
@@ -158,7 +160,8 @@ def render_event(event: dict) -> None:
 
 
 def step_title(step: int, events: list[dict]) -> str:
-    tools = [e["tool"] for e in events if e["kind"] == "action"]
+    tools = [f"→ {e['tool']} agent" for e in events if e["kind"] == "routing"]
+    tools += [e["tool"] for e in events if e["kind"] == "action"]
     if any(e["kind"] == "guardrail" for e in events):
         tools.append("submit_diagnosis")
     if any(e["kind"] == "escalation" for e in events):

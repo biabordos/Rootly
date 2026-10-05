@@ -144,7 +144,9 @@ Trece de la "documentație" la "cod care rulează" cât mai repede, chiar dacă 
 - [x] README actualizat cu instrucțiuni reale de instalare/rulare — secțiunea "MVP Status" din README.md.
 - [ ] `CONTRIBUTING.md` minimal dacă lucrați în echipă — nefăcut, opțional pentru un MVP de prezentare.
 - [ ] CI simplu (GitHub Actions) care rulează testele tool-urilor la fiecare push — nefăcut; `python -m pytest` local acoperă asta pentru acum.
-- [ ] Discuție despre pașii din README §9 care rămân pentru "viitor îndepărtat": arhitectură multi-agent, integrare cu sisteme reale (Datadog/ServiceNow/Splunk) — nu le începe înainte ca MVP-ul de mai sus să fie stabil.
+- [x] Arhitectura multi-agent e implementată (orchestrator + specializaști CMDB/log/sinteză,
+      `src/agent/specialists/`) — vezi README §8, secțiunea "Agents".
+- [ ] Discuție despre pașii din README §9 care rămân pentru "viitor îndepărtat": integrare cu sisteme reale (Datadog/ServiceNow/Splunk) — nu le începe înainte ca MVP-ul de mai sus să fie stabil.
 
 ---
 

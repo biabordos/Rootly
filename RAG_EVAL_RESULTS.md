@@ -12,7 +12,7 @@ used as an NLI judge here — expect noisier scores than a dedicated reasoning m
 | ALRT-003 | 1.00 | 1.00 |
 | ALRT-004 | 1.00 | 1.00 |
 | ALRT-005 | 1.00 | 1.00 |
-| ALRT-006 | 1.00 | 1.00 |
+| ALRT-006 | 0.83 | 1.00 |
 | ALRT-007 | 1.00 | 1.00 |
 | ALRT-008 | 1.00 | 1.00 |
 | ALRT-009 | 1.00 | 1.00 |
