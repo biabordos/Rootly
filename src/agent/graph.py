@@ -278,6 +278,7 @@ def run_diagnosis(
         "cmdb_context": [],
         "log_evidence_gathered": [],
         "replan_reasons": [],
+        "log_search_cache": {},
         "diagnosis": None,
         "trace": [],
     }

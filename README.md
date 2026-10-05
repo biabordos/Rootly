@@ -496,7 +496,8 @@ agent — one turn per routing decision plus two per specialist run, and more ev
 guardrail sends the investigation back for another round. Two scenarios (ALRT-004, ALRT-010)
 exhausted the 32-turn budget entirely; see `EVAL_RESULTS.md`. Mistral's free tier allows about 1 request/second; the backoff in
 `graph_nodes._invoke()` (2s, 4s, 8s, 16s) absorbs the 429s, so a full `evaluate.py` run
-simply takes longer. `MAX_REACT_STEPS` caps the total at `DEFAULT_MAX_STEPS` (32) model
+simply takes longer — budget roughly 15 minutes for a single pass over the 10 scenarios,
+and three times that for `--runs 3`. `MAX_REACT_STEPS` caps the total at `DEFAULT_MAX_STEPS` (32) model
 turns per run.
 
 ## Quickstart (Docker)
@@ -560,6 +561,7 @@ streamlit run src/ui/streamlit_app.py  # web UI with trace, diagnosis package an
 
 python -m pytest                       # tool + agent tests (offline, no API key needed)
 python evaluate.py                     # run all scenarios and write EVAL_RESULTS.md
+python evaluate.py --runs 3            # 3 runs per scenario, reported as success rates
 ```
 
 The first run downloads the embedding model (~80 MB) and builds the local vector index in `.chroma/`. Paused runs are checkpointed in `.checkpoints/rootly.sqlite`.
@@ -577,7 +579,6 @@ The MVP covers investigation and diagnosis end-to-end (§8), multi-agent include
 * LLM-driven routing is new and the orchestrator still makes recoverable mistakes — see
   the known limitations below for what is guarded deterministically and what is not;
 
-* automated KPI collection over many runs, not just the single-run summary `evaluate.py` produces today;
 * integration with real observability and ticketing systems (Datadog/Splunk/ServiceNow) in a future version;
 * real automated remediation — out of scope by design (§1.4), an explicit later decision, not an oversight.
 
@@ -588,12 +589,19 @@ See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase plan this MVP 
 ## Limitări cunoscute
 
 * Routingul e decis de LLM, deci orchestratorul poate greși. Ce e păzit determinist în
-  `_normalise_route`: un specialist necunoscut, un handoff `log` fără niciun serviciu real,
-  un handoff `cmdb` către o componentă inexistentă sau deja citită. Fiecare refuz e
+  `_normalise_route`: un specialist necunoscut, un handoff `log` fără niciun serviciu real
+  **sau către servicii deja căutate pe exact aceeași fereastră**, un handoff `cmdb` către o
+  componentă inexistentă sau deja citită. Fiecare refuz e
   întors ca `ToolMessage` de eroare, cu lista numelor valide, și după
-  `ORCHESTRATOR_ROUTE_ATTEMPTS` (2) încercări se cade pe pasul determinist următor. Ambele
-  garduri vin din rulări live: pe ALRT-001 orchestratorul a rutat de două ori la CMDB pe
-  `checkout-api`, iar pe ALRT-005 a inventat `authentication-service` (pentru `auth-service`).
+  `ORCHESTRATOR_ROUTE_ATTEMPTS` (2) încercări se cade pe pasul determinist următor. Toate
+  gardurile vin din rulări live: pe ALRT-001 orchestratorul a rutat de două ori la CMDB pe
+  `checkout-api`, pe ALRT-005 a inventat `authentication-service` (pentru `auth-service`),
+  iar pe ALRT-004 a re-căutat logurile `order-service` deja citite. O rundă redundantă
+  costă o tură de orchestrator plus două de specialist — așa rămâne un scenariu fără buget.
+* Sub gardă, `log_search_cache` (cheie `service|start|end|level`) servește o căutare
+  repetată din rezultatul deja obținut. `level` face parte din cheie intenționat: o căutare
+  filtrată pe ERROR întoarce un subset strict, deci refolosirea ei pentru aceeași fereastră
+  fără filtru ar ascunde exact liniile INFO/WARN care exclud o componentă.
 * Liniile din `log_evidence` sunt verificate contra corpusului de loguri
   (`_fabricated_log_evidence` din `graph_nodes.py`): fiecare citare trebuie să corespundă
   unei intrări reale, iar serviciul numit în citare trebuie să fie chiar cel care a logat-o
@@ -649,7 +657,7 @@ Rootly/
 │   ├── ROADMAP.md                # phased implementation plan
 │   └── Rootly_Plan_Implementare.txt  # team task split (RO)
 ├── run_cli.py                   # CLI entry point
-├── evaluate.py                  # runs all scenarios, writes EVAL_RESULTS.md
+├── evaluate.py                  # runs all scenarios (--runs N for success rates), writes EVAL_RESULTS.md
 ├── requirements.txt
 └── .env.example
 ```

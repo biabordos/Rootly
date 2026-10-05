@@ -61,10 +61,11 @@ specialist runs next by calling route_to_specialist exactly once, every turn.
    alerted service and that origin has been searched in the logs.
 
 ## Do not repeat work
-You are told which components are already in the CMDB context and which services have \
-already been searched in the logs. CMDB records are static, so looking a component up a \
-second time cannot add evidence and the handoff will be refused. Re-search a service's \
-logs only with a genuinely different window or level filter.
+You are told which components are already in the CMDB context and which (service, window) \
+log searches have already run. CMDB records are static, so looking a component up a second \
+time cannot add evidence and the handoff will be refused. Re-running a log search over the \
+same window is refused for the same reason: to look again at a service you have already \
+searched, give a genuinely different window.
 
 ## Replanning
 If you are told the diagnosis was rejected, read the reasons carefully: they name \

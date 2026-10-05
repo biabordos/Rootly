@@ -617,21 +617,48 @@ class SpecialistOutcome:
     update: dict  # the shared state update (messages, trace, counters, usage)
 
 
+def log_search_key(args: dict) -> str:
+    """
+    Cache key for one log_search call.
+
+    `level` is part of the key even though a window alone identifies the search: a search
+    filtered to ERROR returns a strict subset, so serving it to a later unfiltered call for
+    the same window would silently hide the INFO and WARN lines that rule a component out.
+    """
+    return "|".join(
+        str(args.get(field, "") or "").strip().lower()
+        for field in ("service", "start_time", "end_time", "level")
+    )
+
+
+def _searched_windows(cache: dict) -> set[str]:
+    """The (service, start, end) triples already searched, with the level filter dropped."""
+    return {key.rsplit("|", 1)[0] for key in cache}
+
+
 def _run_tool_calls(
     response: AIMessage,
     step: int,
     runtime: Runtime[RootlyContext],
     allowed: set[str],
-) -> tuple[list[BaseMessage], list[dict], list[ToolCallRecord], set[str]]:
+    cache: dict,
+) -> tuple[list[BaseMessage], list[dict], list[ToolCallRecord], set[str], dict]:
     """
     Execute one turn's tool calls. This is the former tools_node, scoped to a single
     specialist: a call to a tool the specialist does not own is refused as an error
     observation rather than executed, so a confused model cannot reach around its role.
+
+    Repeated log_search calls are served from `cache` instead of re-running. The logs are a
+    local JSON file, so this saves no measurable time -- what it protects is the budget: the
+    agents keep their own turn count, and a specialist that re-asks for a window it already
+    has gets the same answer without the run drifting. The handoff-level guard in
+    _normalise_route is what actually removes the wasted orchestrator round.
     """
     messages: list[BaseMessage] = []
     trace: list[dict] = []
     records: list[ToolCallRecord] = []
     investigated: set[str] = set()
+    new_cache: dict = {}
 
     for call in response.invalid_tool_calls:
         trace += _emit(runtime, TraceEvent(step, "note", content=f"Malformed arguments for {call.get('name')}: {call.get('error')}", is_error=True))
@@ -652,7 +679,17 @@ def _run_tool_calls(
             ))
             continue
         trace += _emit(runtime, TraceEvent(step, "action", tool=name, input=dict(args)))
-        record = _registry.execute(name, dict(args))
+        key = log_search_key(dict(args)) if name == "log_search" else None
+        cached = cache.get(key) if key else None
+        if cached is not None:
+            record = ToolCallRecord(name, dict(args), cached, 0.0, "error" in cached)
+            trace += _emit(runtime, TraceEvent(
+                step, "note", content=f"log_search for {args.get('service')} in that window already ran; reusing the result.",
+            ))
+        else:
+            record = _registry.execute(name, dict(args))
+            if key and not record.is_error:
+                new_cache[key] = record.result
         records.append(record)
         if name == "log_search" and not record.is_error:
             investigated.add(str(args.get("service", "")).strip().lower())
@@ -663,7 +700,7 @@ def _run_tool_calls(
             tool_call_id=call_id, name=name, status="error" if record.is_error else "success",
         ))
 
-    return messages, trace, records, investigated
+    return messages, trace, records, investigated, new_cache
 
 
 def run_specialist(
@@ -696,6 +733,7 @@ def run_specialist(
     trace: list[dict] = []
     records: list[ToolCallRecord] = []
     investigated = set(state["investigated_services"])
+    cache = dict(state.get("log_search_cache") or {})
     used_ids = set(state["used_tool_call_ids"])
     usage = dict(state["usage"])
     step = state["step_count"]
@@ -747,9 +785,10 @@ def run_specialist(
         if not response.tool_calls and not response.invalid_tool_calls:
             break  # the specialist is done: its text is the analysis
 
-        turn_messages, turn_trace, turn_records, turn_investigated = _run_tool_calls(
-            response, step, runtime, allowed_tools
+        turn_messages, turn_trace, turn_records, turn_investigated, turn_cache = _run_tool_calls(
+            response, step, runtime, allowed_tools, cache
         )
+        cache.update(turn_cache)
         messages += turn_messages
         audit += turn_messages
         trace += turn_trace
@@ -769,6 +808,7 @@ def run_specialist(
         "truncated_responses": truncated_total,
         "used_tool_call_ids": sorted(used_ids),
         "investigated_services": sorted(investigated),
+        "log_search_cache": cache,
         "tool_calls": tool_calls,
         "model": model,
     }
@@ -838,9 +878,19 @@ def _normalise_route(args: dict, state: RootlyState) -> dict:
         # ALRT-005: the orchestrator invented "authentication-service" (for auth-service),
         # log_search returned "Unknown service", and the log agent then reported a *fabricated*
         # log line for it. Refusing the handoff stops that cascade at the source.
-        assignment["targets"] = [t for t in targets if t in {c.name for c in load_cmdb()}]
+        known = {c.name for c in load_cmdb()}
+        # And drop services already searched over this exact window: re-reading them cannot
+        # add evidence, and the round costs an orchestrator turn plus two log-agent turns.
+        # Observed live on ALRT-004, which re-searched order-service at step 10 having
+        # already done so at step 5. A *different* window stays legitimate, which is why the
+        # window is part of the comparison rather than just the service name.
+        searched = _searched_windows(state.get("log_search_cache") or {})
+        window_key = f"{assignment['start_time'].strip().lower()}|{assignment['end_time'].strip().lower()}"
+        assignment["targets"] = [
+            t for t in targets if t in known and f"{t}|{window_key}" not in searched
+        ]
         if not assignment["targets"]:
-            return {}  # a log assignment without a known service is not actionable
+            return {}  # a log assignment with nothing new to search is not actionable
     if choice == "cmdb":
         # CMDB records are static, so looking the same component up twice cannot add
         # evidence. Observed live on ALRT-001: the orchestrator routed to the CMDB agent
@@ -880,7 +930,9 @@ def orchestrator_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> di
         "",
         f"Components already looked up in the CMDB: {', '.join(sorted(_looked_up(state))) or 'none yet'}. "
         "Looking one of them up again cannot add evidence, so do not.",
-        f"Services whose logs have been searched: {', '.join(state['investigated_services']) or 'none yet'}.",
+        "Log searches already run (service, window): "
+        + ("; ".join(sorted(_searched_windows(state.get("log_search_cache") or {}))) or "none yet")
+        + ". Repeating one of these cannot add evidence; search a different window instead.",
         f"Model turns used: {step} of {max_steps}.",
     ]
     replan = format_replan_reasons(state.get("replan_reasons"))
@@ -934,8 +986,9 @@ def orchestrator_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> di
             # Every routing call is answered, so the audit log keeps valid tool pairs.
             refusal = (
                 "Unusable routing arguments: 'next' must be cmdb, log or synthesis; 'log' needs "
-                "at least one real service; 'cmdb' needs at least one component that exists and "
-                "has not been looked up already. Valid component names: "
+                "at least one real service not already searched over that same window; 'cmdb' needs "
+                "at least one component that exists and has not been looked up already. "
+                "Valid component names: "
                 f"{', '.join(sorted(c.name for c in load_cmdb()))}. Call the tool again."
             )
             for call in route_calls:

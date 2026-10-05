@@ -433,6 +433,94 @@ def test_a_log_handoff_keeps_only_the_services_that_exist():
     assert log_routing["input"]["targets"] == ["payments-db"]  # the typo is dropped
 
 
+def test_a_repeat_log_handoff_over_the_same_window_is_refused():
+    # Observed live on ALRT-004: the orchestrator re-routed to order-service's logs at step
+    # 10 having already searched them at step 5. That round costs one orchestrator turn plus
+    # two log-agent turns and returns nothing new, which is how a scenario runs out of budget.
+    llms = scripted_alrt_001()
+    llms["orchestrator"] = FakeLLM([
+        route("cmdb", "checkout-api"),
+        route("log", "payments-db", window=WINDOW_001),
+        route("log", "payments-db", window=WINDOW_001, text="Let me re-read those logs."),
+        route("synthesis"),
+    ])
+    events: list[dict] = []
+
+    result = run_diagnosis(get_alert("ALRT-001"), llms=llms, on_event=events.append)
+
+    assert [e["tool"] for e in events if e["kind"] == "routing"] == ["cmdb", "log", "synthesis"]
+    assert len(llms["log"].calls) == 2, "the log specialist ran once, not twice"
+    refusals = [m for call in llms["orchestrator"].calls for m in call
+                if isinstance(m, ToolMessage) and m.status == "error"]
+    assert refusals and "not already searched over that same window" in refusals[-1].content
+    assert result.diagnosis.affected_component == "payments-db"
+
+
+def test_a_different_window_for_the_same_service_is_still_allowed():
+    # Narrowing or widening the window is legitimate, so the guard compares the window too,
+    # not just the service name.
+    wider = {"start_time": "2026-08-18T08:00:00Z", "end_time": "2026-08-18T09:30:00Z"}
+    llms = scripted_alrt_001()
+    llms["orchestrator"] = FakeLLM([
+        route("cmdb", "checkout-api"),
+        route("log", "payments-db", window=WINDOW_001),
+        route("log", "payments-db", window=wider, text="Widen the window."),
+        route("synthesis"),
+    ])
+    llms["log"] = FakeLLM([
+        turn("", ("log_search", {"service": "payments-db", **WINDOW_001, "level": "ERROR"})),
+        report("payments-db: LOCAL. INVESTIGATE NEXT: none"),
+        turn("", ("log_search", {"service": "payments-db", **wider})),
+        report("payments-db: LOCAL over the wider window too. INVESTIGATE NEXT: none"),
+    ])
+    events: list[dict] = []
+
+    run_diagnosis(get_alert("ALRT-001"), llms=llms, on_event=events.append)
+
+    assert [e["tool"] for e in events if e["kind"] == "routing"] == ["cmdb", "log", "log", "synthesis"]
+
+
+def test_an_identical_log_search_is_served_from_the_cache():
+    # The same guard one level down: if a specialist re-issues a search it already ran, the
+    # cached result comes back instead of the tool running again.
+    repeat = {"service": "payments-db", **WINDOW_001, "level": "ERROR"}
+    llms = scripted_alrt_001()
+    llms["log"] = FakeLLM([
+        turn("", ("log_search", repeat)),
+        turn("Let me check that again.", ("log_search", dict(repeat))),
+        report("payments-db: LOCAL. INVESTIGATE NEXT: none"),
+    ])
+    events: list[dict] = []
+
+    result = run_diagnosis(get_alert("ALRT-001"), llms=llms, on_event=events.append)
+
+    observations = [e for e in events if e["kind"] == "observation" and e["tool"] == "log_search"]
+    assert len(observations) == 2
+    assert observations[0]["result"] == observations[1]["result"]
+    assert observations[1]["duration_ms"] == 0.0  # not re-executed
+    assert any("already ran; reusing the result" in e.get("content", "") for e in events if e["kind"] == "note")
+    assert result.diagnosis.affected_component == "payments-db"
+
+
+def test_a_level_filtered_search_is_not_served_to_an_unfiltered_one():
+    # The cache key includes `level`: an ERROR-filtered search returns a strict subset, so
+    # reusing it for the same window without a filter would hide the INFO and WARN lines
+    # that rule a component out.
+    llms = scripted_alrt_001()
+    llms["log"] = FakeLLM([
+        turn("", ("log_search", {"service": "payments-db", **WINDOW_001, "level": "ERROR"})),
+        turn("Now without the filter.", ("log_search", {"service": "payments-db", **WINDOW_001})),
+        report("payments-db: LOCAL. INVESTIGATE NEXT: none"),
+    ])
+    events: list[dict] = []
+
+    run_diagnosis(get_alert("ALRT-001"), llms=llms, on_event=events.append)
+
+    filtered, unfiltered = [e for e in events if e["kind"] == "observation" and e["tool"] == "log_search"]
+    assert unfiltered["result"]["total_matches"] > filtered["result"]["total_matches"]
+    assert unfiltered["duration_ms"] > 0.0  # genuinely re-executed, not served from the cache
+
+
 def test_a_log_handoff_without_a_window_gets_the_alert_window():
     llms = scripted_alrt_001()
     llms["orchestrator"] = FakeLLM([

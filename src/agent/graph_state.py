@@ -13,7 +13,7 @@ LangGraph merges in. "Who writes what":
     step_count, usage, model                orchestrator, specialists            model turn counting + tokens
     truncated_responses                     orchestrator, specialists            recovery from a cut-off response
     tool_calls, investigated_services       cmdb_agent, log_agent,               which investigation tools ran
-                                              synthesis_agent
+    log_search_cache                          synthesis_agent
     next_specialist, assignment             orchestrator                         the routing decision it just made
     cmdb_context                            cmdb_agent                           dependency/blast-radius findings
     log_evidence_gathered                   log_agent                            per-service LOCAL/RELAY verdicts
@@ -71,6 +71,9 @@ class RootlyState(TypedDict, total=False):
     log_evidence_gathered: Annotated[list[dict], operator.add]
     # Guardrail rejection reasons the orchestrator must act on in the next round.
     replan_reasons: list[str]
+    # Results of every log_search already run, keyed "service|start|end|level", so a repeat
+    # of the same search is served from here instead of re-running (see graph_nodes).
+    log_search_cache: dict[str, dict]
 
     # DiagnosisPackage.model_dump(mode="json"): plain data keeps checkpoints portable.
     diagnosis: dict | None
