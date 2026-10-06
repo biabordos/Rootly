@@ -33,6 +33,16 @@ from src.eval_ground_truth import GROUND_TRUTH
 
 OUTPUT = Path(__file__).resolve().parent / "EVAL_RESULTS.md"
 
+# Every report carries these: the numbers below mean nothing without the architecture
+# that produced them, the baseline they are compared against, or the targets the ✅/❌
+# marks are measured against.
+ARCHITECTURE_NOTE = (
+    "Architecture: orchestrator + CMDB/log/synthesis specialists. The single-agent"
+    " reference run is kept in [`EVAL_RESULTS_SINGLE_AGENT_BASELINE.md`]"
+    "(./EVAL_RESULTS_SINGLE_AGENT_BASELINE.md)."
+)
+TARGETS = "Targets: steps < 15, time < 30 s."
+
 # Manual baseline per scenario: README §1.1 cites 15-30 min of manual context
 # gathering; the harder multi-hop scenarios (8, 9) sit at the top of that range.
 MANUAL_BASELINE_MINUTES = {
@@ -278,9 +288,11 @@ def _retry_report(scenarios: list[Scenario], max_retries: int, command: str) -> 
         )
 
     return [
-        "# Rootly — Evaluation Results",
+        "# Rootly — Evaluation Results (multi-agent)",
         "",
         f"Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC by `{command}`.",
+        "",
+        ARCHITECTURE_NOTE,
         "",
         f"**Root component correctly identified:** {passed}/{len(scenarios)} scenarios",
         "",
@@ -291,6 +303,8 @@ def _retry_report(scenarios: list[Scenario], max_retries: int, command: str) -> 
         "",
         f"Smart retry stops at the first correct root component; up to {max_retries} retries "
         "follow the initial attempt. Dependencies, evidence and incident are reported for the final run.",
+        "",
+        f"{TARGETS} Similar incident = the direct match from MOCK_DATA_README.md was cited.",
         "",
         # Retry mode's accuracy is per scenario, matching the headline above: a scenario
         # that only passed on retry 2 still counts as one diagnosis delivered, so counting
@@ -372,9 +386,11 @@ def _statistical_report(scenarios: list[Scenario], runs: int, command: str) -> l
             "",
         ])
     return [
-        f"# Rootly — Statistical Evaluation (N={runs})",
+        f"# Rootly — Statistical Evaluation (multi-agent, N={runs})",
         "",
         f"Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC by `{command}`.",
+        "",
+        ARCHITECTURE_NOTE,
         "",
         "## Success rates",
         "",
@@ -385,6 +401,10 @@ def _statistical_report(scenarios: list[Scenario], runs: int, command: str) -> l
         f"**Root component correctly identified:** {total_correct}/{total_runs} runs "
         f"({total_correct / total_runs * 100:.0f}%) over {len(scenarios)} scenarios × {runs} runs. "
         f"{perfect}/{len(scenarios)} scenarios were correct on every run.",
+        "",
+        "Routing is decided by an LLM, so the same scenario can pass on one run and exhaust its "
+        "step budget on the next. A success rate over several runs is the honest measure; a single "
+        f"pass is one sample. {TARGETS}",
         "",
         *failure_analysis,
         *review,

@@ -157,6 +157,23 @@ def test_max_retries_must_not_be_negative():
         evaluate.main(["--max-retries", "-1"])
 
 
+@pytest.mark.parametrize("runs", [None, 3])
+def test_every_report_states_the_architecture_and_the_targets(runs):
+    """
+    The numbers are meaningless without the architecture that produced them, the baseline
+    they beat and the thresholds behind the ✅/❌ marks. A previous refactor dropped all
+    three from the generated report, which is only visible by reading EVAL_RESULTS.md.
+    """
+    report = "\n".join(evaluate.build_report([
+        scenario("ALRT-001", [("payments-db", 9, 11.0)] * (runs or 1)),
+    ], runs=runs))
+
+    assert "(multi-agent" in report
+    assert "orchestrator + CMDB/log/synthesis specialists" in report
+    assert "EVAL_RESULTS_SINGLE_AGENT_BASELINE.md" in report
+    assert "Targets: steps < 15, time < 30 s." in report
+
+
 # ── Smart retry ──────────────────────────────────────────────────────────
 
 
