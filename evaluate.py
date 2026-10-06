@@ -277,8 +277,6 @@ def _retry_report(scenarios: list[Scenario], max_retries: int, command: str) -> 
             f"{checks}"
         )
 
-    total_attempts = sum(len(scenario.attempts) for scenario in scenarios)
-    completed_correct = sum(scenario.correct for scenario in scenarios)
     return [
         "# Rootly — Evaluation Results",
         "",
@@ -294,7 +292,10 @@ def _retry_report(scenarios: list[Scenario], max_retries: int, command: str) -> 
         f"Smart retry stops at the first correct root component; up to {max_retries} retries "
         "follow the initial attempt. Dependencies, evidence and incident are reported for the final run.",
         "",
-        *kpi_section(scenarios, total_attempts, completed_correct),
+        # Retry mode's accuracy is per scenario, matching the headline above: a scenario
+        # that only passed on retry 2 still counts as one diagnosis delivered, so counting
+        # the discarded attempts here would contradict the same file's own summary.
+        *kpi_section(scenarios, len(scenarios), passed),
     ]
 
 
@@ -482,11 +483,7 @@ def main(argv: list[str]) -> int:
 
     scenarios = []
     if args.runs is None:
-        for alert_id in alert_ids:
-            if args.max_retries == 3:
-                scenarios.append(run_scenario(alert_id, 1))
-            else:
-                scenarios.append(run_scenario(alert_id, 1, args.max_retries))
+        scenarios = [run_scenario(alert_id, 1, args.max_retries) for alert_id in alert_ids]
     elif args.runs == 1:
         scenarios = [
             run_scenario(alert_id, 1, args.max_retries, statistical=True)

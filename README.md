@@ -560,9 +560,18 @@ python run_cli.py --resume ALRT-001-1a2b3c4d --decision downgrade --note "known 
 streamlit run src/ui/streamlit_app.py  # web UI with trace, diagnosis package and exports
 
 python -m pytest                       # tool + agent tests (offline, no API key needed)
-python evaluate.py                     # run all scenarios and write EVAL_RESULTS.md
+python evaluate.py                     # all scenarios, retrying a wrong root up to 3x
+python evaluate.py --max-retries 5     # widen the retry budget
 python evaluate.py --runs 3            # 3 runs per scenario, reported as success rates
+python evaluate.py --runs 3 ALRT-005   # the hardest scenario only, 3 times
+python evaluate.py --runs 3 --json eval_report.json   # plus machine-readable output
 ```
+
+Both modes write `EVAL_RESULTS.md`. Smart retry (the default) answers "can the agent get
+there?" and stops at the first correct root component, reporting which attempt it took;
+`--runs N` never short-circuits and answers "how often does it?", reporting a success rate
+per scenario plus the wrong components it settled on. Because the orchestrator's routing is
+LLM-decided, `--runs N` is the honest number for a presentation.
 
 The first run downloads the embedding model (~80 MB) and builds the local vector index in `.chroma/`. Paused runs are checkpointed in `.checkpoints/rootly.sqlite`.
 
@@ -657,7 +666,7 @@ Rootly/
 │   ├── ROADMAP.md                # phased implementation plan
 │   └── Rootly_Plan_Implementare.txt  # team task split (RO)
 ├── run_cli.py                   # CLI entry point
-├── evaluate.py                  # runs all scenarios (--runs N for success rates), writes EVAL_RESULTS.md
+├── evaluate.py                  # all scenarios: smart retry by default, --runs N for success rates
 ├── requirements.txt
 └── .env.example
 ```
