@@ -56,12 +56,44 @@ st.markdown(
         .rootly-section { animation:rootly-rise 500ms ease both; }
         .rootly-about-card,.rootly-alert-card { border:1px solid var(--line); background:var(--panel); padding:1.5rem; border-radius:2px; }
         .rootly-about-card p { line-height:1.7; }
-        .rootly-alert-dot { width:8px; height:8px; border-radius:50%; margin:.7rem auto 0; }
-        .rootly-alert-dot.resolved { background:#7ee2a8; } .rootly-alert-dot.unresolved { background:#ff6b6b; }
-        .rootly-alert-row { border:1px solid var(--line); border-radius:30px; padding:.2rem; }
-        .rootly-alert-row + .rootly-alert-row { margin-top:.35rem; }
-        [class*="st-key-alert-"] button { border-radius:30px !important; }
+        .rootly-alert-dot { width:10px; height:10px; border-radius:50%; display:block; border:1px solid #8e8e8e; background:#f5f5f2; box-shadow:0 0 0 1px rgba(255,255,255,0.08); }
+        .rootly-alert-dot.resolved { background:#7ee2a8; border-color:#7ee2a8; }
+        .rootly-alert-dot.unresolved { background:#f5f5f2; border-color:#8e8e8e; }
+        .rootly-alert-dot.urgent { background:#ff6b6b; border-color:#ff6b6b; }
+        .rootly-alert-dot.selected { box-shadow:0 0 0 2px rgba(217,255,98,0.72), 0 0 0 6px rgba(217,255,98,0.12); }
+        .rootly-alert-strip { display:flex; flex-wrap:nowrap; gap:.75rem; overflow-x:auto; padding:.5rem 0 1rem; }
+        .rootly-alert-strip > div { flex:0 0 auto; min-width:150px; }
+        [class*="st-key-alert-"] button {
+            width:100% !important;
+            min-width:max-content !important;
+            border-radius:12px !important;
+            border:1px solid transparent !important;
+            background:transparent !important;
+            color:var(--white) !important;
+            padding:.7rem .9rem !important;
+            justify-content:center !important;
+            box-shadow:none !important;
+            transition:background 180ms ease, border-color 180ms ease, transform 180ms ease;
+            white-space:nowrap !important;
+            overflow:visible !important;
+            text-overflow:clip !important;
+            font-size:.78rem !important;
+            letter-spacing:.02em !important;
+        }
+        [class*="st-key-alert-"] button:hover {
+            background:rgba(255,255,255,0.04) !important;
+            border-color:rgba(255,255,255,0.12) !important;
+            transform:translateY(-1px);
+        }
+        [class*="st-key-alert-"] button[kind="primary"] {
+            background:rgba(217,255,98,0.08) !important;
+            border-color:rgba(217,255,98,0.45) !important;
+            color:var(--white) !important;
+        }
         .rootly-kicker { color:var(--muted); font:500 .72rem Consolas,monospace; letter-spacing:.08em; text-transform:uppercase; }
+        .rootly-legend-item { display:inline-flex; align-items:center; gap:.55rem; margin:1.25rem 1rem .5rem 0; white-space:nowrap; color:var(--muted); font-size:.85rem; line-height:1.2; }
+        .rootly-legend-item .rootly-alert-dot { margin:0; flex-shrink:0; }
+        .rootly-legend-item span:last-child { display:inline-block; }
         .stButton > button,.stDownloadButton > button { border-radius:2px; border:1px solid #3b3b3b; background:transparent; color:var(--white); transition:border-color 180ms ease,background 180ms ease,transform 180ms ease; }
         .stButton > button:hover,.stDownloadButton > button:hover { border-color:var(--accent); background:#171b0d; color:var(--white); transform:translateY(-1px); }
         .stButton > button[kind="primary"] { background:var(--accent); border-color:var(--accent); color:#000 !important; font-weight:600; }
@@ -78,10 +110,13 @@ st.markdown(
 )
 
 
-def is_resolved(alert_id: str) -> bool:
-    # A diagnosis awaiting human approval is still unresolved; completed diagnoses are resolved.
+def get_alert_status(alert_id: str) -> str:
     result = results.get(alert_id)
-    return bool(result and result.diagnosis and not result.needs_approval)
+    if result and result.needs_approval:
+        return "urgent"
+    if result and result.diagnosis and not result.needs_approval:
+        return "resolved"
+    return "unresolved"
 
 
 def render_landing() -> None:
@@ -184,26 +219,33 @@ if view == "system_map":
 
 with st.sidebar:
     st.markdown('<div class="rootly-eyebrow">Rootly / workspace</div>', unsafe_allow_html=True)
-    st.markdown("# Incident triage")
     if st.button("About Rootly", width="stretch"):
         st.session_state.view = "about"
         st.rerun()
     st.markdown('<div class="rootly-rule"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="rootly-kicker">Alerts</div>', unsafe_allow_html=True)
-    st.caption("Red = unresolved, green = resolved")
-    for alert_id, item in alerts.items():
-        status = "resolved" if is_resolved(alert_id) else "unresolved"
-        st.markdown('<div class="rootly-alert-row">', unsafe_allow_html=True)
-        dot, alert_button = st.columns([0.12, 0.88], vertical_alignment="center")
-        dot.markdown(f'<div class="rootly-alert-dot {status}"></div>', unsafe_allow_html=True)
-        if alert_button.button(f"{alert_id} / {item.service}", key=f"alert-{alert_id}", width="stretch"):
-            st.session_state.selected_alert = alert_id
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="rootly-rule"></div>', unsafe_allow_html=True)
     sidebar_status = st.container()
 
 selected = st.session_state.selected_alert
+
+# ── Header & alert card ──────────────────────────────────────────────────
+alert_strip = st.container()
+with alert_strip:
+    st.markdown('<div class="rootly-eyebrow">Incident triage</div>', unsafe_allow_html=True)
+    alert_cols = st.columns(len(alerts))
+    for index, (alert_id, item) in enumerate(alerts.items()):
+        with alert_cols[index]:
+            button_type = "primary" if alert_id == selected else "secondary"
+            if st.button(f"{alert_id}", key=f"alert-top-{alert_id}", type=button_type, use_container_width=True):
+                st.session_state.selected_alert = alert_id
+                st.rerun()
+
+st.markdown(
+    '<div class="rootly-legend-item"><span class="rootly-alert-dot unresolved"></span><span>nerezolvat</span></div>'
+    '<div class="rootly-legend-item"><span class="rootly-alert-dot resolved"></span><span>rezolvat</span></div>'
+    '<div class="rootly-legend-item"><span class="rootly-alert-dot urgent"></span><span>urgent</span></div>',
+    unsafe_allow_html=True,
+)
+
 if not selected:
     st.markdown('<div class="rootly-section"><div class="rootly-eyebrow">Workspace ready</div>', unsafe_allow_html=True)
     st.title("Select an alert to begin.")
@@ -214,7 +256,6 @@ if not selected:
 alert = alerts[selected]
 run_clicked = st.button("Run diagnosis", type="primary", width="content")
 
-# ── Header & alert card ──────────────────────────────────────────────────
 st.markdown('<div class="rootly-eyebrow">Active investigation</div>', unsafe_allow_html=True)
 st.title(f"{alert.id} / {alert.service}")
 st.caption("Thought / Action / Observation over CMDB, logs, and historical incidents, with human approval for urgent escalations.")
