@@ -99,6 +99,8 @@ st.markdown(
         .stButton > button[kind="primary"] { background:var(--accent); border-color:var(--accent); color:#000 !important; font-weight:600; }
         .stButton > button[kind="primary"] p,.stButton > button[kind="primary"] span,
         .stButton > button[kind="primary"]:hover,.stButton > button[kind="primary"]:hover p,.stButton > button[kind="primary"]:hover span { color:#000 !important; }
+        [class*="st-key-alert-"] button[kind="primary"] p,[class*="st-key-alert-"] button[kind="primary"] span,
+        [class*="st-key-alert-"] button[kind="primary"]:hover p,[class*="st-key-alert-"] button[kind="primary"]:hover span { color:var(--white) !important; }
         [data-testid="stMetric"] { background:var(--panel); border:1px solid var(--line); padding:1rem; }
         [data-testid="stMetricValue"] { color:var(--white); }
         [data-testid="stExpander"],[data-testid="stForm"] { border-color:var(--line); background:var(--panel); }
@@ -234,7 +236,13 @@ with alert_strip:
     alert_cols = st.columns(len(alerts))
     for index, (alert_id, item) in enumerate(alerts.items()):
         with alert_cols[index]:
+            status = get_alert_status(alert_id)
+            selected_class = " selected" if alert_id == selected else ""
             button_type = "primary" if alert_id == selected else "secondary"
+            st.markdown(
+                f'<div class="rootly-alert-dot {status}{selected_class}" style="margin:0 auto .4rem;"></div>',
+                unsafe_allow_html=True,
+            )
             if st.button(f"{alert_id}", key=f"alert-top-{alert_id}", type=button_type, use_container_width=True):
                 st.session_state.selected_alert = alert_id
                 st.rerun()
