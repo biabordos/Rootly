@@ -1,21 +1,21 @@
 {
   "mode": "statistical",
-  "timestamp": "2026-10-06T10:21:11.459698Z",
+  "timestamp": "2026-10-13T22:34:10.318588Z",
   "scenarios": {
     "ALRT-001": {
       "success_rate": 1.0,
-      "successes": 3,
-      "total": 3,
+      "successes": 10,
+      "total": 10,
       "avg_steps": 12,
-      "avg_elapsed": 40.769999999999996,
-      "avg_confidence": 0.8833333333333333,
+      "avg_elapsed": 17.224,
+      "avg_confidence": 0.9,
       "failure_components": [],
       "runs": [
         {
           "component": "payments-db",
           "correct": true,
           "steps": 12,
-          "elapsed": 58.64,
+          "elapsed": 43.74,
           "confidence": 0.9,
           "incident_cited": true
         },
@@ -23,34 +23,135 @@
           "component": "payments-db",
           "correct": true,
           "steps": 12,
-          "elapsed": 37.36,
-          "confidence": 0.85,
+          "elapsed": 14.39,
+          "confidence": 0.9,
           "incident_cited": true
         },
         {
           "component": "payments-db",
           "correct": true,
           "steps": 12,
-          "elapsed": 26.31,
+          "elapsed": 13.19,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 12,
+          "elapsed": 16.87,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 12,
+          "elapsed": 13.62,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 12,
+          "elapsed": 13.82,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 12,
+          "elapsed": 15.11,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 12,
+          "elapsed": 14.27,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 12,
+          "elapsed": 13.3,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 12,
+          "elapsed": 13.93,
           "confidence": 0.9,
           "incident_cited": true
         }
       ]
     },
     "ALRT-002": {
-      "success_rate": 1.0,
-      "successes": 3,
-      "total": 3,
-      "avg_steps": 12.333333333333334,
-      "avg_elapsed": 27.35333333333333,
-      "avg_confidence": 0.8,
+      "success_rate": 0.9,
+      "successes": 9,
+      "total": 10,
+      "avg_steps": 14.333333333333334,
+      "avg_elapsed": 20.25777777777778,
+      "avg_confidence": 0.8166666666666667,
       "failure_components": [],
       "runs": [
         {
           "component": "user-service",
           "correct": true,
-          "steps": 12,
-          "elapsed": 23.65,
+          "steps": 16,
+          "elapsed": 21.96,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 16,
+          "elapsed": 18.81,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": null,
+          "correct": false,
+          "error": "No valid diagnosis package after 32 steps."
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 29,
+          "elapsed": 38.58,
+          "confidence": 0.95,
+          "incident_cited": false
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 15.65,
+          "confidence": 0.8,
+          "incident_cited": false
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 14.56,
+          "confidence": 0.8,
+          "incident_cited": false
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 16,
+          "elapsed": 20.4,
           "confidence": 0.8,
           "incident_cited": true
         },
@@ -58,7 +159,7 @@
           "component": "user-service",
           "correct": true,
           "steps": 9,
-          "elapsed": 13.38,
+          "elapsed": 13.07,
           "confidence": 0.8,
           "incident_cited": true
         },
@@ -66,63 +167,169 @@
           "component": "user-service",
           "correct": true,
           "steps": 16,
-          "elapsed": 45.03,
+          "elapsed": 24.74,
           "confidence": 0.8,
-          "incident_cited": true
+          "incident_cited": false
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 14.55,
+          "confidence": 0.8,
+          "incident_cited": false
         }
       ]
     },
     "ALRT-003": {
-      "success_rate": 0.6666666666666666,
-      "successes": 2,
-      "total": 3,
-      "avg_steps": 16.666666666666668,
-      "avg_elapsed": 36.46,
-      "avg_confidence": 0.9,
-      "failure_components": [
-        "auth-service"
-      ],
+      "success_rate": 0.8,
+      "successes": 8,
+      "total": 10,
+      "avg_steps": 19.625,
+      "avg_elapsed": 28.61,
+      "avg_confidence": 0.93125,
+      "failure_components": [],
       "runs": [
         {
-          "component": "auth-service",
-          "correct": false,
-          "steps": 16,
-          "elapsed": 41.32,
+          "component": "redis-cache",
+          "correct": true,
+          "steps": 27,
+          "elapsed": 41.21,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "redis-cache",
+          "correct": true,
+          "steps": 22,
+          "elapsed": 29.71,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "redis-cache",
+          "correct": true,
+          "steps": 22,
+          "elapsed": 34.4,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "redis-cache",
+          "correct": true,
+          "steps": 15,
+          "elapsed": 21.25,
           "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "redis-cache",
+          "correct": true,
+          "steps": 15,
+          "elapsed": 16.3,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "redis-cache",
+          "correct": true,
+          "steps": 15,
+          "elapsed": 17.33,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "redis-cache",
+          "correct": true,
+          "steps": 22,
+          "elapsed": 42.41,
+          "confidence": 0.95,
           "incident_cited": true
         },
         {
           "component": "redis-cache",
           "correct": true,
           "steps": 19,
-          "elapsed": 38.67,
-          "confidence": 0.9,
+          "elapsed": 26.27,
+          "confidence": 0.95,
           "incident_cited": true
         },
         {
-          "component": "redis-cache",
-          "correct": true,
-          "steps": 15,
-          "elapsed": 29.39,
-          "confidence": 0.9,
-          "incident_cited": true
+          "component": null,
+          "correct": false,
+          "error": "No valid diagnosis package after 32 steps."
+        },
+        {
+          "component": null,
+          "correct": false,
+          "error": "No valid diagnosis package after 32 steps."
         }
       ]
     },
     "ALRT-004": {
-      "success_rate": 1.0,
-      "successes": 3,
-      "total": 3,
-      "avg_steps": 20,
-      "avg_elapsed": 33.013333333333335,
-      "avg_confidence": 0.8,
+      "success_rate": 0.7,
+      "successes": 7,
+      "total": 10,
+      "avg_steps": 19.285714285714285,
+      "avg_elapsed": 28.14857142857143,
+      "avg_confidence": 0.8428571428571429,
       "failure_components": [],
       "runs": [
+        {
+          "component": null,
+          "correct": false,
+          "error": "No valid diagnosis package after 32 steps."
+        },
+        {
+          "component": "order-service",
+          "correct": true,
+          "steps": 16,
+          "elapsed": 15.24,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "order-service",
+          "correct": true,
+          "steps": 17,
+          "elapsed": 23.96,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": null,
+          "correct": false,
+          "error": "No valid diagnosis package after 32 steps."
+        },
         {
           "component": "order-service",
           "correct": true,
           "steps": 25,
-          "elapsed": 43.47,
+          "elapsed": 36.32,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "order-service",
+          "correct": true,
+          "steps": 28,
+          "elapsed": 37.38,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "order-service",
+          "correct": true,
+          "steps": 15,
+          "elapsed": 19.64,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "order-service",
+          "correct": true,
+          "steps": 19,
+          "elapsed": 46.4,
           "confidence": 0.8,
           "incident_cited": true
         },
@@ -130,77 +337,135 @@
           "component": "order-service",
           "correct": true,
           "steps": 15,
-          "elapsed": 23.3,
+          "elapsed": 18.1,
           "confidence": 0.8,
           "incident_cited": true
         },
         {
-          "component": "order-service",
-          "correct": true,
-          "steps": 20,
-          "elapsed": 32.27,
-          "confidence": 0.8,
-          "incident_cited": true
+          "component": null,
+          "correct": false,
+          "error": "No valid diagnosis package after 32 steps."
         }
       ]
     },
     "ALRT-005": {
-      "success_rate": 1.0,
-      "successes": 3,
-      "total": 3,
-      "avg_steps": 12,
-      "avg_elapsed": 22.506666666666668,
-      "avg_confidence": 0.9,
+      "success_rate": 0.9,
+      "successes": 9,
+      "total": 10,
+      "avg_steps": 23.333333333333332,
+      "avg_elapsed": 37.06333333333333,
+      "avg_confidence": 0.9277777777777778,
       "failure_components": [],
       "runs": [
         {
           "component": "auth-service",
           "correct": true,
-          "steps": 12,
-          "elapsed": 19.26,
+          "steps": 19,
+          "elapsed": 34.16,
           "confidence": 0.9,
           "incident_cited": true
         },
         {
           "component": "auth-service",
           "correct": true,
-          "steps": 12,
-          "elapsed": 19.11,
+          "steps": 19,
+          "elapsed": 21.92,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": null,
+          "correct": false,
+          "error": "No valid diagnosis package after 32 steps."
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 19,
+          "elapsed": 22.19,
           "confidence": 0.9,
           "incident_cited": true
         },
         {
           "component": "auth-service",
           "correct": true,
-          "steps": 12,
-          "elapsed": 29.15,
+          "steps": 25,
+          "elapsed": 36.76,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 25,
+          "elapsed": 46.6,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 26,
+          "elapsed": 53.24,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 32,
+          "elapsed": 52.28,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 19,
+          "elapsed": 26.4,
           "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 26,
+          "elapsed": 40.02,
+          "confidence": 0.95,
           "incident_cited": true
         }
       ]
     },
     "ALRT-006": {
       "success_rate": 1.0,
-      "successes": 3,
-      "total": 3,
-      "avg_steps": 9,
-      "avg_elapsed": 18.163333333333334,
-      "avg_confidence": 0.8666666666666667,
+      "successes": 10,
+      "total": 10,
+      "avg_steps": 13.8,
+      "avg_elapsed": 23.044,
+      "avg_confidence": 0.845,
       "failure_components": [],
       "runs": [
         {
           "component": "payments-db",
           "correct": true,
           "steps": 9,
-          "elapsed": 17.16,
-          "confidence": 0.9,
+          "elapsed": 11.9,
+          "confidence": 0.8,
           "incident_cited": true
         },
         {
           "component": "payments-db",
           "correct": true,
-          "steps": 9,
-          "elapsed": 18.39,
+          "steps": 14,
+          "elapsed": 19.42,
+          "confidence": 0.85,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 21,
+          "elapsed": 31.47,
           "confidence": 0.8,
           "incident_cited": true
         },
@@ -208,7 +473,55 @@
           "component": "payments-db",
           "correct": true,
           "steps": 9,
-          "elapsed": 18.94,
+          "elapsed": 12.86,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 12.37,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 14.25,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 14.01,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 15,
+          "elapsed": 37.2,
+          "confidence": 0.85,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 25,
+          "elapsed": 45.91,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 18,
+          "elapsed": 31.05,
           "confidence": 0.9,
           "incident_cited": true
         }
@@ -216,18 +529,42 @@
     },
     "ALRT-007": {
       "success_rate": 1.0,
-      "successes": 3,
-      "total": 3,
-      "avg_steps": 16,
-      "avg_elapsed": 29.653333333333332,
-      "avg_confidence": 0.7666666666666667,
+      "successes": 10,
+      "total": 10,
+      "avg_steps": 12.8,
+      "avg_elapsed": 20.673,
+      "avg_confidence": 0.79,
       "failure_components": [],
       "runs": [
         {
           "component": "user-service",
           "correct": true,
           "steps": 16,
-          "elapsed": 25.28,
+          "elapsed": 24.63,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 19,
+          "elapsed": 35.57,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 15.31,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 14.9,
           "confidence": 0.8,
           "incident_cited": true
         },
@@ -235,34 +572,98 @@
           "component": "user-service",
           "correct": true,
           "steps": 16,
-          "elapsed": 32.1,
+          "elapsed": 26.15,
           "confidence": 0.8,
           "incident_cited": true
         },
         {
           "component": "user-service",
           "correct": true,
-          "steps": 16,
-          "elapsed": 31.58,
+          "steps": 9,
+          "elapsed": 14.31,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 14.75,
           "confidence": 0.7,
+          "incident_cited": true
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 16,
+          "elapsed": 21.79,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 14.11,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "user-service",
+          "correct": true,
+          "steps": 16,
+          "elapsed": 25.21,
+          "confidence": 0.8,
           "incident_cited": true
         }
       ]
     },
     "ALRT-008": {
       "success_rate": 1.0,
-      "successes": 3,
-      "total": 3,
-      "avg_steps": 10,
-      "avg_elapsed": 20.17,
-      "avg_confidence": 0.85,
+      "successes": 10,
+      "total": 10,
+      "avg_steps": 12.4,
+      "avg_elapsed": 18.872,
+      "avg_confidence": 0.86,
       "failure_components": [],
       "runs": [
         {
           "component": "cdn-provider",
           "correct": true,
+          "steps": 13,
+          "elapsed": 20.59,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "cdn-provider",
+          "correct": true,
           "steps": 9,
-          "elapsed": 19.6,
+          "elapsed": 14.06,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "cdn-provider",
+          "correct": true,
+          "steps": 19,
+          "elapsed": 38.08,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "cdn-provider",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 13.61,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "cdn-provider",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 12.48,
           "confidence": 0.8,
           "incident_cited": true
         },
@@ -270,7 +671,23 @@
           "component": "cdn-provider",
           "correct": true,
           "steps": 9,
-          "elapsed": 18.76,
+          "elapsed": 14.07,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "cdn-provider",
+          "correct": true,
+          "steps": 19,
+          "elapsed": 28.57,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "cdn-provider",
+          "correct": true,
+          "steps": 12,
+          "elapsed": 15.71,
           "confidence": 0.85,
           "incident_cited": true
         },
@@ -278,76 +695,201 @@
           "component": "cdn-provider",
           "correct": true,
           "steps": 12,
-          "elapsed": 22.15,
-          "confidence": 0.9,
+          "elapsed": 14.63,
+          "confidence": 0.85,
+          "incident_cited": true
+        },
+        {
+          "component": "cdn-provider",
+          "correct": true,
+          "steps": 13,
+          "elapsed": 16.92,
+          "confidence": 0.8,
           "incident_cited": true
         }
       ]
     },
     "ALRT-009": {
-      "success_rate": 1.0,
-      "successes": 3,
-      "total": 3,
-      "avg_steps": 18.333333333333332,
-      "avg_elapsed": 30.14,
-      "avg_confidence": 0.9,
-      "failure_components": [],
+      "success_rate": 0.9,
+      "successes": 9,
+      "total": 10,
+      "avg_steps": 21.2,
+      "avg_elapsed": 28.62,
+      "avg_confidence": 0.87,
+      "failure_components": [
+        "checkout-api"
+      ],
       "runs": [
         {
           "component": "payments-db",
           "correct": true,
+          "steps": 25,
+          "elapsed": 39.13,
+          "confidence": 0.95,
+          "incident_cited": false
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
           "steps": 18,
-          "elapsed": 32.46,
+          "elapsed": 21.01,
+          "confidence": 0.8,
+          "incident_cited": false
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 18,
+          "elapsed": 20.18,
           "confidence": 0.9,
           "incident_cited": true
         },
         {
           "component": "payments-db",
           "correct": true,
-          "steps": 18,
-          "elapsed": 27.55,
+          "steps": 21,
+          "elapsed": 25.19,
           "confidence": 0.9,
-          "incident_cited": true
+          "incident_cited": false
         },
         {
           "component": "payments-db",
           "correct": true,
           "steps": 19,
-          "elapsed": 30.41,
+          "elapsed": 19.47,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "checkout-api",
+          "correct": false,
+          "steps": 29,
+          "elapsed": 48.64,
           "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 31,
+          "elapsed": 51.1,
+          "confidence": 0.95,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 18,
+          "elapsed": 19.33,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 18,
+          "elapsed": 25.37,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "payments-db",
+          "correct": true,
+          "steps": 15,
+          "elapsed": 16.78,
+          "confidence": 0.8,
           "incident_cited": true
         }
       ]
     },
     "ALRT-010": {
-      "success_rate": 0.3333333333333333,
-      "successes": 1,
-      "total": 3,
-      "avg_steps": 9,
-      "avg_elapsed": 16.19,
+      "success_rate": 0.9,
+      "successes": 9,
+      "total": 10,
+      "avg_steps": 13.11111111111111,
+      "avg_elapsed": 16.461111111111112,
       "avg_confidence": 0.8,
       "failure_components": [],
       "runs": [
         {
+          "component": null,
+          "correct": false,
+          "error": "No valid diagnosis package after 32 steps."
+        },
+        {
           "component": "auth-service",
           "correct": true,
           "steps": 9,
-          "elapsed": 16.19,
+          "elapsed": 9.9,
           "confidence": 0.8,
           "incident_cited": true
         },
         {
-          "component": null,
-          "correct": false,
-          "error": "No valid diagnosis package after 32 steps."
+          "component": "auth-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 10.55,
+          "confidence": 0.8,
+          "incident_cited": true
         },
         {
-          "component": null,
-          "correct": false,
-          "error": "No valid diagnosis package after 32 steps."
+          "component": "auth-service",
+          "correct": true,
+          "steps": 18,
+          "elapsed": 19.7,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 13,
+          "elapsed": 13.28,
+          "confidence": 0.9,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 12.51,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 11,
+          "elapsed": 11.8,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 9,
+          "elapsed": 11.14,
+          "confidence": 0.8,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 27,
+          "elapsed": 44.16,
+          "confidence": 0.7,
+          "incident_cited": true
+        },
+        {
+          "component": "auth-service",
+          "correct": true,
+          "steps": 13,
+          "elapsed": 15.11,
+          "confidence": 0.7,
+          "incident_cited": true
         }
       ]
     }
   },
-  "runs_per_scenario": 3
+  "runs_per_scenario": 10
 }
