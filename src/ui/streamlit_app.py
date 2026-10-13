@@ -6,6 +6,7 @@ Rootly Streamlit UI.
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 from pathlib import Path
@@ -24,7 +25,13 @@ from src.data_loader import load_alerts, load_incidents
 from src.ui.system_map import render_system_map
 
 load_dotenv(ROOT / ".env")
-st.set_page_config(page_title="Rootly | Incident Triage", layout="wide", initial_sidebar_state="expanded")
+LOGO_PATH = Path(__file__).resolve().parent / "assets" / "rootly-mark.png"
+st.set_page_config(
+    page_title="Rootly | Incident Triage",
+    page_icon=str(LOGO_PATH),
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 SEVERITY_COLOR = {"low": "#7ee2a8", "medium": "#f2c66d", "high": "#f19a66", "critical": "#ff6b6b"}
 ESCALATION_COLOR = {"auto_resolved": "#7ee2a8", "escalate_normal": "#f2c66d", "escalate_urgent_needs_approval": "#ff6b6b"}
@@ -48,6 +55,8 @@ st.markdown(
         h1 { letter-spacing:-.04em; font-weight:500; } h2,h3 { letter-spacing:-.025em; font-weight:500; }
         p,li,label { color:#d0d0cd; } code,pre,[data-testid="stCode"] { font-family:Consolas,monospace; }
         .rootly-eyebrow { color:var(--accent); font:500 .7rem Consolas,monospace; letter-spacing:.12em; text-transform:uppercase; }
+        .rootly-brand { display:flex; align-items:center; gap:.65rem; width:fit-content; margin:0 0 1.25rem; color:var(--white); font-size:1.05rem; font-weight:600; letter-spacing:-.03em; }
+        .rootly-brand img { display:block; width:32px; height:32px; object-fit:contain; }
         .rootly-muted { color:var(--muted); }
         .rootly-hero { animation:rootly-fade 900ms ease both; padding:12vh 0 8vh; max-width:820px; }
         .rootly-hero h1 { font-size:clamp(4rem,11vw,9rem); line-height:.9; margin:1rem 0 2rem; }
@@ -109,6 +118,12 @@ st.markdown(
         @keyframes rootly-rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
     </style>
     """, unsafe_allow_html=True,
+)
+
+logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+st.markdown(
+    f'<div class="rootly-brand" aria-label="Rootly"><img src="data:image/png;base64,{logo_data}" alt=""><span>Rootly</span></div>',
+    unsafe_allow_html=True,
 )
 
 
