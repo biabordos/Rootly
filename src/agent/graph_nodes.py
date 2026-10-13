@@ -42,7 +42,7 @@ from src.agent.escalation_policy import HUMAN_APPROVE, HUMAN_DECISIONS, apply_hu
 from src.agent.graph_state import RootlyContext, RootlyState
 from src.agent.tool_registry import ToolCallRecord, ToolRegistry
 from src.data_loader import get_alert, load_cmdb, load_incidents, load_logs
-from src.models.schemas import Alert, DiagnosisPackage, Severity
+from src.models.schemas import Alert, Criticality, DiagnosisPackage, Severity
 from src.tools.cmdb_lookup import cmdb_lookup
 
 DEFAULT_MODEL = "codestral-latest"
@@ -1267,7 +1267,11 @@ def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
 def escalation_policy_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
     diagnosis = DiagnosisPackage.model_validate(state["diagnosis"])
     component = cmdb_lookup(diagnosis.affected_component)["component"]
-    decision, reason = decide_escalation(diagnosis, len(component["depended_by"]))
+    decision, reason = decide_escalation(
+        diagnosis,
+        len(component["depended_by"]),
+        Criticality(component["criticality"]),
+    )
     diagnosis = diagnosis.model_copy(update={
         "escalation_decision": decision,
         "escalation_reason": reason,

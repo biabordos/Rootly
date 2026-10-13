@@ -11,7 +11,7 @@ from src.agent.escalation_policy import (
     apply_human_decision,
     decide_escalation,
 )
-from src.models.schemas import DiagnosisPackage, EscalationDecision, Severity
+from src.models.schemas import Criticality, DiagnosisPackage, EscalationDecision, Severity
 
 URGENT = EscalationDecision.ESCALATE_URGENT_NEEDS_APPROVAL
 CONFIDENCES = [0.0, 0.3, 0.5, 0.69, 0.7, 0.85, 0.99, 1.0]
@@ -83,6 +83,63 @@ def test_confidence_threshold_boundary():
 @pytest.mark.parametrize("severity", list(Severity))
 def test_every_decision_comes_with_a_reason(severity, confidence, dependents):
     _, reason = decide_escalation(package(severity, confidence), dependents)
+    assert reason.strip()
+
+
+# ── Business criticality ──────────────────────────────────
+
+@pytest.mark.parametrize("dependents", [0, 1])
+@pytest.mark.parametrize("confidence", GOOD_CONFIDENCES)
+def test_high_severity_on_a_critical_component_is_urgent(confidence, dependents):
+    """A critical component with a narrow blast radius still needs approval."""
+    decision, reason = decide_escalation(
+        package(Severity.HIGH, confidence), dependents, Criticality.CRITICAL
+    )
+    assert decision == URGENT
+    assert "business-critical" in reason
+
+
+@pytest.mark.parametrize("criticality", [Criticality.LOW, Criticality.MEDIUM, Criticality.HIGH])
+def test_high_severity_below_critical_criticality_stays_normal(criticality):
+    decision, _ = decide_escalation(package(Severity.HIGH, 0.85), 0, criticality)
+    assert decision == EscalationDecision.ESCALATE_NORMAL
+
+
+def test_criticality_omitted_keeps_the_previous_behaviour():
+    """The rule is skipped when the caller supplies no criticality (backward compatible)."""
+    assert decide_escalation(package(Severity.HIGH, 0.85), 0)[0] == EscalationDecision.ESCALATE_NORMAL
+    assert decide_escalation(package(Severity.HIGH, 0.85), 0, None)[0] == EscalationDecision.ESCALATE_NORMAL
+
+
+@pytest.mark.parametrize("severity", [Severity.LOW, Severity.MEDIUM])
+def test_low_or_medium_on_a_critical_component_is_still_auto_resolved(severity):
+    """The rule is gated on high severity: a minor fault does not page because of the tier."""
+    decision, _ = decide_escalation(package(severity, 0.85), 0, Criticality.CRITICAL)
+    assert decision == EscalationDecision.AUTO_RESOLVED
+
+
+def test_blast_radius_keeps_its_reason_on_a_critical_component():
+    """Rule order: a wide radius is reported as the blast radius, not the criticality tier."""
+    decision, reason = decide_escalation(package(Severity.HIGH, 0.85), 2, Criticality.CRITICAL)
+    assert decision == URGENT
+    assert "blast radius" in reason
+
+
+def test_critical_severity_outranks_the_criticality_tier():
+    _, reason = decide_escalation(package(Severity.CRITICAL, 0.85), 0, Criticality.CRITICAL)
+    assert "critical incidents" in reason
+
+
+def test_low_confidence_on_a_critical_component_is_urgent():
+    """Both signals point the same way; the decision must not depend on which fires first."""
+    decision, _ = decide_escalation(package(Severity.HIGH, 0.3), 0, Criticality.CRITICAL)
+    assert decision == URGENT
+
+
+@pytest.mark.parametrize("criticality", list(Criticality) + [None])
+@pytest.mark.parametrize("severity", list(Severity))
+def test_every_criticality_tier_comes_with_a_reason(severity, criticality):
+    _, reason = decide_escalation(package(severity, 0.85), 0, criticality)
     assert reason.strip()
 
 

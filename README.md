@@ -404,7 +404,7 @@ A manual evaluation checklist can be applied to a fixed set of test scenarios to
 | Tools | `cmdb_lookup`, `log_search`, `similar_incidents_search` (RAG: ChromaDB + all-MiniLM-L6-v2, BM25 fallback) |
 | Agents | Four agents in one LangGraph `StateGraph` on Mistral tool calling (`langchain-mistralai`): an **orchestrator** that only routes, plus **CMDB**, **log** and **synthesis** specialists, each holding exactly one part of the toolset. The diagnosis is submitted through a `submit_diagnosis` tool. See [Agents](#agents) below |
 | Guardrail | The package may only reference CMDB components and historical incidents that exist, and every `log_evidence` line must match a real entry in the log corpus, attributed to the service that actually logged it. A component is only accepted as the origin once the logs of every upstream dependency that the component's own error logs blame have been searched. Unchanged by the multi-agent split: the synthesis agent's `submit_diagnosis` goes through exactly the same `check_package()` |
-| Escalation | Deterministic policy after the guardrail (`src/agent/escalation_policy.py`): critical severity, a blast radius of ≥ 2 CMDB dependents, or confidence < 0.70 each force an urgent escalation that needs human approval; a confident low/medium diagnosis is auto-resolved; anything else is a normal escalation |
+| Escalation | Deterministic policy after the guardrail (`src/agent/escalation_policy.py`): critical severity, a blast radius of ≥ 2 CMDB dependents, a high-severity fault on a component the CMDB marks `criticality: critical`, or confidence < 0.70 each force an urgent escalation that needs human approval; a confident low/medium diagnosis is auto-resolved; anything else is a normal escalation |
 | Human-in-the-loop | Urgent escalations pause the graph with `interrupt()`; state is checkpointed to SQLite (`.checkpoints/`), so a human can approve or downgrade (“not urgent”) later, from the CLI or Streamlit, even from another process. The decision and optional note are recorded in the package |
 | Interfaces | `run_cli.py` (Rich) and `src/ui/streamlit_app.py` |
 
@@ -484,7 +484,7 @@ Fiecare handoff are un contract de date explicit:
 | specialist → orchestrator | Analiza proprie + datele brute, ca state structurat | Orchestratorul decide dacă mai e nevoie de un hop upstream |
 | synthesis_agent → guardrail | `AIMessage` cu `submit_diagnosis` | Verificări CMDB + origin check + reachability tranzitiv + căutarea istorică |
 | guardrail → orchestrator | `replan_reasons` (lista motivelor) | Pachet respins; orchestratorul trebuie să dispatch-uiască logurile cerute înainte de o nouă sinteză |
-| guardrail → escalation_policy | `DiagnosisPackage` validat | Severitate critică / blast radius ≥ 2 / confidence < 0.70 |
+| guardrail → escalation_policy | `DiagnosisPackage` validat | Severitate critică / blast radius ≥ 2 / severitate high pe un component `criticality: critical` / confidence < 0.70 |
 | escalation_policy → human_approval | Decizie urgentă + `interrupt()` | Pauză checkpoint-ată în SQLite |
 | human_approval → END | Decizia umană (`approve`/`downgrade`) | Stare reluată din checkpoint-ul SQLite |
 
