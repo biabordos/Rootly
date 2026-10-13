@@ -10,7 +10,7 @@ def test_datasets_load_and_validate():
     assert len(load_alerts()) == 10
     assert len(load_cmdb()) == 11
     assert len(load_logs()) == 201
-    assert len(load_incidents()) == 10
+    assert len(load_incidents()) == 47
 
 
 def test_every_referenced_service_exists_in_cmdb():

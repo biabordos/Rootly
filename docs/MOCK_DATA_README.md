@@ -17,7 +17,7 @@ data/
 ├── alerts.json        10 alerte (câte una per scenariu)
 ├── cmdb.json           11 componente IT cu dependențe
 ├── logs.json           201 log entries (13-24 per scenariu + 14 zgomot)
-└── incidents.json      10 incidente istorice (pentru RAG)
+└── incidents.json      47 incidente istorice (pentru RAG)
 
 src/models/
 └── schemas.py         Scheme Pydantic pentru toate entitățile
@@ -186,7 +186,9 @@ Tot 10, neschimbate — dar acum toate au un match direct printr-o alertă, nu d
 | INC-2025-341 | Scenariu 5 | Direct |
 | INC-2024-512 | Scenariu 10 | Direct (era partial pentru scenariul 5) |
 
-Fiecare incident e acum "direct" pentru exact un scenariu — testul RAG (Chroma vs. BM25) devine mai relevant pentru că fiecare query trebuie să discrimineze între 10 documente, nu 2.
+Fiecare incident din tabel e "direct" pentru exact un scenariu. Corpusul a fost extins ulterior la **47 de incidente**: cele 10 de mai sus rămân potrivirile de ground truth, iar restul sunt distractori care acoperă toate cele 11 componente CMDB (4-11 incidente fiecare) și toate cele 7 categorii de root cause, inclusiv `RC-09_data_pipeline`, care nu era reprezentată. Testul RAG discriminează deci între 47 de documente, nu 10 — iar marjele s-au strâns corespunzător (vezi mai jos).
+
+Marja dintre #1 și #2 pe cele 5 query-uri de ranking, pe corpusul de 47 (backend chromadb): +0.002, +0.088, +0.157, +0.102, +0.190. Prima — `checkout-api connection timeouts, payments-db max connections reached`, unde INC-2025-114 bate INC-2025-278 la 0.002 — era la fel de strânsă și pe corpusul de 10: ambii competitori erau deja acolo, deci nu e o regresie introdusă de extindere. Este însă singura potrivire pe care o schimbare de model de embedding sau o reformulare a descrierilor o poate întoarce.
 
 
 ---
