@@ -356,6 +356,143 @@ def _fabricated_log_evidence(cited: list[Any]) -> list[str]:
     ]
 
 
+def _confidence_without_evidence(package_input: dict[str, Any]) -> list[str]:
+    """
+    Confidence floor: high confidence requires supporting breadth.
+    confidence > 0.85 needs at least 2 log lines from different services
+    and at least 1 similar incident.
+    """
+    confidence = float(package_input.get("confidence", 0.0))
+    if confidence <= 0.85:
+        return []
+    evidence = package_input.get("log_evidence") or []
+    services_in_evidence: set[str] = set()
+    cmdb_names = {c.name for c in load_cmdb()}
+    for line in evidence:
+        normalised = _normalise_evidence(line)
+        # Determine the emitting service: lines follow "<timestamp> <service>: <message>".
+        # The emitter is the first CMDB name that appears followed by ":" in the line.
+        for name in sorted(cmdb_names, key=len, reverse=True):
+            marker = f"{name}:"
+            if marker in normalised:
+                services_in_evidence.add(name)
+                break
+        else:
+            # Fallback: count any mentioned CMDB name as an emitter
+            for name in cmdb_names:
+                if name in normalised:
+                    services_in_evidence.add(name)
+                    break
+    similar = package_input.get("similar_incidents") or []
+    problems: list[str] = []
+    if len(services_in_evidence) < 2:
+        problems.append(
+            f"confidence is {confidence:.2f} but log_evidence covers only "
+            f"{len(services_in_evidence)} service(s). High confidence (>0.85) requires "
+            f"log lines from at least 2 different services. Lower confidence or gather more evidence."
+        )
+    if not similar:
+        problems.append(
+            f"confidence is {confidence:.2f} but similar_incidents is empty. "
+            f"High confidence requires at least one matching historical incident."
+        )
+    return problems
+
+
+def _severity_without_blast_radius(package_input: dict[str, Any]) -> list[str]:
+    """
+    Severity consistency: critical severity needs blast_radius >= 2
+    or the affected component must have downstream dependents.
+    """
+    severity = str(package_input.get("severity_assessed", "")).strip().lower()
+    if severity != "critical":
+        return []
+    affected = _component_name(str(package_input.get("affected_component", "")))
+    component = next((c for c in load_cmdb() if c.name == affected), None)
+    if component is None:
+        return []  # caught by the CMDB existence check
+    deps = package_input.get("critical_dependencies") or []
+    has_dependents = len(component.depended_by) > 0
+    if len(deps) >= 2 or has_dependents:
+        return []
+    return [
+        f"severity_assessed is 'critical' but affected_component '{affected}' has "
+        f"{len(component.depended_by)} dependents and only {len(deps)} critical dependencies listed. "
+        f"Critical severity requires blast_radius >= 2 or downstream dependents. "
+        f"Lower to 'high' or add the affected dependencies."
+    ]
+
+
+def _evidence_does_not_cover_affected(package_input: dict[str, Any]) -> list[str]:
+    """
+    Evidence coverage: at least one log line must mention the affected component.
+    Otherwise the agent is blaming a component whose logs it never cited.
+    """
+    affected = _component_name(str(package_input.get("affected_component", "")))
+    evidence = package_input.get("log_evidence") or []
+    if not evidence or not affected:
+        return []  # empty evidence is caught elsewhere
+    for line in evidence:
+        if affected in _normalise_evidence(line):
+            return []
+    return [
+        f"None of the {len(evidence)} log_evidence lines mention '{affected}'. "
+        f"You are blaming a component whose logs you did not cite. "
+        f"Add log evidence from {affected} or change affected_component to the one your evidence supports."
+    ]
+
+
+def _evidence_not_from_search_results(
+    cited: list[Any], log_search_cache: dict[str, dict],
+) -> list[str]:
+    """
+    Cross-agent validation: every cited log line must trace back to a log_search
+    result that was actually returned during this run. Catches a model that invents
+    a line which happens to exist in the corpus but was never surfaced by a tool call.
+    """
+    if not log_search_cache:
+        return []
+    # Collect every message the log agent actually received from log_search
+    all_returned: set[str] = set()
+    for cached_result in log_search_cache.values():
+        for entry in cached_result.get("logs") or []:
+            if isinstance(entry, dict):
+                msg = entry.get("message", "")
+                svc = entry.get("service") or cached_result.get("service", "")
+                if msg:
+                    all_returned.add(_normalise_evidence(f"{svc}: {msg}"))
+                    all_returned.add(_normalise_evidence(msg))
+    if not all_returned:
+        return []
+    unreturned = []
+    _TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}t\d{2}:\d{2}:\d{2}z?\s*")
+    for raw in cited:
+        normalised = _normalise_evidence(raw)
+        if not normalised:
+            continue
+        found = any(
+            cached in normalised or normalised in cached
+            for cached in all_returned
+        )
+        if not found:
+            # Cited evidence often has a timestamp prefix the cache lacks; strip and retry
+            stripped = _TS_RE.sub("", normalised)
+            if stripped and stripped != normalised:
+                found = any(
+                    cached in stripped or stripped in cached
+                    for cached in all_returned
+                )
+        if not found:
+            unreturned.append(str(raw))
+    if unreturned:
+        return [
+            "log_evidence contains lines not returned by any log_search in this run: "
+            + "; ".join(f'"{line}"' for line in unreturned)
+            + ". Only cite lines that log_search actually returned."
+        ]
+    return []
+
+
 def check_package(
     alert: Alert,
     package_input: dict[str, Any],
@@ -363,6 +500,7 @@ def check_package(
     elapsed: float,
     investigated_services: set[str] | None = None,
     searched_similar_incidents: bool | None = None,
+    log_search_cache: dict[str, dict] | None = None,
 ) -> tuple[DiagnosisPackage | None, list[str]]:
     """
     Guardrail: the package may only reference components that exist in the CMDB and
@@ -420,6 +558,19 @@ def check_package(
             )
         if workflow_problems:
             return None, workflow_problems
+
+    # ── Semantic guardrails ──────────────────────────────────────────────
+    if not problems:
+        semantic_problems: list[str] = []
+        semantic_problems += _confidence_without_evidence(package_input)
+        semantic_problems += _severity_without_blast_radius(package_input)
+        semantic_problems += _evidence_does_not_cover_affected(package_input)
+        if log_search_cache is not None:
+            semantic_problems += _evidence_not_from_search_results(
+                package_input.get("log_evidence", []), log_search_cache
+            )
+        if semantic_problems:
+            return None, semantic_problems
 
     if problems:
         # The component list only helps when a component name was actually wrong; appending
@@ -1027,6 +1178,9 @@ def orchestrator_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> di
     }
 
 
+MAX_GUARDRAIL_REJECTIONS = 3
+
+
 def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
     step = state["step_count"]
     alert = get_alert(state["alert_id"])
@@ -1036,30 +1190,77 @@ def guardrail_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> dict:
     accepted: DiagnosisPackage | None = None
     rejected_reasons: list[str] = []
     searched = any(e["kind"] == "action" and e.get("tool") == "similar_incidents_search" for e in state["trace"])
+    rejection_count = state.get("rejection_count", 0)
+    cache = state.get("log_search_cache") or {}
 
     for call in _submit_calls(state):
-        package, problems = check_package(alert, call["args"], step, elapsed, set(state["investigated_services"]), searched)
-        if package:
-            accepted = package
-            trace += _emit(runtime, TraceEvent(step, "guardrail", content="Diagnosis package passed the CMDB guardrail."))
-            messages.append(ToolMessage(content="Diagnosis accepted.", tool_call_id=call["id"], name=SUBMIT_TOOL_NAME))
-        else:
-            rejected_reasons += problems
-            trace += _emit(runtime, TraceEvent(step, "guardrail", content=" ".join(problems), is_error=True))
-            messages.append(ToolMessage(
-                content="Diagnosis rejected:\n- " + "\n- ".join(problems),
-                tool_call_id=call["id"], name=SUBMIT_TOOL_NAME, status="error",
-            ))
+        # Circuit breaker: after MAX_GUARDRAIL_REJECTIONS failed attempts, force-accept
+        # with confidence capped at 0.3 and skip semantic/workflow validation. The agent
+        # is stuck in a reject loop and burning budget; a low-confidence package is more
+        # useful than running until the step budget raises DiagnosisError.
+        # Note: the component must still exist in the CMDB (escalation_policy_node needs it).
+        if rejection_count >= MAX_GUARDRAIL_REJECTIONS:
+            args = dict(call["args"])
+            affected = _component_name(str(args.get("affected_component", "")))
+            deps = [_component_name(str(d)) for d in args.get("critical_dependencies", [])]
+            # Even in circuit-breaker mode, the component must exist in the CMDB:
+            # escalation_policy_node calls cmdb_lookup() on it and KeyErrors on a
+            # non-existent name.  Fall through to normal validation if it doesn't.
+            cmdb_names = {c.name for c in load_cmdb()}
+            if affected not in cmdb_names:
+                pass  # fall through to normal check_package below
+            else:
+                raw_confidence = min(max(float(args.get("confidence", 0.3)), 0.0), 1.0)
+                try:
+                    package = DiagnosisPackage(
+                        **{
+                            **{k: v for k, v in args.items() if k in SUBMIT_FIELDS},
+                            "affected_component": affected,
+                            "critical_dependencies": deps,
+                            "confidence": min(raw_confidence, 0.3),
+                        },
+                        alert_id=alert.id,
+                        investigation_steps=step,
+                        time_to_diagnosis_seconds=round(elapsed, 2),
+                    )
+                    accepted = package
+                    trace += _emit(runtime, TraceEvent(step, "guardrail",
+                        content=f"Circuit breaker: force-accepted after {rejection_count} rejections "
+                                f"with confidence capped at {min(raw_confidence, 0.3):.2f}."))
+                    messages.append(ToolMessage(
+                        content="Diagnosis force-accepted (circuit breaker: too many rejections, confidence capped at 0.3).",
+                        tool_call_id=call["id"], name=SUBMIT_TOOL_NAME))
+                except (ValidationError, TypeError, ValueError):
+                    pass  # fall through to normal validation
+
+        if not accepted:
+            package, problems = check_package(
+                alert, call["args"], step, elapsed,
+                set(state["investigated_services"]), searched, cache,
+            )
+            if package:
+                accepted = package
+                trace += _emit(runtime, TraceEvent(step, "guardrail", content="Diagnosis package passed the guardrail."))
+                messages.append(ToolMessage(content="Diagnosis accepted.", tool_call_id=call["id"], name=SUBMIT_TOOL_NAME))
+            else:
+                rejected_reasons += problems
+                trace += _emit(runtime, TraceEvent(step, "guardrail", content=" ".join(problems), is_error=True))
+                messages.append(ToolMessage(
+                    content="Diagnosis rejected:\n- " + "\n- ".join(problems),
+                    tool_call_id=call["id"], name=SUBMIT_TOOL_NAME, status="error",
+                ))
 
     update: dict = {"messages": messages, "trace": trace}
     if accepted:
         update["diagnosis"] = accepted.model_dump(mode="json")
         update["elapsed_seconds"] = round(elapsed, 2)
         update["replan_reasons"] = []
+        update["rejection_count"] = rejection_count
     else:
         # The orchestrator reads these to decide which logs still have to be searched
         # before the synthesis agent is allowed to submit again.
         update["replan_reasons"] = rejected_reasons
+        update["rejection_count"] = rejection_count + 1
     return update
 
 

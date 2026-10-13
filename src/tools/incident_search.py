@@ -69,7 +69,7 @@ def _result(incident: HistoricalIncident, score: float) -> dict:
     # root_cause_category is evaluation metadata and deliberately not exposed.
     return {
         "id": incident.id,
-        "similarity": round(score, 3),
+        "similarity": round(float(score), 3),
         "description": incident.description,
         "root_cause": incident.root_cause,
         "resolution": incident.resolution,

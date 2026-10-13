@@ -71,6 +71,7 @@ class RootlyState(TypedDict, total=False):
     log_evidence_gathered: Annotated[list[dict], operator.add]
     # Guardrail rejection reasons the orchestrator must act on in the next round.
     replan_reasons: list[str]
+    rejection_count: int  # how many times the guardrail has rejected a submit_diagnosis call
     # Results of every log_search already run, keyed "service|start|end|level", so a repeat
     # of the same search is served from here instead of re-running (see graph_nodes).
     log_search_cache: dict[str, dict]

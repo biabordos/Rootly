@@ -17,6 +17,7 @@ from __future__ import annotations
 import itertools
 import os
 import sqlite3
+import time
 
 import httpx
 import pytest
@@ -97,7 +98,7 @@ VALID_PACKAGE = {
     "critical_dependencies": ["CI-006 (payments-db)", "order-service"],
     "log_evidence": ["2026-08-18T09:09:15Z payments-db: Max connections reached (20/20), rejecting new connection requests"],
     "root_cause_hypothesis": "payments-db max_connections=20 is saturated, so checkout-api connections time out after 5000ms.",
-    "confidence": 0.9,
+    "confidence": 0.85,
     "escalation_recommendation": "Page payments-team: raise the pool size and add PgBouncer, as in INC-2025-114.",
     "similar_incidents": ["INC-2025-114"],
 }
@@ -518,7 +519,11 @@ def test_a_level_filtered_search_is_not_served_to_an_unfiltered_one():
 
     filtered, unfiltered = [e for e in events if e["kind"] == "observation" and e["tool"] == "log_search"]
     assert unfiltered["result"]["total_matches"] > filtered["result"]["total_matches"]
-    assert unfiltered["duration_ms"] > 0.0  # genuinely re-executed, not served from the cache
+    # The unfiltered search must NOT have been served from cache (cache hits produce a "note" event
+    # before the observation, and duration_ms is always 0.0 for cached results). We check that no
+    # cache-reuse note was emitted for the unfiltered search.
+    cache_notes = [e for e in events if e["kind"] == "note" and "already ran" in (e.get("content") or "")]
+    assert len(cache_notes) == 0
 
 
 def test_a_log_handoff_without_a_window_gets_the_alert_window():
@@ -624,7 +629,12 @@ def test_origin_check_requires_searching_dependencies_the_logs_blame():
             turn("", ("similar_incidents_search", {"query": "redis-cache OOM crash, auth-service outage"})),
             turn("", (SUBMIT_TOOL_NAME, stops_one_hop_short)),
             turn("", (SUBMIT_TOOL_NAME, {**stops_one_hop_short, "affected_component": "redis-cache",
-                                         "critical_dependencies": ["auth-service", "api-gateway"]})),
+                                         "critical_dependencies": ["auth-service", "api-gateway"],
+                                         "confidence": 0.85,
+                                         "log_evidence": [
+                                             "2026-08-20T03:15:10Z auth-service: Redis connection refused",
+                                             "2026-08-20T03:15:00Z redis-cache: Out of memory: cannot allocate 256KB for new key, all eviction attempts failed",
+                                         ]})),
         ],
     )
     events: list[dict] = []
@@ -690,6 +700,11 @@ def test_alerted_service_is_rejected_until_a_dependency_is_investigated():
         "affected_component": "auth-service",
         "critical_dependencies": ["web-frontend", "api-gateway"],
         "root_cause_hypothesis": "auth-service's TLS certificate expired.",
+        "confidence": 0.85,
+        "log_evidence": [
+            "2026-08-21T07:55:00Z web-frontend: Site completely unavailable",
+            "2026-08-22T16:05:30Z auth-service: TLS certificate expired at 16:00:00Z, all inbound HTTPS connections rejected",
+        ],
     }
     llms = agents(
         orchestrator=[
@@ -1082,7 +1097,7 @@ def test_transitive_guardrail_leaves_the_original_scenarios_unaffected():
         "log_evidence": ["2026-08-22T16:05:30Z auth-service: TLS certificate expired at 16:00:00Z, all inbound HTTPS connections rejected"],
         "root_cause_hypothesis": "auth-service's TLS certificate expired at 16:00:00Z; every inbound HTTPS "
                                   "connection is rejected, cascading to a full outage.",
-        "confidence": 0.9,
+        "confidence": 0.85,
         "escalation_recommendation": "Page security-team: renew the auth-service TLS certificate immediately.",
         "similar_incidents": ["INC-2025-341"],
     }
@@ -1134,6 +1149,7 @@ def test_transitive_guardrail_rejects_a_shortcut_then_accepts_the_order_service_
         "critical_dependencies": ["api-gateway", "order-service"],
         "summary": "payments-db failover took 12 minutes instead of the expected 30 seconds; the same "
                    "failure propagated to web-frontend through api-gateway and order-service.",
+        "confidence": 0.85,
     }
     llms = agents(
         orchestrator=[
@@ -1182,7 +1198,7 @@ def test_transitive_guardrail_accepts_the_checkout_api_path():
         "critical_dependencies": ["api-gateway", "checkout-api"],
         "log_evidence": ["2026-08-27T01:57:00Z checkout-api: Write query to payments-db failed: no primary available during failover"],
         "root_cause_hypothesis": "Scheduled payments-db failover suffered abnormal replication lag, breaking checkout-api's writes.",
-        "confidence": 0.9,
+        "confidence": 0.85,
         "escalation_recommendation": "Page payments-team: investigate replication lag during failovers.",
         "similar_incidents": ["INC-2024-445"],
     }
@@ -1206,6 +1222,67 @@ def test_transitive_guardrail_accepts_the_checkout_api_path():
 
     assert result.diagnosis.affected_component == "payments-db"
     assert result.diagnosis.critical_dependencies == ["api-gateway", "checkout-api"]
+
+
+# ── Circuit breaker ──────────────────────────────────────────────────────
+
+def _breaker_state(package: dict, rejection_count: int) -> dict:
+    """A guardrail_node state holding one submit_diagnosis call, with the breaker armed or not."""
+    submit = AIMessage(
+        content="",
+        tool_calls=[{"name": SUBMIT_TOOL_NAME, "args": package, "id": "brk000001", "type": "tool_call"}],
+    )
+    return {
+        "messages": [submit],
+        "alert_id": "ALRT-001",
+        "step_count": 20,
+        "max_steps": 32,
+        "tool_calls": 3,
+        "investigated_services": [],
+        "started_at": time.time() - 5,
+        "trace": [],
+        "log_search_cache": {},
+        "rejection_count": rejection_count,
+        "usage": {},
+        "model": "codestral-latest",
+    }
+
+
+class _NoContextRuntime:
+    """A Runtime stand-in for calling a node directly: no LLM, no on_event."""
+
+    context = None
+
+
+def test_circuit_breaker_force_accepts_a_real_component_with_capped_confidence():
+    # Fabricated evidence and no historical match: check_package would reject this.
+    package = {**VALID_PACKAGE, "confidence": 0.95, "similar_incidents": [],
+               "log_evidence": ["2026-08-18T09:00:00Z payments-db: totally invented line"]}
+
+    rejected = graph_nodes.guardrail_node(_breaker_state(package, 0), _NoContextRuntime())
+    assert rejected.get("diagnosis") is None  # breaker disarmed: normal validation applies
+    assert rejected["rejection_count"] == 1
+
+    forced = graph_nodes.guardrail_node(
+        _breaker_state(package, graph_nodes.MAX_GUARDRAIL_REJECTIONS), _NoContextRuntime()
+    )
+    assert forced["diagnosis"]["affected_component"] == "payments-db"
+    assert forced["diagnosis"]["confidence"] == 0.3  # capped, so it always needs a human
+    assert forced["rejection_count"] == graph_nodes.MAX_GUARDRAIL_REJECTIONS
+
+
+def test_circuit_breaker_still_refuses_a_component_that_is_not_in_the_cmdb():
+    # Regression: the breaker used to skip the CMDB existence check, so a bogus component
+    # was force-accepted and escalation_policy_node then died on cmdb_lookup(...)["component"].
+    package = {**VALID_PACKAGE, "affected_component": "ghost-service"}
+    state = _breaker_state(package, graph_nodes.MAX_GUARDRAIL_REJECTIONS)
+
+    update = graph_nodes.guardrail_node(state, _NoContextRuntime())
+
+    assert update.get("diagnosis") is None
+    assert any("not a CMDB component" in reason for reason in update["replan_reasons"])
+    # A rejected package goes back to the orchestrator, so escalation_policy is never reached.
+    assert rootly_graph.route_after_guardrail({**state, **update}) == "orchestrator"
 
 
 @pytest.mark.live
