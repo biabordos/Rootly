@@ -32,6 +32,7 @@ from src.agent.graph_nodes import ROUTE_TOOL_NAME, SUBMIT_TOOL_NAME
 from src.agent.system_prompt import format_alert
 from src.data_loader import get_alert
 from src.models.schemas import EscalationDecision
+from src.tools.log_search import log_search
 
 _ids = itertools.count(1)
 
@@ -1283,6 +1284,118 @@ def test_circuit_breaker_still_refuses_a_component_that_is_not_in_the_cmdb():
     assert any("not a CMDB component" in reason for reason in update["replan_reasons"])
     # A rejected package goes back to the orchestrator, so escalation_policy is never reached.
     assert rootly_graph.route_after_guardrail({**state, **update}) == "orchestrator"
+
+
+# ── Semantic guardrails ──────────────────────────────────────────────────
+
+# Real corpus lines, so the fabrication check passes and the semantic layer is what
+# actually decides. Each is picked for what one test below needs.
+PAYMENTS_DB_LINE = "2026-08-18T09:09:15Z payments-db: Max connections reached (20/20), rejecting new connection requests"
+CHECKOUT_API_LINE = "2026-08-18T09:09:22Z checkout-api: Failed to process payment for ORD-8852: database connection unavailable"
+# Names no other component, so it cannot accidentally satisfy the coverage check.
+CHECKOUT_API_LINE_NAMING_NO_DEPENDENCY = "2026-08-18T09:10:32Z checkout-api: 5xx error rate at 7.4% (threshold: 5%)"
+WEB_FRONTEND_LINE = "2026-08-22T16:05:00Z web-frontend: Site completely unavailable for all authenticated users"
+
+
+def _check(package: dict, alert_id: str = "ALRT-001", **kwargs):
+    """check_package with the workflow checks off, so only the semantic layer can reject."""
+    return graph_nodes.check_package(get_alert(alert_id), package, steps=5, elapsed=1.0, **kwargs)
+
+
+def test_high_confidence_needs_evidence_from_two_services():
+    package = {**VALID_PACKAGE, "confidence": 0.95, "log_evidence": [PAYMENTS_DB_LINE]}
+
+    accepted, problems = _check(package)
+
+    assert accepted is None
+    assert any("covers only 1 service(s)" in p for p in problems)
+
+    # A second service's line is all that was missing.
+    accepted, problems = _check({**package, "log_evidence": [PAYMENTS_DB_LINE, CHECKOUT_API_LINE]})
+
+    assert problems == []
+    assert accepted is not None
+
+
+def test_confidence_at_the_threshold_does_not_need_a_second_service():
+    # The rule fires above 0.85, not at it, so a single-service package stays acceptable.
+    accepted, problems = _check({**VALID_PACKAGE, "confidence": 0.85})
+
+    assert problems == []
+    assert accepted is not None
+
+
+def test_high_confidence_needs_a_matching_historical_incident():
+    package = {**VALID_PACKAGE, "confidence": 0.95, "similar_incidents": [],
+               "log_evidence": [PAYMENTS_DB_LINE, CHECKOUT_API_LINE]}
+
+    accepted, problems = _check(package)
+
+    assert accepted is None
+    assert any("similar_incidents is empty" in p for p in problems)
+
+
+def test_critical_severity_needs_a_blast_radius():
+    # web-frontend is the only component with no dependents, so it is the only place this
+    # rule can fire: nothing downstream breaks when it does.
+    package = {**VALID_PACKAGE, "affected_component": "web-frontend", "severity_assessed": "critical",
+               "critical_dependencies": ["api-gateway"], "log_evidence": [WEB_FRONTEND_LINE]}
+
+    accepted, problems = _check(package, alert_id="ALRT-005")
+
+    assert accepted is None
+    assert any("Critical severity requires blast_radius >= 2" in p for p in problems)
+
+    # A second critical dependency satisfies it.
+    accepted, problems = _check({**package, "critical_dependencies": ["api-gateway", "auth-service"]},
+                                alert_id="ALRT-005")
+
+    assert problems == []
+    assert accepted is not None
+
+
+def test_critical_severity_is_accepted_for_a_component_with_dependents():
+    # payments-db has dependents, so critical needs no extra justification.
+    accepted, problems = _check({**VALID_PACKAGE, "severity_assessed": "critical",
+                                 "critical_dependencies": ["checkout-api"]})
+
+    assert problems == []
+    assert accepted is not None
+
+
+def test_evidence_must_mention_the_component_being_blamed():
+    # payments-db is blamed on a real checkout-api line that never names it.
+    package = {**VALID_PACKAGE, "log_evidence": [CHECKOUT_API_LINE_NAMING_NO_DEPENDENCY]}
+
+    accepted, problems = _check(package)
+
+    assert accepted is None
+    assert any("log_evidence lines mention 'payments-db'" in p for p in problems)
+
+
+def test_cited_evidence_must_come_from_a_log_search_in_this_run():
+    # A real corpus line is not enough: if no log_search in this run returned it, the
+    # investigation never saw it. Here only payments-db was searched.
+    cache = {
+        graph_nodes.log_search_key({"service": "payments-db", **WINDOW_001}):
+            log_search(service="payments-db", **WINDOW_001),
+    }
+
+    # The line that search did return is accepted.
+    accepted, problems = _check(VALID_PACKAGE, log_search_cache=cache)
+
+    assert problems == []
+    assert accepted is not None
+
+    # A real web-frontend line, never returned by any search this run, is not.
+    accepted, problems = _check(
+        {**VALID_PACKAGE, "affected_component": "web-frontend", "log_evidence": [WEB_FRONTEND_LINE],
+         "critical_dependencies": ["api-gateway"]},
+        alert_id="ALRT-005", log_search_cache=cache,
+    )
+
+    assert accepted is None
+    assert any("not returned by any log_search in this run" in p for p in problems)
 
 
 @pytest.mark.live
