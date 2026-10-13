@@ -807,10 +807,13 @@ def test_alerted_service_is_accepted_once_a_dependency_was_investigated():
 
 def test_missing_submit_is_nudged_and_budget_exhaustion_raises():
     llms = scripted_alrt_001()
-    llms["orchestrator"] = FakeLLM([route("synthesis"), route("synthesis")])
+    llms["orchestrator"] = FakeLLM([route("synthesis")])
     llms["synthesis"] = FakeLLM([
         report("I think it is the database."),  # no submit_diagnosis
         report("Still the database."),
+        # The synthesis reserve re-dispatches synthesis without spending an orchestrator
+        # turn, so it gets one more attempt than it used to before the budget runs out.
+        report("Still, with no package."),
     ])
     events: list[dict] = []
 
@@ -819,6 +822,66 @@ def test_missing_submit_is_nudged_and_budget_exhaustion_raises():
 
     notes = [e["content"] for e in events if e["kind"] == "note"]
     assert any("budget" in n for n in notes)
+
+
+# -- Synthesis reserve (hard budget guard) -------------------------------
+
+def test_the_reserve_forces_synthesis_without_spending_an_orchestrator_turn():
+    """
+    With only SPECIALIST_MAX_TURNS left the orchestrator must not be asked again: the
+    handoff to synthesis is decided in code. The orchestrator here is scripted with the
+    two investigation rounds only -- it never offers a synthesis route -- so a run that
+    produces a package proves the reserve dispatched it.
+    """
+    llms = scripted_alrt_001()
+    llms["orchestrator"] = FakeLLM([
+        route("cmdb", "checkout-api"),
+        route("log", "payments-db", window=WINDOW_001),
+    ])
+    events: list[dict] = []
+
+    # 6 turns go to the two investigation rounds, leaving 3 == SPECIALIST_MAX_TURNS.
+    result = run_diagnosis(get_alert("ALRT-001"), llms=llms, on_event=events.append, max_steps=9)
+
+    assert result.diagnosis.affected_component == "payments-db"
+    assert len(llms["orchestrator"].calls) == 2, "the reserve must not cost a model turn"
+    forced = [e for e in events if e["kind"] == "routing" and "forced" in (e.get("content") or "")]
+    assert forced and forced[-1]["tool"] == "synthesis"
+
+
+def test_the_reserve_does_not_fire_while_the_budget_is_comfortable():
+    """The normal path must be untouched: the model still picks every handoff."""
+    llms = scripted_alrt_001()
+    events: list[dict] = []
+
+    result = run_diagnosis(get_alert("ALRT-001"), llms=llms, on_event=events.append, max_steps=32)
+
+    assert result.diagnosis.affected_component == "payments-db"
+    assert len(llms["orchestrator"].calls) == 3, "all three handoffs come from the model"
+    assert not [e for e in events if "forced" in (e.get("content") or "")]
+
+
+def test_a_run_that_would_die_without_a_package_now_submits_one():
+    """
+    Regression for the dominant failure mode in the N=10 evaluation: the orchestrator keeps
+    investigating until the budget is gone and submit_diagnosis is never called. Scripted
+    with investigation routes only, nothing here would ever hand off to synthesis, so the
+    package exists purely because the reserve forced the handoff.
+    """
+    llms = scripted_alrt_001()
+    llms["orchestrator"] = FakeLLM([
+        route("cmdb", "checkout-api"),
+        route("log", "payments-db", window=WINDOW_001),
+        # Would keep investigating if it were ever asked again.
+        route("cmdb", "auth-service"),
+        route("cmdb", "order-service"),
+    ])
+
+    result = run_diagnosis(get_alert("ALRT-001"), llms=llms, max_steps=9)
+
+    assert result.diagnosis is not None
+    assert result.diagnosis.escalation_decision is not None
+    assert result.steps <= 9
 
 
 def test_duplicate_tool_call_ids_within_one_turn_are_deduplicated():
@@ -1223,6 +1286,59 @@ def test_transitive_guardrail_accepts_the_checkout_api_path():
 
     assert result.diagnosis.affected_component == "payments-db"
     assert result.diagnosis.critical_dependencies == ["api-gateway", "checkout-api"]
+
+
+# ── Synthesis reserve, at the node level ─────────────────────────────────
+
+def _reserve_state(step_count: int, max_steps: int = 32) -> dict:
+    """An orchestrator_node state parked at a given point in the step budget."""
+    return {
+        "messages": [],
+        "alert_id": "ALRT-001",
+        "step_count": step_count,
+        "max_steps": max_steps,
+        "tool_calls": 2,
+        "truncated_responses": 0,
+        "used_tool_call_ids": ["abc0000001"],
+        "investigated_services": ["payments-db"],
+        "started_at": time.time() - 5,
+        "trace": [],
+        "log_search_cache": {},
+        "cmdb_context": [],
+        "log_evidence_gathered": [],
+        "replan_reasons": [],
+        "rejection_count": 0,
+        "usage": {"input_tokens": 1, "output_tokens": 2},
+        "model": "codestral-latest",
+    }
+
+
+def test_the_reserve_routes_to_synthesis_without_touching_the_model():
+    # _NoContextRuntime has context = None, so reaching runtime.context.orchestrator_llm
+    # would raise. Returning cleanly is the proof that no model call was made.
+    update = graph_nodes.orchestrator_node(
+        _reserve_state(32 - graph_nodes.SYNTHESIS_RESERVE_TURNS), _NoContextRuntime()
+    )
+    assert update["next_specialist"] == "synthesis"
+    assert update["step_count"] == 32 - graph_nodes.SYNTHESIS_RESERVE_TURNS, "no turn spent"
+    assert update["messages"] == []
+    assert "forced" in update["trace"][-1]["content"]
+
+
+def test_one_turn_above_the_reserve_still_asks_the_model():
+    with pytest.raises(AttributeError):
+        graph_nodes.orchestrator_node(
+            _reserve_state(32 - graph_nodes.SYNTHESIS_RESERVE_TURNS - 1), _NoContextRuntime()
+        )
+
+
+def test_the_reserve_preserves_the_counters_it_does_not_change():
+    state = _reserve_state(30)
+    update = graph_nodes.orchestrator_node(state, _NoContextRuntime())
+    assert update["usage"] == state["usage"]
+    assert update["truncated_responses"] == state["truncated_responses"]
+    assert update["model"] == state["model"]
+    assert update["used_tool_call_ids"] == state["used_tool_call_ids"]
 
 
 # ── Circuit breaker ──────────────────────────────────────────────────────

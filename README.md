@@ -358,7 +358,11 @@ The decision to continue investigating or stop is made using predefined stopping
 
 Tool execution itself remains deterministic. The tools retrieve and return data; the LLM is responsible for interpretation and reasoning.
 
-In future iterations, the single orchestrator could evolve into a multi-agent architecture with specialized agents for CMDB analysis, log analysis, and diagnosis synthesis.
+This section describes the original single-agent loop. It has since been replaced: the
+orchestrator no longer investigates itself but routes to three specialized agents (CMDB,
+log, diagnosis synthesis), each owning one tool — see [§8](#8-mvp-status) for the
+implemented graph and its measured step cost. The stopping criteria above still hold; they are now enforced
+by `check_package()` in the guardrail rather than by the agent's own judgement.
 
 ---
 
@@ -619,6 +623,12 @@ See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase plan this MVP 
   caractere pentru un fragment e calibrat pe citările rulărilor reale din `exports/`.
   Guardrail-ul a fost adăugat după ce, pe o rulare live ALRT-005, agentul de log a raportat
   o linie **fabricată** pentru un serviciu la care `log_search` răspunsese „Unknown service”.
+* Ultimele `SYNTHESIS_RESERVE_TURNS` (3) ture din buget sunt rezervate agentului de
+  sinteză: când mai rămân atât, `orchestrator_node` nu mai întreabă modelul încotro, ci
+  rutează el însuși la `synthesis`. `BUDGET_EXHAUSTED_NOTE` cerea deja asta în prompt, dar
+  modelul putea să o ignore — în evaluarea N=10 (a62e73b) **9 din 10 eșecuri** au fost
+  rulări care au consumat toate cele 32 de ture fără să cheme niciodată `submit_diagnosis`.
+  Decizia luată în cod nu costă nicio tură de model, deci sinteza primește toate cele trei.
 * Multi-agent costă mai multe apeluri de model (vezi [Rate limiting](#rate-limiting)), deci
   `MAX_REACT_STEPS` a crescut de la 15 la 32. Cu vechea valoare de 15, ALRT-005 cade cu
   „No valid diagnosis package after 15 steps” — dacă ai un `.env` mai vechi, actualizează-l.

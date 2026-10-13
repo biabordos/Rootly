@@ -20,14 +20,17 @@ from src.models.schemas import EscalationDecision
 
 
 def stub_result(alert_id: str, component: str, steps: int, seconds: float, *,
-                needs_approval: bool = False, auto_resolved: bool = False):
+                needs_approval: bool = False, auto_resolved: bool = False,
+                escalation: EscalationDecision | None = None):
     diagnosis = SimpleNamespace(
         affected_component=component,
         critical_dependencies=sorted(GROUND_TRUTH[alert_id]["involved"]),
         log_evidence=["2026-08-18T09:09:15Z payments-db: Max connections reached (20/20)"],
         similar_incidents=[GROUND_TRUTH[alert_id]["incident"]],
         confidence=0.9,
-        escalation_decision=EscalationDecision.AUTO_RESOLVED if auto_resolved else EscalationDecision.ESCALATE_NORMAL,
+        escalation_decision=escalation or (
+            EscalationDecision.AUTO_RESOLVED if auto_resolved else EscalationDecision.ESCALATE_NORMAL
+        ),
         root_cause_hypothesis=f"hypothesis for {alert_id}",
         escalation_recommendation=f"page someone about {alert_id}",
     )
@@ -277,3 +280,68 @@ def test_json_export_records_the_success_rate_in_statistical_mode(monkeypatch, t
     assert entry["success_rate"] == 0.5
     assert entry["failure_components"] == ["api-gateway"]
     assert [run["correct"] for run in entry["runs"]] == [True, False]
+
+# ── Escalation ground truth ──────────────────────────────────────────────
+
+def test_the_expected_escalation_is_graded_when_it_matches():
+    attempt = evaluate.score(
+        "ALRT-001",
+        stub_result("ALRT-001", "payments-db", 9, 11.0, escalation=EscalationDecision.ESCALATE_URGENT_NEEDS_APPROVAL),
+    )
+    assert attempt.component_ok
+    assert attempt.escalation == "escalate_urgent_needs_approval"
+    assert attempt.escalation_ok
+
+
+def test_a_wrong_escalation_decision_is_caught():
+    """ALRT-001's root has a 2-dependent blast radius, so anything but urgent is a failure."""
+    attempt = evaluate.score(
+        "ALRT-001",
+        stub_result("ALRT-001", "payments-db", 9, 11.0, escalation=EscalationDecision.AUTO_RESOLVED),
+    )
+    assert attempt.component_ok
+    assert not attempt.escalation_ok
+
+
+def test_a_scenario_without_an_expectation_is_never_an_escalation_failure():
+    """ALRT-002's root has one dependent, so its decision follows the model: not asserted."""
+    assert "escalation" not in GROUND_TRUTH["ALRT-002"]
+    for decision in EscalationDecision:
+        attempt = evaluate.score(
+            "ALRT-002", stub_result("ALRT-002", "user-service", 9, 11.0, escalation=decision)
+        )
+        assert attempt.escalation_ok
+
+
+def test_escalation_is_not_graded_on_a_wrong_component():
+    """The expectation comes from the expected root's blast radius, so it says nothing here."""
+    attempt = evaluate.score(
+        "ALRT-001",
+        stub_result("ALRT-001", "checkout-api", 9, 11.0, escalation=EscalationDecision.AUTO_RESOLVED),
+    )
+    assert not attempt.component_ok
+    assert attempt.escalation_ok
+
+
+def test_the_report_states_the_escalation_outcome():
+    scenarios = [scenario("ALRT-001", [("payments-db", 9, 11.0)])]
+    # The stub escalates normally, which contradicts ALRT-001's structural expectation.
+    body = "\n".join(evaluate.build_report(scenarios, runs=1, statistical=True))
+    assert "Escalation policy:" in body
+    assert "Mismatches" in body and "ALRT-001" in body
+
+
+def test_the_report_names_the_unasserted_scenarios():
+    scenarios = [
+        scenario("ALRT-001", [("payments-db", 9, 11.0)]),
+        scenario("ALRT-002", [("user-service", 9, 11.0)]),
+    ]
+    body = "\n".join(evaluate.build_report(scenarios, runs=1, statistical=True))
+    assert "Not asserted" in body and "ALRT-002" in body
+
+
+def test_json_export_records_the_escalation_decision():
+    built = scenario("ALRT-001", [("payments-db", 9, 11.0)])
+    run = evaluate._scenario_json(built, 1)["runs"][0]
+    assert run["escalation"] == "escalate_normal"
+    assert run["escalation_ok"] is False

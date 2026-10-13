@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 from src.agent import DiagnosisError, DiagnosisResult, resume_diagnosis, run_diagnosis
 from src.agent.observability import setup_phoenix
 from src.data_loader import get_alert, load_alerts
+from src.agent.escalation_policy import HIGH_BLAST_RADIUS_DEPENDENTS
 from src.eval_ground_truth import GROUND_TRUTH
 
 OUTPUT = Path(__file__).resolve().parent / "EVAL_RESULTS.md"
@@ -69,6 +70,10 @@ class Attempt:
     steps: int = 0
     seconds: float = 0.0
     needed_approval: bool = False
+    escalation: str = ""
+    # True when the scenario has no structural expectation, so an unasserted scenario
+    # never counts as a failure (see the "escalation" note in src/eval_ground_truth.py).
+    escalation_ok: bool = True
 
     @property
     def completed(self) -> bool:
@@ -96,16 +101,26 @@ def score(alert_id: str, result: DiagnosisResult, *, needed_approval: bool = Fal
     truth = GROUND_TRUTH[alert_id]
     diagnosis = result.diagnosis
     mentioned = {diagnosis.affected_component, *diagnosis.critical_dependencies}
+    decided = diagnosis.escalation_decision.value if diagnosis.escalation_decision else ""
+    expected_escalation = truth.get("escalation")
+    component_ok = diagnosis.affected_component == truth["root"]
+    # Only graded on a run that found the right component: the expectation is derived from
+    # the root's CMDB blast radius, so it says nothing about a package built on another one.
+    escalation_ok = (
+        decided == expected_escalation if expected_escalation and component_ok else True
+    )
     return Attempt(
         result=result,
         component=diagnosis.affected_component,
-        component_ok=diagnosis.affected_component == truth["root"],
+        component_ok=component_ok,
         deps_ok=truth["involved"] <= mentioned,
         evidence_ok=bool(diagnosis.log_evidence),
         incident_ok=truth["incident"] in diagnosis.similar_incidents,
         steps=result.steps,
         seconds=result.elapsed_seconds,
         needed_approval=needed_approval,
+        escalation=decided,
+        escalation_ok=escalation_ok,
     )
 
 
@@ -192,6 +207,49 @@ def run_scenario(
             scenario.attempts.append(Attempt(error=str(exc)))
             print(f"ERROR: {exc}", flush=True)
     return scenario
+
+
+def escalation_section(scenarios: list[Scenario]) -> list[str]:
+    """
+    End-to-end check of the deterministic escalation policy.
+
+    Only the scenarios whose root component has a structural blast radius carry an
+    expectation (see src/eval_ground_truth.py); the rest are reported as not asserted so
+    the line cannot be mistaken for full coverage.
+    """
+    graded = [
+        (scenario, attempt)
+        for scenario in scenarios
+        for attempt in scenario.completed
+        if GROUND_TRUTH[scenario.alert_id].get("escalation") and attempt.component_ok
+    ]
+    asserted = sorted({s.alert_id for s, _ in graded})
+    unasserted = sorted(
+        s.alert_id for s in scenarios if not GROUND_TRUTH[s.alert_id].get("escalation")
+    )
+    if not graded:
+        return [
+            "**Escalation policy:** no run both found the expected root and had a structural "
+            "expectation, so the policy was not exercised end-to-end.",
+            "",
+        ]
+    ok = sum(1 for _, attempt in graded if attempt.escalation_ok)
+    wrong = [
+        f"{s.alert_id} got `{a.escalation or '—'}`"
+        for s, a in graded if not a.escalation_ok
+    ]
+    lines = [
+        f"**Escalation policy:** {ok}/{len(graded)} graded runs reached the expected decision, "
+        f"over {len(asserted)} scenario(s) whose root has a blast radius of "
+        f"{HIGH_BLAST_RADIUS_DEPENDENTS}+ dependents ({', '.join(asserted)}). "
+        f"Not asserted (decision depends on the model's severity and confidence): "
+        f"{', '.join(unasserted) or 'none'}.",
+    ]
+    if wrong:
+        lines.append("")
+        lines.append("Mismatches: " + "; ".join(wrong) + ".")
+    lines.append("")
+    return lines
 
 
 def kpi_section(scenarios: list[Scenario], total_runs: int, total_correct: int) -> list[str]:
@@ -309,6 +367,7 @@ def _retry_report(scenarios: list[Scenario], max_retries: int, command: str) -> 
         # Retry mode's accuracy is per scenario, matching the headline above: a scenario
         # that only passed on retry 2 still counts as one diagnosis delivered, so counting
         # the discarded attempts here would contradict the same file's own summary.
+        *escalation_section(scenarios),
         *kpi_section(scenarios, len(scenarios), passed),
     ]
 
@@ -406,6 +465,7 @@ def _statistical_report(scenarios: list[Scenario], runs: int, command: str) -> l
         "step budget on the next. A success rate over several runs is the honest measure; a single "
         f"pass is one sample. {TARGETS}",
         "",
+        *escalation_section(scenarios),
         *failure_analysis,
         *review,
         *kpi_section(scenarios, total_runs, total_correct),
@@ -464,6 +524,8 @@ def _scenario_json(scenario: Scenario, statistical_runs: int | None) -> dict:
                     "elapsed": attempt.seconds,
                     "confidence": attempt.result.diagnosis.confidence,
                     "incident_cited": attempt.incident_ok,
+                    "escalation": attempt.escalation,
+                    "escalation_ok": attempt.escalation_ok,
                 } if attempt.completed else {"error": attempt.error}),
             }
             for attempt in scenario.attempts

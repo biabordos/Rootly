@@ -13,6 +13,7 @@ Necesita MISTRAL_API_KEY: judecatorul e acelasi model ca al agentului.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -102,8 +103,15 @@ def main():
     # RAGAS default 16 workers -> furtuna de 429. Serializam.
     run_config = RunConfig(max_workers=1)
 
+    # Stamp what produced the numbers: the report is a single hardcoded file that any run
+    # overwrites, and a 10- and a 47-incident corpus give near-identical tables, so without
+    # this line the file cannot say which state it describes.
+    corpus_size = len(load_incidents())
     report = [
         "# Rootly — RAG Evaluation (RAGAS)",
+        "",
+        f"**Corpus:** {corpus_size} incidents | **Backend(s):** {args.backend} | "
+        f"**Generated:** {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC",
         "",
         "**Judge LLM:** codestral-latest (Mistral free tier). Codestral is a code model",
         "used as an NLI judge here — expect noisier scores than a dedicated reasoning model.",

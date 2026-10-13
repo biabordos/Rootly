@@ -54,6 +54,10 @@ DEFAULT_MAX_STEPS = 32
 # A specialist searches in its first turn and reports its analysis in the second. The
 # third exists so a malformed or truncated tool call can be retried without ending the run.
 SPECIALIST_MAX_TURNS = 3
+# Turns held back for the synthesis agent: once this little budget is left, orchestrator_node
+# stops asking the model where to go and hands off to synthesis itself. Kept separate from
+# SPECIALIST_MAX_TURNS so the reserve can be tuned (or switched off, with 0) on its own.
+SYNTHESIS_RESERVE_TURNS = SPECIALIST_MAX_TURNS
 # How many times the orchestrator may answer without calling route_to_specialist before
 # the node falls back to the deterministic next step.
 ORCHESTRATOR_ROUTE_ATTEMPTS = 2
@@ -1072,6 +1076,30 @@ def orchestrator_node(state: RootlyState, runtime: Runtime[RootlyContext]) -> di
     alert = get_alert(state["alert_id"])
     step = state["step_count"]
     max_steps = state["max_steps"]
+
+    # Hard synthesis reserve. BUDGET_EXHAUSTED_NOTE below *asks* the model to route to
+    # synthesis once the budget runs low, but it is free to ignore it: 9 of the 10 failures
+    # in the N=10 evaluation (a62e73b) were runs that spent all 32 steps without ever
+    # calling submit_diagnosis, so they raised DiagnosisError with no package at all.
+    # Deciding the last handoff here costs no model turn, which both guarantees the attempt
+    # and leaves the synthesis agent the full SPECIALIST_MAX_TURNS to make it.
+    if max_steps - step <= SYNTHESIS_RESERVE_TURNS:
+        forced = {"targets": [], "reason": f"step budget reserved for synthesis ({step}/{max_steps} used)"}
+        return {
+            "messages": [],
+            "trace": _emit(runtime, TraceEvent(
+                step, "routing", content="synthesis agent → — (forced: step budget reserved)",
+                tool="synthesis", input={"reason": forced["reason"]},
+            )),
+            "step_count": step,
+            "usage": dict(state["usage"]),
+            "truncated_responses": state["truncated_responses"],
+            "used_tool_call_ids": sorted(set(state["used_tool_call_ids"])),
+            "model": state["model"],
+            "next_specialist": "synthesis",
+            "assignment": forced,
+        }
+
     briefing_parts = [
         format_alert(alert),
         "",
