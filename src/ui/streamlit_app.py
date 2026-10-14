@@ -10,6 +10,7 @@ import base64
 import json
 import sys
 from pathlib import Path
+from textwrap import dedent
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -26,6 +27,7 @@ from src.ui.system_map import render_system_map
 
 load_dotenv(ROOT / ".env")
 LOGO_PATH = Path(__file__).resolve().parent / "assets" / "rootly-mark.png"
+ARCHITECTURE_PATH = ROOT / "docs" / "diagrams" / "architecture.png"
 st.set_page_config(
     page_title="Rootly | Incident Triage",
     page_icon=str(LOGO_PATH),
@@ -39,23 +41,33 @@ alerts = {a.id: a for a in load_alerts()}
 incidents = {i.id: i for i in load_incidents()}
 results: dict = st.session_state.setdefault("results", {})
 errors: dict = st.session_state.setdefault("errors", {})
-view = st.session_state.setdefault("view", "landing")
+alert_statuses: dict[str, str] = st.session_state.setdefault(
+    "alert_statuses", {alert_id: "unresolved" for alert_id in alerts}
+)
+view = st.session_state.setdefault("view", "diagnosis")
+if view not in {"diagnosis", "system_map"}:
+    view = "diagnosis"
+    st.session_state.view = view
 st.session_state.setdefault("selected_alert", None)
 
-st.markdown(
-    """
+APP_CSS = dedent("""
     <style>
-        :root { --black:#050505; --panel:#0c0c0c; --raised:#121212; --line:#252525; --muted:#8e8e8e; --white:#f5f5f2; --accent:#d9ff62; }
+        :root {
+            --black:#050505; --panel:#0c0c0c; --raised:#121212; --line:#252525;
+            --muted:#8e8e8e; --white:#f5f5f2; --accent:#d9ff62;
+            --alert-unresolved:#f5f5f2; --alert-resolved:#7ee2a8; --alert-urgent:#ff6b6b;
+        }
         .stApp { background:var(--black); color:var(--white); }
         [data-testid="stHeader"] { background:transparent; }
         [data-testid="stSidebar"] { background:#090909; border-right:1px solid var(--line); }
         [data-testid="stSidebar"] > div:first-child { padding:2.4rem 1.25rem; }
-        .block-container { max-width:1280px; padding:3.5rem 4rem 5rem; }
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] { overflow-y:auto; }
+        .block-container { max-width:1280px; padding:3rem 4rem 5rem; }
         h1,h2,h3,h4,p,label,[data-testid="stMetricLabel"],[data-testid="stMetricValue"] { font-family:Helvetica,Arial,sans-serif; }
         h1 { letter-spacing:-.04em; font-weight:500; } h2,h3 { letter-spacing:-.025em; font-weight:500; }
-        p,li,label { color:#d0d0cd; } code,pre,[data-testid="stCode"] { font-family:Consolas,monospace; }
+        p,li,label { color:#d0d0cd; line-height:1.6; } code,pre,[data-testid="stCode"] { font-family:Consolas,monospace; }
         .rootly-eyebrow { color:var(--accent); font:500 .7rem Consolas,monospace; letter-spacing:.12em; text-transform:uppercase; }
-        .rootly-brand { display:flex; align-items:center; gap:.65rem; width:fit-content; margin:0 0 1.25rem; color:var(--white); font-size:1.05rem; font-weight:600; letter-spacing:-.03em; }
+        .rootly-brand { display:flex; align-items:center; gap:.65rem; width:fit-content; margin:0 0 1.75rem; color:var(--white); font-size:1.05rem; font-weight:600; letter-spacing:-.03em; }
         .rootly-brand img { display:block; width:32px; height:32px; object-fit:contain; }
         .rootly-muted { color:var(--muted); }
         .rootly-hero { animation:rootly-fade 900ms ease both; padding:12vh 0 8vh; max-width:820px; }
@@ -65,60 +77,141 @@ st.markdown(
         .rootly-section { animation:rootly-rise 500ms ease both; }
         .rootly-about-card,.rootly-alert-card { border:1px solid var(--line); background:var(--panel); padding:1.5rem; border-radius:2px; }
         .rootly-about-card p { line-height:1.7; }
-        .rootly-alert-dot { width:10px; height:10px; border-radius:50%; display:block; border:1px solid #8e8e8e; background:#f5f5f2; box-shadow:0 0 0 1px rgba(255,255,255,0.08); }
-        .rootly-alert-dot.resolved { background:#7ee2a8; border-color:#7ee2a8; }
-        .rootly-alert-dot.unresolved { background:#f5f5f2; border-color:#8e8e8e; }
-        .rootly-alert-dot.urgent { background:#ff6b6b; border-color:#ff6b6b; }
-        .rootly-alert-dot.selected { box-shadow:0 0 0 2px rgba(217,255,98,0.72), 0 0 0 6px rgba(217,255,98,0.12); }
-        .rootly-alert-strip { display:flex; flex-wrap:nowrap; gap:.75rem; overflow-x:auto; padding:.5rem 0 1rem; }
-        .rootly-alert-strip > div { flex:0 0 auto; min-width:150px; }
-        [class*="st-key-alert-"] button {
-            width:100% !important;
-            min-width:max-content !important;
-            border-radius:12px !important;
-            border:1px solid transparent !important;
-            background:transparent !important;
+        .rootly-alert-dot {
+            display:block; width:14px; height:14px; flex:0 0 14px; margin:0;
+            border:1px solid var(--alert-unresolved); border-radius:50%; background:var(--alert-unresolved);
+        }
+        .rootly-alert-dot.resolved { border-color:var(--alert-resolved); background:var(--alert-resolved); }
+        .rootly-alert-dot.urgent { border-color:var(--alert-urgent); background:var(--alert-urgent); }
+        .st-key-triage-panel {
+            padding:1.65rem; border:1px solid #252a20; border-radius:16px;
+            background:linear-gradient(145deg,rgba(16,18,13,.96),rgba(9,9,9,.98));
+            box-shadow:0 16px 42px rgba(0,0,0,.18);
+        }
+        .rootly-triage-heading {
+            padding-bottom:.8rem; border-bottom:1px solid rgba(255,255,255,.07);
+            margin-bottom:1.4rem;
+        }
+        .rootly-triage-heading .rootly-eyebrow { letter-spacing:.16em; }
+        .st-key-alert-bar [data-testid="stHorizontalBlock"] {
+            display:grid !important; grid-template-columns:repeat(10,minmax(0,1fr)); gap:.65rem;
+            width:100%; align-items:stretch;
+        }
+        .st-key-alert-bar [data-testid="stColumn"] {
+            width:auto !important; min-width:0 !important; flex:none !important;
+        }
+        .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"] {
+            display:flex; flex-direction:row; align-items:center; gap:.5rem; min-width:0;
+            min-height:54px; padding:0 .45rem; border:1px solid #30352a; border-radius:12px;
+            background:#11130f; transition:background 180ms ease,border-color 180ms ease,box-shadow 180ms ease,transform 180ms ease;
+        }
+        .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"]:hover {
+            transform:translateY(-2px); border-color:rgba(217,255,98,.48);
+            background:#15190d; box-shadow:0 8px 20px rgba(217,255,98,.1);
+        }
+        .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"]:has(button[kind="primary"]) {
+            border-color:var(--accent); background:rgba(217,255,98,.12);
+            box-shadow:0 0 0 1px rgba(217,255,98,.18),0 5px 18px rgba(217,255,98,.1);
+        }
+        .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:first-child {
+            width:auto !important; flex:0 0 auto !important;
+        }
+        .st-key-alert-bar [class*="st-key-alert-top-"] {
+            width:auto !important; min-width:0 !important; flex:1 1 auto !important;
+        }
+        .st-key-alert-bar [class*="st-key-alert-top-"] button {
+            width:100% !important; min-width:0 !important; min-height:50px !important; padding:0 !important;
+            justify-content:flex-start !important; border:0 !important;
+            border-radius:0 !important; background:transparent !important; color:var(--white) !important;
+            box-shadow:none !important; font-weight:600 !important; transform:none !important;
+            transition:background 180ms ease,border-color 180ms ease,box-shadow 180ms ease,transform 180ms ease;
+            white-space:nowrap !important; font-size:.8rem !important; letter-spacing:.02em !important;
+        }
+        .st-key-alert-bar [class*="st-key-alert-top-"] button p {
+            margin:0 !important; font-size:.8rem !important; line-height:1.1 !important;
+        }
+        .st-key-alert-bar [class*="st-key-alert-top-"] button:hover {
+            transform:none !important; border:0 !important; background:transparent !important; box-shadow:none !important;
+        }
+        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"] {
+            border:0 !important; background:transparent !important; box-shadow:none !important;
             color:var(--white) !important;
-            padding:.7rem .9rem !important;
-            justify-content:center !important;
-            box-shadow:none !important;
-            transition:background 180ms ease, border-color 180ms ease, transform 180ms ease;
-            white-space:nowrap !important;
-            overflow:visible !important;
-            text-overflow:clip !important;
-            font-size:.78rem !important;
-            letter-spacing:.02em !important;
         }
-        [class*="st-key-alert-"] button:hover {
-            background:rgba(255,255,255,0.04) !important;
-            border-color:rgba(255,255,255,0.12) !important;
-            transform:translateY(-1px);
+        .rootly-alert-legend {
+            display:flex; align-items:center; gap:1.8rem; margin:0;
+            color:var(--muted); font-size:.75rem; line-height:1.2; white-space:nowrap;
         }
-        [class*="st-key-alert-"] button[kind="primary"] {
-            background:rgba(217,255,98,0.08) !important;
-            border-color:rgba(217,255,98,0.45) !important;
-            color:var(--white) !important;
+        .rootly-alert-legend-item { display:inline-flex; align-items:center; gap:.4rem; }
+        .rootly-alert-legend .rootly-alert-dot { width:12px; height:12px; flex-basis:12px; }
+        .st-key-diagnosis-run { width:66%; margin:0 auto; padding-top:1.75rem; }
+        .st-key-diagnosis-run [data-testid="stButton"] button {
+            width:100% !important; min-height:58px !important; border:1px solid var(--accent) !important;
+            border-radius:12px !important; background:var(--accent) !important; color:#050505 !important;
+            font-size:1.05rem !important; font-weight:700 !important; letter-spacing:.01em !important;
+            box-shadow:0 6px 20px rgba(217,255,98,.12) !important;
+            transition:background 180ms ease,border-color 180ms ease,box-shadow 180ms ease,transform 180ms ease;
         }
+        .st-key-diagnosis-run [data-testid="stButton"] button p {
+            margin:0 !important; color:#050505 !important; font-size:1.05rem !important; font-weight:700 !important;
+        }
+        .st-key-diagnosis-run [data-testid="stButton"] button:hover {
+            transform:translateY(-2px); background:#e4ff88 !important;
+            box-shadow:0 10px 26px rgba(217,255,98,.22) !important;
+        }
+        .st-key-diagnosis-run [data-testid="stButton"] button:active {
+            transform:translateY(0); box-shadow:0 3px 10px rgba(217,255,98,.14) !important;
+        }
+        .st-key-diagnosis-run [data-testid="stButton"] button:disabled {
+            opacity:.42; cursor:not-allowed; box-shadow:none !important; transform:none;
+        }
+        .rootly-sidebar-category {
+            margin:1.25rem 0 .5rem; color:var(--accent);
+            font:500 .68rem Consolas,monospace; letter-spacing:.1em; text-transform:uppercase;
+        }
+        .rootly-sidebar-list { display:flex; flex-direction:column; gap:.6rem; }
+        .rootly-sidebar-item { display:flex; flex-direction:column; gap:.1rem; }
+        .rootly-sidebar-item strong { color:#deded9; font-size:.76rem; font-weight:600; line-height:1.25; }
+        .rootly-sidebar-item span { color:var(--muted); font-size:.68rem; line-height:1.35; }
+        .st-key-sidebar-diagnosis button,.st-key-sidebar-system-map button {
+            width:100%; min-height:2.2rem; padding:.45rem .65rem; border-radius:8px;
+            justify-content:flex-start; font-size:.76rem; font-weight:600;
+        }
+        .st-key-sidebar-diagnosis button[kind="primary"],.st-key-sidebar-system-map button[kind="primary"] {
+            background:rgba(217,255,98,.1); border-color:rgba(217,255,98,.48); color:var(--accent) !important;
+        }
+        .rootly-sidebar-view-description { margin:.1rem 0 .65rem; color:var(--muted); font-size:.68rem; line-height:1.35; }
+        .rootly-system-architecture { margin:1.2rem 0 2rem; padding:1rem; border:1px solid var(--line); border-radius:12px; background:#090909; }
+        .rootly-system-architecture img { border-radius:6px; }
         .rootly-kicker { color:var(--muted); font:500 .72rem Consolas,monospace; letter-spacing:.08em; text-transform:uppercase; }
-        .rootly-legend-item { display:inline-flex; align-items:center; gap:.55rem; margin:1.25rem 1rem .5rem 0; white-space:nowrap; color:var(--muted); font-size:.85rem; line-height:1.2; }
-        .rootly-legend-item .rootly-alert-dot { margin:0; flex-shrink:0; }
-        .rootly-legend-item span:last-child { display:inline-block; }
         .stButton > button,.stDownloadButton > button { border-radius:2px; border:1px solid #3b3b3b; background:transparent; color:var(--white); transition:border-color 180ms ease,background 180ms ease,transform 180ms ease; }
         .stButton > button:hover,.stDownloadButton > button:hover { border-color:var(--accent); background:#171b0d; color:var(--white); transform:translateY(-1px); }
         .stButton > button[kind="primary"] { background:var(--accent); border-color:var(--accent); color:#000 !important; font-weight:600; }
         .stButton > button[kind="primary"] p,.stButton > button[kind="primary"] span,
         .stButton > button[kind="primary"]:hover,.stButton > button[kind="primary"]:hover p,.stButton > button[kind="primary"]:hover span { color:#000 !important; }
-        [class*="st-key-alert-"] button[kind="primary"] p,[class*="st-key-alert-"] button[kind="primary"] span,
-        [class*="st-key-alert-"] button[kind="primary"]:hover p,[class*="st-key-alert-"] button[kind="primary"]:hover span { color:var(--white) !important; }
+        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"] p,
+        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"] span,
+        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"]:hover p,
+        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"]:hover span { color:var(--white) !important; }
         [data-testid="stMetric"] { background:var(--panel); border:1px solid var(--line); padding:1rem; }
         [data-testid="stMetricValue"] { color:var(--white); }
         [data-testid="stExpander"],[data-testid="stForm"] { border-color:var(--line); background:var(--panel); }
         [data-testid="stTabs"] button { color:var(--muted); } [data-testid="stTabs"] button[aria-selected="true"] { color:var(--accent); }
+        @media (max-width:1200px) {
+            .st-key-alert-bar [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(5,minmax(0,1fr)); }
+        }
+        @media (max-width:520px) {
+            .block-container { padding:1.5rem 1rem 3rem; }
+            .st-key-triage-panel { padding:1rem; border-radius:14px; }
+            .st-key-alert-bar [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; }
+            .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { gap:.5rem; padding:0 .65rem; }
+            .st-key-diagnosis-run { width:100%; }
+            .rootly-alert-legend { gap:1rem; font-size:.7rem; }
+        }
         @keyframes rootly-fade { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
         @keyframes rootly-rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
     </style>
-    """, unsafe_allow_html=True,
-)
+""")
+st.markdown(APP_CSS, unsafe_allow_html=True)
 
 logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
 st.markdown(
@@ -128,12 +221,7 @@ st.markdown(
 
 
 def get_alert_status(alert_id: str) -> str:
-    result = results.get(alert_id)
-    if result and result.needs_approval:
-        return "urgent"
-    if result and result.diagnosis and not result.needs_approval:
-        return "resolved"
-    return "unresolved"
+    return alert_statuses.get(alert_id, "unresolved")
 
 
 def render_landing() -> None:
@@ -166,25 +254,21 @@ def render_about() -> None:
 
 
 def render_system_map_view() -> None:
-    current = st.session_state.selected_alert or next(iter(alerts))
-    with st.sidebar:
-        st.markdown('<div class="rootly-eyebrow">Rootly / system map</div>', unsafe_allow_html=True)
-        st.markdown("# System Map")
-        selected = st.selectbox(
-            "Alert scenario",
-            list(alerts),
-            index=list(alerts).index(current),
-            format_func=lambda alert_id: f"{alert_id} / {alerts[alert_id].service}",
-        )
-        st.session_state.selected_alert = selected
-        st.markdown('<div class="rootly-rule"></div>', unsafe_allow_html=True)
-        st.caption("Map data comes from the CMDB, alerts, and logs.")
-        if st.button("Back to launch", width="stretch"):
-            st.session_state.view = "landing"
-            st.rerun()
+    if st.button("Back to diagnosis", key="system-map-back"):
+        st.session_state.view = "diagnosis"
+        st.rerun()
+
     st.markdown('<div class="rootly-eyebrow">Operational topology</div>', unsafe_allow_html=True)
     st.title("System Map")
-    st.caption("A live view of dependency relationships and same-scenario log timing.")
+    selected = st.session_state.selected_alert or next(iter(alerts))
+    if ARCHITECTURE_PATH.is_file():
+        st.markdown('<div class="rootly-system-architecture">', unsafe_allow_html=True)
+        st.image(str(ARCHITECTURE_PATH), width="stretch")
+        st.caption("Rootly system architecture: investigation orchestration, tools, and observability.")
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.info("The architecture diagram is not available yet.")
+    st.caption("Live dependency map for the selected alert scenario, built from CMDB and same-day log evidence.")
     render_system_map(alerts[selected])
 
 
@@ -223,51 +307,110 @@ def step_title(step: int, events: list[dict]) -> str:
     return f"Step {step}: " + (" → ".join(tools) if tools else "reasoning")
 
 
-# ── View routing and sidebar ────────────────────────────────────────────
-if view == "landing":
-    render_landing()
-    st.stop()
-if view == "about":
-    render_about()
-    st.stop()
+# ── Sidebar navigation ──────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown('<div class="rootly-eyebrow">Rootly / workspace</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="rootly-sidebar-category">Investigation</div>
+        <div class="rootly-sidebar-list">
+          <div class="rootly-sidebar-item"><strong>Alert intake</strong><span>Loads one of 10 mock alert scenarios</span></div>
+          <div class="rootly-sidebar-item"><strong>CMDB lookup</strong><span>Component details, dependency chain, blast radius, owner team</span></div>
+          <div class="rootly-sidebar-item"><strong>Log search</strong><span>Filters logs by service, time window, and level</span></div>
+          <div class="rootly-sidebar-item"><strong>Similar incidents (RAG)</strong><span>ChromaDB with BM25 fallback over past incidents</span></div>
+        </div>
+        <div class="rootly-sidebar-category">Multi-agent orchestration</div>
+        <div class="rootly-sidebar-list">
+          <div class="rootly-sidebar-item"><strong>Orchestrator</strong><span>Routes the investigation to specialists</span></div>
+          <div class="rootly-sidebar-item"><strong>CMDB / Log / Synthesis agents</strong><span>Each owns one part of the toolset</span></div>
+        </div>
+        <div class="rootly-sidebar-category">Safety &amp; decisions</div>
+        <div class="rootly-sidebar-list">
+          <div class="rootly-sidebar-item"><strong>Guardrail</strong><span>Validates components, incidents, and log evidence against real data</span></div>
+          <div class="rootly-sidebar-item"><strong>Escalation policy</strong><span>Auto-resolved / normal / urgent</span></div>
+          <div class="rootly-sidebar-item"><strong>Human approval</strong><span>Approve or downgrade urgent escalations</span></div>
+        </div>
+        <div class="rootly-sidebar-category">Output</div>
+        <div class="rootly-sidebar-list">
+          <div class="rootly-sidebar-item"><strong>Diagnosis package</strong><span>Root cause, evidence, confidence, escalation recommendation</span></div>
+          <div class="rootly-sidebar-item"><strong>Reasoning trace</strong><span>Thought → Action → Observation steps</span></div>
+          <div class="rootly-sidebar-item"><strong>Export</strong><span>JSON and Markdown</span></div>
+        </div>
+        <div class="rootly-sidebar-category">Observability &amp; quality</div>
+        <div class="rootly-sidebar-list">
+          <div class="rootly-sidebar-item"><strong>Phoenix tracing</strong><span>Agent tracing and observability</span></div>
+          <div class="rootly-sidebar-item"><strong>Statistical &amp; RAG evaluation</strong><span>Evaluation with RAGAS</span></div>
+        </div>
+        <div class="rootly-sidebar-category">Views</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        "Diagnosis",
+        key="sidebar-diagnosis",
+        type="primary" if view == "diagnosis" else "secondary",
+        use_container_width=True,
+    ):
+        st.session_state.view = "diagnosis"
+        st.rerun()
+    st.markdown('<div class="rootly-sidebar-view-description">Default incident triage workspace</div>', unsafe_allow_html=True)
+    if st.button(
+        "System map",
+        key="sidebar-system-map",
+        type="primary" if view == "system_map" else "secondary",
+        use_container_width=True,
+    ):
+        st.session_state.view = "system_map"
+        st.rerun()
+    st.markdown('<div class="rootly-sidebar-view-description">Architecture and live CMDB dependencies</div>', unsafe_allow_html=True)
+
 if view == "system_map":
     render_system_map_view()
     st.stop()
 
-with st.sidebar:
-    st.markdown('<div class="rootly-eyebrow">Rootly / workspace</div>', unsafe_allow_html=True)
-    if st.button("About Rootly", width="stretch"):
-        st.session_state.view = "about"
-        st.rerun()
-    st.markdown('<div class="rootly-rule"></div>', unsafe_allow_html=True)
-    sidebar_status = st.container()
-
 selected = st.session_state.selected_alert
 
 # ── Header & alert card ──────────────────────────────────────────────────
-alert_strip = st.container()
-with alert_strip:
-    st.markdown('<div class="rootly-eyebrow">Incident triage</div>', unsafe_allow_html=True)
-    alert_cols = st.columns(len(alerts))
-    for index, (alert_id, item) in enumerate(alerts.items()):
-        with alert_cols[index]:
-            status = get_alert_status(alert_id)
-            selected_class = " selected" if alert_id == selected else ""
-            button_type = "primary" if alert_id == selected else "secondary"
-            st.markdown(
-                f'<div class="rootly-alert-dot {status}{selected_class}" style="margin:0 auto .4rem;"></div>',
-                unsafe_allow_html=True,
-            )
-            if st.button(f"{alert_id}", key=f"alert-top-{alert_id}", type=button_type, use_container_width=True):
-                st.session_state.selected_alert = alert_id
-                st.rerun()
+with st.container(key="triage-panel"):
+    st.markdown(
+        '<div class="rootly-triage-heading"><div class="rootly-eyebrow">Incident triage</div></div>',
+        unsafe_allow_html=True,
+    )
+    alert_strip = st.container(key="alert-bar")
+    with alert_strip:
+        alert_cols = st.columns(len(alerts))
+        for index, (alert_id, item) in enumerate(alerts.items()):
+            with alert_cols[index]:
+                status = get_alert_status(alert_id)
+                button_type = "primary" if alert_id == selected else "secondary"
+                status_label = {
+                    "unresolved": "Unresolved",
+                    "resolved": "Resolved",
+                    "urgent": "Urgent",
+                }[status]
+                st.markdown(
+                    f'<span class="rootly-alert-dot {status}" title="{status_label}" '
+                    f'aria-label="{status_label}" role="img"></span>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(f"{alert_id}", key=f"alert-top-{alert_id}", type=button_type, use_container_width=True):
+                    st.session_state.selected_alert = alert_id
+                    st.rerun()
 
-st.markdown(
-    '<div class="rootly-legend-item"><span class="rootly-alert-dot unresolved"></span><span>nerezolvat</span></div>'
-    '<div class="rootly-legend-item"><span class="rootly-alert-dot resolved"></span><span>rezolvat</span></div>'
-    '<div class="rootly-legend-item"><span class="rootly-alert-dot urgent"></span><span>urgent</span></div>',
-    unsafe_allow_html=True,
-)
+    st.markdown(
+        '<div class="rootly-alert-legend">'
+        '<span class="rootly-alert-legend-item"><span class="rootly-alert-dot unresolved" '
+        'title="Unresolved" aria-label="Unresolved" role="img"></span><span>= unresolved</span></span>'
+        '<span class="rootly-alert-legend-item"><span class="rootly-alert-dot resolved" '
+        'title="Resolved" aria-label="Resolved" role="img"></span><span>= resolved</span></span>'
+        '<span class="rootly-alert-legend-item"><span class="rootly-alert-dot urgent" '
+        'title="Urgent" aria-label="Urgent" role="img"></span><span>= urgent</span></span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    if selected:
+        with st.container(key="diagnosis-run"):
+            run_clicked = st.button("Run diagnosis", type="primary", width="stretch")
 
 if not selected:
     st.markdown('<div class="rootly-section"><div class="rootly-eyebrow">Workspace ready</div>', unsafe_allow_html=True)
@@ -277,7 +420,6 @@ if not selected:
     st.stop()
 
 alert = alerts[selected]
-run_clicked = st.button("Run diagnosis", type="primary", width="content")
 
 st.markdown('<div class="rootly-eyebrow">Active investigation</div>', unsafe_allow_html=True)
 st.title(f"{alert.id} / {alert.service}")
@@ -307,7 +449,18 @@ if run_clicked:
             render_event(event)
 
         try:
-            results[selected] = run_diagnosis(alert, on_event=on_event)
+            diagnosis_result = run_diagnosis(alert, on_event=on_event)
+            results[selected] = diagnosis_result
+            escalation_decision = diagnosis_result.diagnosis.escalation_decision
+            if diagnosis_result.needs_approval or (
+                escalation_decision
+                and escalation_decision.value == "escalate_urgent_needs_approval"
+            ):
+                alert_statuses[selected] = "urgent"
+            elif escalation_decision and escalation_decision.value in {"auto_resolved", "escalate_normal"}:
+                alert_statuses[selected] = "resolved"
+            else:
+                alert_statuses[selected] = "unresolved"
             status.update(label="Diagnosis complete", state="complete", expanded=False)
         except DiagnosisError as exc:
             errors[selected] = f"Diagnosis failed: {exc}"
@@ -319,22 +472,6 @@ if selected in errors:
     st.error(errors[selected])
 
 result = results.get(selected)
-
-with sidebar_status:
-    if result and result.needs_approval:
-        st.warning("Waiting for approval")
-    elif result:
-        st.success("Complete")
-    if result:
-        m1, m2 = st.columns(2)
-        m1.metric("Steps", result.steps)
-        m2.metric("Time", f"{result.elapsed_seconds:.0f}s")
-        m3, m4 = st.columns(2)
-        m3.metric("Tool calls", result.tool_calls)
-        m4.metric("Confidence", f"{result.diagnosis.confidence:.2f}")
-        st.caption(f"Thread: `{result.thread_id}`")
-    else:
-        st.info("Not run yet. Run the diagnosis when you are ready.")
 
 if not result:
     st.stop()
