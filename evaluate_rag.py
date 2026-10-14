@@ -84,12 +84,27 @@ def format_result(result, backend_name: str) -> list[str]:
         "| Scenario | Context Precision | Context Recall |",
         "|---|---|---|",
     ]
+    # RAGAS yields NaN for a sample whose judge response it could not parse into a verdict.
+    # That is a missing measurement, not a score of zero, so it is rendered as n/a and
+    # called out under the table instead of being formatted as a number.
+    def cell(value) -> str:
+        return "n/a" if value != value else f"{value:.2f}"
+
+    unscored = []
     for i, alert_id in enumerate(SCENARIOS):
         row = df.iloc[i]
         cp = row.get("llm_context_precision_with_reference", float("nan"))
         cr = row.get("context_recall", float("nan"))
-        lines.append(f"| {alert_id} | {cp:.2f} | {cr:.2f} |")
+        if cp != cp or cr != cr:
+            unscored.append(alert_id)
+        lines.append(f"| {alert_id} | {cell(cp)} | {cell(cr)} |")
     lines += [""]
+    if unscored:
+        lines += [
+            f"*n/a: the judge returned no parsable verdict for {', '.join(unscored)}, so the "
+            f"metric is missing for that sample rather than zero.*",
+            "",
+        ]
     return lines
 
 

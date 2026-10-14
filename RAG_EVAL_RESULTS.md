@@ -1,5 +1,7 @@
 # Rootly — RAG Evaluation (RAGAS)
 
+**Corpus:** 47 incidents | **Backend(s):** both | **Generated:** 2026-10-14 00:02 UTC
+
 **Judge LLM:** codestral-latest (Mistral free tier). Codestral is a code model
 used as an NLI judge here — expect noisier scores than a dedicated reasoning model.
 
@@ -24,7 +26,7 @@ used as an NLI judge here — expect noisier scores than a dedicated reasoning m
 |---|---|---|
 | ALRT-001 | 1.00 | 1.00 |
 | ALRT-002 | 1.00 | 1.00 |
-| ALRT-003 | 1.00 | 1.00 |
+| ALRT-003 | 0.83 | 1.00 |
 | ALRT-004 | 1.00 | 1.00 |
 | ALRT-005 | 1.00 | 1.00 |
 | ALRT-006 | 1.00 | 1.00 |
