@@ -718,8 +718,8 @@ if page == "landing":
 else:
     st.markdown(
         "<style>"
-        ".stMainBlockContainer{max-width:100%!important;margin-left:84px!important;padding:0!important}"
-        ".block-container{max-width:100%!important;margin-left:0!important;padding:0!important}"
+        ".stMainBlockContainer{max-width:100%!important;padding:0 0 0 84px!important}"
+        ".block-container{max-width:100%!important;padding:0!important}"
         "</style>",
         unsafe_allow_html=True,
     )
