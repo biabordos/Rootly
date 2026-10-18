@@ -113,6 +113,11 @@ APP_CSS = f"""<style>
 .stMainBlockContainer [data-testid="stVerticalBlock"] {{ gap:0!important; }}
 .stMain {{ background:var(--bg)!important; }}
 .stApp {{ background:var(--bg); color:var(--text); font-family:var(--sans); }}
+/* Sidebar offset for non-landing pages, applied to our own wrapper
+   container (not Streamlit's block-container, which resists overrides). */
+.st-key-page-shell {{
+    width:calc(100% - 84px)!important; margin-left:84px!important;
+}}
 
 /* ── Design tokens ──────────────────────────────────────────────── */
 :root {{
@@ -687,7 +692,9 @@ code,pre {{ font-family:var(--mono); }}
     .side-nav nav a.active::before {{
         top:-6px; left:auto; width:24px; height:2px;
     }}
-    .stMainBlockContainer {{ margin-left:0!important; padding-bottom:66px!important; }}
+    .stMainBlockContainer {{ padding-bottom:66px!important; }}
+    .st-key-page-shell {{ width:100%!important; margin-left:0!important; }}
+    .about-page {{ width:100%!important; margin-left:0!important; }}
     .workspace-header {{ min-height:110px; padding:25px 20px 20px; }}
     .alert-strip {{ padding:15px 20px; }}
     .st-key-workspace-content {{ width:calc(100% - 40px)!important; padding-top:28px!important; }}
@@ -713,14 +720,6 @@ st.markdown(APP_CSS, unsafe_allow_html=True)
 if page == "landing":
     st.markdown(
         "<style>.stMainBlockContainer{padding:0!important}</style>",
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        "<style>"
-        ".stMainBlockContainer{max-width:100%!important;padding:0 0 0 84px!important}"
-        ".block-container{max-width:100%!important;padding:0!important}"
-        "</style>",
         unsafe_allow_html=True,
     )
 
@@ -873,331 +872,333 @@ def _render_map() -> None:
     _render_sidebar("map")
     alert_id = selected_alert or next(iter(alerts))
     alert = alerts[alert_id]
-    st.markdown(
-        f'<div class="map-header">'
-        f'<div><span class="kicker">Live topology</span>'
-        f"<h1>System architecture</h1></div>"
-        f'<div class="map-meta">'
-        f"<span><i></i>{len(alerts)} alerts tracked</span>"
-        f"<span>Alert: {alert_id}</span></div>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-    with st.container(key="map-content"):
-        if ARCHITECTURE_PATH.is_file():
-            st.image(str(ARCHITECTURE_PATH), use_container_width=True)
-            st.caption("Rootly system architecture: investigation orchestration, tools, and observability.")
-        st.caption("Live dependency map for the selected alert scenario, built from CMDB and same-day log evidence.")
-        render_system_map(alert)
+    with st.container(key="page-shell"):
+        st.markdown(
+            f'<div class="map-header">'
+            f'<div><span class="kicker">Live topology</span>'
+            f"<h1>System architecture</h1></div>"
+            f'<div class="map-meta">'
+            f"<span><i></i>{len(alerts)} alerts tracked</span>"
+            f"<span>Alert: {alert_id}</span></div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        with st.container(key="map-content"):
+            if ARCHITECTURE_PATH.is_file():
+                st.image(str(ARCHITECTURE_PATH), use_container_width=True)
+                st.caption("Rootly system architecture: investigation orchestration, tools, and observability.")
+            st.caption("Live dependency map for the selected alert scenario, built from CMDB and same-day log evidence.")
+            render_system_map(alert)
 
 
 def _render_alerts() -> None:
     _render_sidebar("alerts")
+    with st.container(key="page-shell"):
 
-    # Workspace header
-    st.markdown(
-        '<div class="workspace-header">'
-        '<div><span class="kicker">Operations center</span>'
-        "<h1>Incident triage</h1></div>"
-        '<div class="agent-status"><span></span>Agent online</div>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    # Alert strip
-    cards_html = []
-    for aid, alert in alerts.items():
-        status = _get_alert_status(aid)
-        sel = " selected" if aid == selected_alert else ""
-        cards_html.append(
-            f'<a class="alert-card{sel}" href="?page=alerts&alert={aid}" target="_top">'
-            f'<span class="status-dot {status}"></span>'
-            f"<span><strong>{aid}</strong>"
-            f"<small>{alert.service}</small></span></a>"
-        )
-    st.markdown(
-        f'<div class="alert-strip" aria-label="Active alerts">'
-        f'{"".join(cards_html)}</div>',
-        unsafe_allow_html=True,
-    )
-
-    # Workspace content
-    with st.container(key="workspace-content"):
-        if not selected_alert:
-            st.markdown(
-                '<div class="empty-state">'
-                f'<span>{_icon("spark", 20)}</span>'
-                "<p>Ready to investigate</p>"
-                "<small>Select an alert from the strip, then run the agent to "
-                "correlate services, logs, and incident history.</small>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
-            return
-
-        alert = alerts[selected_alert]
-        severity = alert.severity_reported.value
-
-        # Context panel
+        # Workspace header
         st.markdown(
-            f'<section class="panel context-panel">'
-            f'<div class="section-heading">'
-            f'<div><span class="kicker">Selected signal</span>'
-            f"<h2>Alert context</h2></div>"
-            f'<span class="severity-badge {severity}">{severity}</span></div>'
-            f'<div class="context-grid">'
-            f"<div><span>Alert type</span><strong>{alert.alert_type.value}</strong></div>"
-            f'<div><span>Reported severity</span><strong class="severity-value">'
-            f'<i class="severity-dot {severity}"></i>{severity}</strong></div>'
-            f"<div><span>Metric value</span><strong>{alert.metric_value:g}</strong></div>"
-            f"<div><span>Fired at · UTC</span>"
-            f'<strong>{alert.timestamp.strftime("%Y-%m-%d %H:%M")}</strong></div>'
-            f"</div></section>",
+            '<div class="workspace-header">'
+            '<div><span class="kicker">Operations center</span>'
+            "<h1>Incident triage</h1></div>"
+            '<div class="agent-status"><span></span>Agent online</div>'
+            "</div>",
             unsafe_allow_html=True,
         )
 
-        # Run button
-        with st.container(key="run-btn"):
-            run_clicked = st.button(
-                "Run" if selected_alert not in results else "Run again",
-                key="run-diagnosis",
+        # Alert strip
+        cards_html = []
+        for aid, alert in alerts.items():
+            status = _get_alert_status(aid)
+            sel = " selected" if aid == selected_alert else ""
+            cards_html.append(
+                f'<a class="alert-card{sel}" href="?page=alerts&alert={aid}" target="_top">'
+                f'<span class="status-dot {status}"></span>'
+                f"<span><strong>{aid}</strong>"
+                f"<small>{alert.service}</small></span></a>"
             )
-
-        # Execute diagnosis
-        if run_clicked:
-            errors.pop(selected_alert, None)
-            st.markdown(
-                '<div class="section-heading investigation-title">'
-                '<div><span class="kicker">Agent trace</span>'
-                "<h2>Orchestrator trace</h2></div></div>",
-                unsafe_allow_html=True,
-            )
-            with st.status("Investigating…", expanded=True) as status:
-                current_step = {"n": 0}
-
-                def on_event(event: dict) -> None:
-                    if event["step"] != current_step["n"]:
-                        current_step["n"] = event["step"]
-                        st.markdown(f"#### Step {event['step']}")
-                        status.update(label=f"Investigating… step {event['step']}")
-                    _render_event(event)
-
-                try:
-                    diagnosis_result = run_diagnosis(alert, on_event=on_event)
-                    results[selected_alert] = diagnosis_result
-                    esc = diagnosis_result.diagnosis.escalation_decision
-                    if diagnosis_result.needs_approval or (
-                        esc and esc.value == "escalate_urgent_needs_approval"
-                    ):
-                        alert_statuses[selected_alert] = "urgent"
-                    elif esc and esc.value in {"auto_resolved", "escalate_normal"}:
-                        alert_statuses[selected_alert] = "resolved"
-                    else:
-                        alert_statuses[selected_alert] = "unresolved"
-                    status.update(label="Diagnosis complete", state="complete", expanded=False)
-                except DiagnosisError as exc:
-                    errors[selected_alert] = f"Diagnosis failed: {exc}"
-                if selected_alert in errors:
-                    status.update(label="Diagnosis failed", state="error", expanded=True)
-            st.rerun()
-
-        if selected_alert in errors:
-            st.error(errors[selected_alert])
-
-        result = results.get(selected_alert)
-
-        if not result:
-            st.markdown(
-                '<div class="empty-state">'
-                f'<span>{_icon("spark", 20)}</span>'
-                "<p>Ready to investigate</p>"
-                "<small>Run the triage agent to correlate services, logs, and "
-                "incident history.</small></div>",
-                unsafe_allow_html=True,
-            )
-            return
-
-        d = result.diagnosis
-
-        # ── Investigation trace ─────────────────────────────────────
-        by_step: dict[int, list[dict]] = {}
-        for event in result.trace:
-            by_step.setdefault(event["step"], []).append(event)
-
-        # Progress track
-        step_labels = []
-        for sn, evts in by_step.items():
-            routing = [e for e in evts if e["kind"] == "routing"]
-            actions = [e for e in evts if e["kind"] == "action"]
-            if routing:
-                step_labels.append(routing[0]["tool"])
-            elif actions:
-                step_labels.append(actions[0]["tool"])
-            else:
-                step_labels.append(f"Step {sn}")
-
-        cols = len(step_labels) or 1
-        track_items = "".join(
-            f'<div class="progress-item">'
-            f'<span class="complete">{_icon("check", 13)}</span>'
-            f"<small>{lbl}</small></div>"
-            for lbl in step_labels
-        )
         st.markdown(
-            f'<section class="investigation">'
-            f'<div class="section-heading investigation-title">'
-            f'<div><span class="kicker">Agent trace</span>'
-            f"<h2>Investigation steps</h2></div>"
-            f'<span class="complete-label">{_icon("check", 14)} Complete</span>'
-            f"</div>"
-            f'<div class="progress-track" style="grid-template-columns:repeat({cols},1fr)">'
-            f"{track_items}</div></section>",
+            f'<div class="alert-strip" aria-label="Active alerts">'
+            f'{"".join(cards_html)}</div>',
             unsafe_allow_html=True,
         )
 
-        # Step list
-        for step_num, events in by_step.items():
-            with st.expander(_step_title(step_num, events), expanded=False):
-                for event in events:
-                    _render_event(event)
-
-        # ── Human approval ──────────────────────────────────────────
-        if result.needs_approval:
-            request = result.approval_request or {}
-            component = request.get("component", "unknown")
-            owner = request.get("owner_team", "unknown")
-            st.markdown(
-                f'<section class="approval-panel">'
-                f'<div class="approval-heading">'
-                f'<span class="warning-icon">{_icon("warning")}</span>'
-                f'<div><span class="kicker">Action gate</span>'
-                f"<h2>Human approval required</h2></div></div>"
-                f'<p class="approval-description">'
-                f"Escalate <strong>{component}</strong> to the "
-                f"<strong>{owner}</strong> on-call team as an urgent production incident.</p>"
-                f'<div class="warning-box">{_icon("info", 17)}'
-                f"<p>Urgent escalation pages two engineers and starts a coordinated "
-                f"restart. Approval is required because this action may briefly "
-                f"invalidate active sessions.</p></div></section>",
-                unsafe_allow_html=True,
-            )
-            note = st.text_input("Audit trail note (optional)", key=f"note-{result.thread_id}")
-            col_a, col_d = st.columns(2)
-            decision = None
-            with col_a:
-                with st.container(key="approve-btn"):
-                    if st.button("Approve urgent escalation", use_container_width=True):
-                        decision = HUMAN_APPROVE
-            with col_d:
-                with st.container(key="downgrade-btn"):
-                    if st.button("Downgrade, not urgent", use_container_width=True):
-                        decision = HUMAN_DOWNGRADE
-            if decision:
-                try:
-                    results[selected_alert] = resume_diagnosis(result.thread_id, decision, note=note)
-                except DiagnosisError as exc:
-                    errors[selected_alert] = f"Resume failed: {exc}"
-                st.rerun()
-
-        elif d.human_decision:
-            label = "approved" if d.human_decision == HUMAN_APPROVE else "downgraded"
-            st.markdown(
-                f'<section class="decision-complete">'
-                f'<span class="decision-icon">{_icon("check")}</span>'
-                f"<div><strong>Urgent escalation {label}</strong>"
-                f"<p>Decision recorded in the incident audit trail.</p></div></section>",
-                unsafe_allow_html=True,
-            )
-
-        # ── Export bar ──────────────────────────────────────────────
-        st.markdown(
-            '<div class="export-bar"><span>Export artifacts</span></div>',
-            unsafe_allow_html=True,
-        )
-        with st.container(key="export-wrap"):
-            ecol1, ecol2, ecol3 = st.columns(3)
-            ecol1.download_button(
-                "Diagnosis JSON",
-                json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
-                file_name=f"{selected_alert}_diagnosis.json",
-                mime="application/json",
-                use_container_width=True,
-            )
-            ecol2.download_button(
-                "Diagnosis Markdown",
-                to_markdown(result),
-                file_name=f"{selected_alert}_diagnosis.md",
-                mime="text/markdown",
-                use_container_width=True,
-            )
-            ecol3.download_button(
-                "Trace JSON",
-                json.dumps(result.trace, indent=2, ensure_ascii=False),
-                file_name=f"{selected_alert}_trace.json",
-                mime="application/json",
-                use_container_width=True,
-            )
-
-        # ── Diagnosis package ───────────────────────────────────────
-        st.markdown(
-            '<div class="section-heading" style="margin-top:40px">'
-            '<div><span class="kicker">Output</span>'
-            "<h2>Diagnosis package</h2></div></div>",
-            unsafe_allow_html=True,
-        )
-        with st.container(border=True):
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Affected component", d.affected_component)
-            c2.metric("Assessed severity", d.severity_assessed.value)
-            c3.metric("Confidence", f"{d.confidence:.0%}")
-            st.progress(d.confidence)
-
-            st.markdown("**Summary**")
-            st.write(d.summary)
-            st.markdown("**Root cause hypothesis**")
-            st.write(d.root_cause_hypothesis)
-            st.markdown("**Escalation recommendation**")
-            st.info(d.escalation_recommendation)
-
-            if d.escalation_decision:
-                dv = d.escalation_decision.value
-                color = ESCALATION_COLOR[dv]
-                st.markdown("**Escalation decision**")
+        # Workspace content
+        with st.container(key="workspace-content"):
+            if not selected_alert:
                 st.markdown(
-                    f'<span class="escalation-tag" style="color:{color};border:1px solid {color}">'
-                    f"{ESCALATION_LABEL[dv]}</span> &nbsp; owner team <code>{d.owner_team}</code>",
+                    '<div class="empty-state">'
+                    f'<span>{_icon("spark", 20)}</span>'
+                    "<p>Ready to investigate</p>"
+                    "<small>Select an alert from the strip, then run the agent to "
+                    "correlate services, logs, and incident history.</small>"
+                    "</div>",
                     unsafe_allow_html=True,
                 )
-                st.caption(d.escalation_reason)
-                if d.human_decision:
-                    st.write(
-                        f"Human {HUMAN_DECISION_LABEL.get(d.human_decision, d.human_decision)}"
-                        + (f" — _{d.human_decision_note}_" if d.human_decision_note else "")
+                return
+
+            alert = alerts[selected_alert]
+            severity = alert.severity_reported.value
+
+            # Context panel
+            st.markdown(
+                f'<section class="panel context-panel">'
+                f'<div class="section-heading">'
+                f'<div><span class="kicker">Selected signal</span>'
+                f"<h2>Alert context</h2></div>"
+                f'<span class="severity-badge {severity}">{severity}</span></div>'
+                f'<div class="context-grid">'
+                f"<div><span>Alert type</span><strong>{alert.alert_type.value}</strong></div>"
+                f'<div><span>Reported severity</span><strong class="severity-value">'
+                f'<i class="severity-dot {severity}"></i>{severity}</strong></div>'
+                f"<div><span>Metric value</span><strong>{alert.metric_value:g}</strong></div>"
+                f"<div><span>Fired at · UTC</span>"
+                f'<strong>{alert.timestamp.strftime("%Y-%m-%d %H:%M")}</strong></div>'
+                f"</div></section>",
+                unsafe_allow_html=True,
+            )
+
+            # Run button
+            with st.container(key="run-btn"):
+                run_clicked = st.button(
+                    "Run" if selected_alert not in results else "Run again",
+                    key="run-diagnosis",
+                )
+
+            # Execute diagnosis
+            if run_clicked:
+                errors.pop(selected_alert, None)
+                st.markdown(
+                    '<div class="section-heading investigation-title">'
+                    '<div><span class="kicker">Agent trace</span>'
+                    "<h2>Orchestrator trace</h2></div></div>",
+                    unsafe_allow_html=True,
+                )
+                with st.status("Investigating…", expanded=True) as status:
+                    current_step = {"n": 0}
+
+                    def on_event(event: dict) -> None:
+                        if event["step"] != current_step["n"]:
+                            current_step["n"] = event["step"]
+                            st.markdown(f"#### Step {event['step']}")
+                            status.update(label=f"Investigating… step {event['step']}")
+                        _render_event(event)
+
+                    try:
+                        diagnosis_result = run_diagnosis(alert, on_event=on_event)
+                        results[selected_alert] = diagnosis_result
+                        esc = diagnosis_result.diagnosis.escalation_decision
+                        if diagnosis_result.needs_approval or (
+                            esc and esc.value == "escalate_urgent_needs_approval"
+                        ):
+                            alert_statuses[selected_alert] = "urgent"
+                        elif esc and esc.value in {"auto_resolved", "escalate_normal"}:
+                            alert_statuses[selected_alert] = "resolved"
+                        else:
+                            alert_statuses[selected_alert] = "unresolved"
+                        status.update(label="Diagnosis complete", state="complete", expanded=False)
+                    except DiagnosisError as exc:
+                        errors[selected_alert] = f"Diagnosis failed: {exc}"
+                    if selected_alert in errors:
+                        status.update(label="Diagnosis failed", state="error", expanded=True)
+                st.rerun()
+
+            if selected_alert in errors:
+                st.error(errors[selected_alert])
+
+            result = results.get(selected_alert)
+
+            if not result:
+                st.markdown(
+                    '<div class="empty-state">'
+                    f'<span>{_icon("spark", 20)}</span>'
+                    "<p>Ready to investigate</p>"
+                    "<small>Run the triage agent to correlate services, logs, and "
+                    "incident history.</small></div>",
+                    unsafe_allow_html=True,
+                )
+                return
+
+            d = result.diagnosis
+
+            # ── Investigation trace ─────────────────────────────────────
+            by_step: dict[int, list[dict]] = {}
+            for event in result.trace:
+                by_step.setdefault(event["step"], []).append(event)
+
+            # Progress track
+            step_labels = []
+            for sn, evts in by_step.items():
+                routing = [e for e in evts if e["kind"] == "routing"]
+                actions = [e for e in evts if e["kind"] == "action"]
+                if routing:
+                    step_labels.append(routing[0]["tool"])
+                elif actions:
+                    step_labels.append(actions[0]["tool"])
+                else:
+                    step_labels.append(f"Step {sn}")
+
+            cols = len(step_labels) or 1
+            track_items = "".join(
+                f'<div class="progress-item">'
+                f'<span class="complete">{_icon("check", 13)}</span>'
+                f"<small>{lbl}</small></div>"
+                for lbl in step_labels
+            )
+            st.markdown(
+                f'<section class="investigation">'
+                f'<div class="section-heading investigation-title">'
+                f'<div><span class="kicker">Agent trace</span>'
+                f"<h2>Investigation steps</h2></div>"
+                f'<span class="complete-label">{_icon("check", 14)} Complete</span>'
+                f"</div>"
+                f'<div class="progress-track" style="grid-template-columns:repeat({cols},1fr)">'
+                f"{track_items}</div></section>",
+                unsafe_allow_html=True,
+            )
+
+            # Step list
+            for step_num, events in by_step.items():
+                with st.expander(_step_title(step_num, events), expanded=False):
+                    for event in events:
+                        _render_event(event)
+
+            # ── Human approval ──────────────────────────────────────────
+            if result.needs_approval:
+                request = result.approval_request or {}
+                component = request.get("component", "unknown")
+                owner = request.get("owner_team", "unknown")
+                st.markdown(
+                    f'<section class="approval-panel">'
+                    f'<div class="approval-heading">'
+                    f'<span class="warning-icon">{_icon("warning")}</span>'
+                    f'<div><span class="kicker">Action gate</span>'
+                    f"<h2>Human approval required</h2></div></div>"
+                    f'<p class="approval-description">'
+                    f"Escalate <strong>{component}</strong> to the "
+                    f"<strong>{owner}</strong> on-call team as an urgent production incident.</p>"
+                    f'<div class="warning-box">{_icon("info", 17)}'
+                    f"<p>Urgent escalation pages two engineers and starts a coordinated "
+                    f"restart. Approval is required because this action may briefly "
+                    f"invalidate active sessions.</p></div></section>",
+                    unsafe_allow_html=True,
+                )
+                note = st.text_input("Audit trail note (optional)", key=f"note-{result.thread_id}")
+                col_a, col_d = st.columns(2)
+                decision = None
+                with col_a:
+                    with st.container(key="approve-btn"):
+                        if st.button("Approve urgent escalation", use_container_width=True):
+                            decision = HUMAN_APPROVE
+                with col_d:
+                    with st.container(key="downgrade-btn"):
+                        if st.button("Downgrade, not urgent", use_container_width=True):
+                            decision = HUMAN_DOWNGRADE
+                if decision:
+                    try:
+                        results[selected_alert] = resume_diagnosis(result.thread_id, decision, note=note)
+                    except DiagnosisError as exc:
+                        errors[selected_alert] = f"Resume failed: {exc}"
+                    st.rerun()
+
+            elif d.human_decision:
+                label = "approved" if d.human_decision == HUMAN_APPROVE else "downgraded"
+                st.markdown(
+                    f'<section class="decision-complete">'
+                    f'<span class="decision-icon">{_icon("check")}</span>'
+                    f"<div><strong>Urgent escalation {label}</strong>"
+                    f"<p>Decision recorded in the incident audit trail.</p></div></section>",
+                    unsafe_allow_html=True,
+                )
+
+            # ── Export bar ──────────────────────────────────────────────
+            st.markdown(
+                '<div class="export-bar"><span>Export artifacts</span></div>',
+                unsafe_allow_html=True,
+            )
+            with st.container(key="export-wrap"):
+                ecol1, ecol2, ecol3 = st.columns(3)
+                ecol1.download_button(
+                    "Diagnosis JSON",
+                    json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
+                    file_name=f"{selected_alert}_diagnosis.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
+                ecol2.download_button(
+                    "Diagnosis Markdown",
+                    to_markdown(result),
+                    file_name=f"{selected_alert}_diagnosis.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+                ecol3.download_button(
+                    "Trace JSON",
+                    json.dumps(result.trace, indent=2, ensure_ascii=False),
+                    file_name=f"{selected_alert}_trace.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
+
+            # ── Diagnosis package ───────────────────────────────────────
+            st.markdown(
+                '<div class="section-heading" style="margin-top:40px">'
+                '<div><span class="kicker">Output</span>'
+                "<h2>Diagnosis package</h2></div></div>",
+                unsafe_allow_html=True,
+            )
+            with st.container(border=True):
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Affected component", d.affected_component)
+                c2.metric("Assessed severity", d.severity_assessed.value)
+                c3.metric("Confidence", f"{d.confidence:.0%}")
+                st.progress(d.confidence)
+
+                st.markdown("**Summary**")
+                st.write(d.summary)
+                st.markdown("**Root cause hypothesis**")
+                st.write(d.root_cause_hypothesis)
+                st.markdown("**Escalation recommendation**")
+                st.info(d.escalation_recommendation)
+
+                if d.escalation_decision:
+                    dv = d.escalation_decision.value
+                    color = ESCALATION_COLOR[dv]
+                    st.markdown("**Escalation decision**")
+                    st.markdown(
+                        f'<span class="escalation-tag" style="color:{color};border:1px solid {color}">'
+                        f"{ESCALATION_LABEL[dv]}</span> &nbsp; owner team <code>{d.owner_team}</code>",
+                        unsafe_allow_html=True,
                     )
+                    st.caption(d.escalation_reason)
+                    if d.human_decision:
+                        st.write(
+                            f"Human {HUMAN_DECISION_LABEL.get(d.human_decision, d.human_decision)}"
+                            + (f" — _{d.human_decision_note}_" if d.human_decision_note else "")
+                        )
 
-            left, right = st.columns(2)
-            with left:
-                st.markdown("**Critical dependencies**")
-                st.write(" ".join(f"`{dep}`" for dep in d.critical_dependencies) or "—")
-                st.markdown("**Similar historical incidents**")
-                for inc_id in d.similar_incidents:
-                    inc = incidents[inc_id]
-                    st.markdown(f"- **{inc.id}** ({inc.duration_minutes} min) — {inc.description}")
-                if not d.similar_incidents:
-                    st.write("—")
-            with right:
-                st.markdown("**Log evidence**")
-                st.code("\n".join(d.log_evidence), language="log")
+                left, right = st.columns(2)
+                with left:
+                    st.markdown("**Critical dependencies**")
+                    st.write(" ".join(f"`{dep}`" for dep in d.critical_dependencies) or "—")
+                    st.markdown("**Similar historical incidents**")
+                    for inc_id in d.similar_incidents:
+                        inc = incidents[inc_id]
+                        st.markdown(f"- **{inc.id}** ({inc.duration_minutes} min) — {inc.description}")
+                    if not d.similar_incidents:
+                        st.write("—")
+                with right:
+                    st.markdown("**Log evidence**")
+                    st.code("\n".join(d.log_evidence), language="log")
 
-        tab_json, tab_md = st.tabs(["JSON", "Markdown"])
-        with tab_json:
-            st.json(diagnosis_dict(result))
-        with tab_md:
-            st.markdown(to_markdown(result))
+            tab_json, tab_md = st.tabs(["JSON", "Markdown"])
+            with tab_json:
+                st.json(diagnosis_dict(result))
+            with tab_md:
+                st.markdown(to_markdown(result))
 
-        with st.expander("Evaluation ground truth (hidden from the agent)"):
-            st.write(f"Root-cause category: `{alert.root_cause_category.value if alert.root_cause_category else '—'}`")
-            st.write(f"Failure mode: `{alert.failure_mode.value if alert.failure_mode else '—'}`")
+            with st.expander("Evaluation ground truth (hidden from the agent)"):
+                st.write(f"Root-cause category: `{alert.root_cause_category.value if alert.root_cause_category else '—'}`")
+                st.write(f"Failure mode: `{alert.failure_mode.value if alert.failure_mode else '—'}`")
 
 
 # ── Page routing ────────────────────────────────────────────────────────────
