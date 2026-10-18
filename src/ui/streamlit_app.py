@@ -314,9 +314,9 @@ code,pre {{ font-family:var(--mono); }}
 /* ── Alert strip ────────────────────────────────────────────────── */
 .alert-strip {{
     display:flex; gap:10px; padding:20px 46px;
-    overflow-x:auto; scrollbar-color:#333 transparent;
-    border-bottom:1px solid var(--border);
+    overflow-x:auto; border-bottom:1px solid var(--border);
     width:100%; box-sizing:border-box;
+    scrollbar-color:#333 transparent;
 }}
 .alert-card {{
     display:flex; min-width:194px; align-items:flex-start; gap:12px;
@@ -688,10 +688,8 @@ code,pre {{ font-family:var(--mono); }}
         top:-6px; left:auto; width:24px; height:2px;
     }}
     .stMainBlockContainer {{ margin-left:0!important; padding-bottom:66px!important; }}
-    .workspace-header,
-    .map-header {{ min-height:110px; padding:25px 20px 20px; }}
+    .workspace-header {{ min-height:110px; padding:25px 20px 20px; }}
     .alert-strip {{ padding:15px 20px; }}
-    .alert-card {{ min-width:175px; }}
     .st-key-workspace-content {{ width:calc(100% - 40px)!important; padding-top:28px!important; }}
     .context-grid {{ grid-template-columns:1fr; }}
     .context-grid > div {{ border-right:0; border-bottom:1px solid #202020; }}
@@ -720,8 +718,8 @@ if page == "landing":
 else:
     st.markdown(
         "<style>"
-        ".stMainBlockContainer,.block-container"
-        "{margin-left:84px!important;padding:0!important;max-width:100%!important}"
+        ".stMainBlockContainer{max-width:100%!important;margin-left:84px!important;padding:0!important}"
+        ".block-container{max-width:100%!important;margin-left:0!important;padding:0!important}"
         "</style>",
         unsafe_allow_html=True,
     )
@@ -740,7 +738,7 @@ def _render_sidebar(active: str) -> None:
     )
     st.markdown(
         f'<aside class="side-nav">'
-        f'<a class="side-logo" href="?" target="_top" aria-label="Back to home">'
+        f'<a class="side-logo" href="/" target="_top" aria-label="Back to home">'
         f'<span class="sidebar-custom-logo" aria-hidden="true">'
         f'<img src="{logo_src}" alt="">'
         f"</span></a>"
