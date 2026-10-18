@@ -294,7 +294,7 @@ code,pre {{ font-family:var(--mono); }}
 }}
 .workspace-header {{
     display:flex; min-height:132px; align-items:flex-end;
-    justify-content:space-between; padding:34px 0 27px;
+    justify-content:space-between; padding:34px 46px 27px;
     border-bottom:1px solid var(--border);
     width:100%; box-sizing:border-box;
 }}
@@ -313,15 +313,15 @@ code,pre {{ font-family:var(--mono); }}
 
 /* ── Alert strip ────────────────────────────────────────────────── */
 .alert-strip {{
-    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-    gap:10px; padding:20px 0;
+    display:flex; gap:10px; padding:20px 46px;
+    overflow-x:auto; scrollbar-color:#333 transparent;
     border-bottom:1px solid var(--border);
     width:100%; box-sizing:border-box;
 }}
 .alert-card {{
-    display:flex; align-items:flex-start; gap:12px;
+    display:flex; min-width:194px; align-items:flex-start; gap:12px;
     padding:15px; border:1px solid var(--border); border-radius:11px;
-    background:#0a0a0a; cursor:pointer; text-align:left; transition:160ms ease;
+    background:var(--panel); cursor:pointer; text-align:left; transition:160ms ease;
     text-decoration:none!important; color:inherit!important;
 }}
 .alert-card:hover {{ background:var(--elevated); }}
@@ -554,7 +554,7 @@ code,pre {{ font-family:var(--mono); }}
 /* ── Map page ───────────────────────────────────────────────────── */
 .map-header {{
     display:flex; min-height:132px; align-items:center;
-    justify-content:space-between; padding:27px 0;
+    justify-content:space-between; padding:27px 46px;
     border-bottom:1px solid var(--border);
     width:100%; box-sizing:border-box;
 }}
@@ -688,8 +688,10 @@ code,pre {{ font-family:var(--mono); }}
         top:-6px; left:auto; width:24px; height:2px;
     }}
     .stMainBlockContainer {{ margin-left:0!important; padding-bottom:66px!important; }}
-    .workspace-header {{ min-height:110px; padding:25px 20px 20px; }}
-    .alert-strip {{ padding:15px 20px; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); }}
+    .workspace-header,
+    .map-header {{ min-height:110px; padding:25px 20px 20px; }}
+    .alert-strip {{ padding:15px 20px; }}
+    .alert-card {{ min-width:175px; }}
     .st-key-workspace-content {{ width:calc(100% - 40px)!important; padding-top:28px!important; }}
     .context-grid {{ grid-template-columns:1fr; }}
     .context-grid > div {{ border-right:0; border-bottom:1px solid #202020; }}
@@ -718,23 +720,9 @@ if page == "landing":
 else:
     st.markdown(
         "<style>"
-        ".stMainBlockContainer,.block-container,"
-        "[data-testid='stAppViewBlockContainer'],[class*='BlockContainer']"
-        "{margin-left:84px!important;padding-left:46px!important;padding-right:46px!important;"
-        "padding-top:0!important;padding-bottom:0!important}"
-        "</style>"
-        "<script>"
-        "const _applyPad=()=>{"
-        "const el=document.querySelector('[class*=\"BlockContainer\"]')"
-        "||document.querySelector('.block-container')"
-        "||document.querySelector('.stMainBlockContainer');"
-        "if(el){el.style.setProperty('margin-left','84px','important');"
-        "el.style.setProperty('padding-left','46px','important');"
-        "el.style.setProperty('padding-right','46px','important');"
-        "el.style.setProperty('padding-top','0','important');"
-        "el.style.setProperty('padding-bottom','0','important');}"
-        "};_applyPad();setTimeout(_applyPad,500);setTimeout(_applyPad,1500);"
-        "</script>",
+        ".stMainBlockContainer,.block-container"
+        "{margin-left:84px!important;padding:0!important;max-width:100%!important}"
+        "</style>",
         unsafe_allow_html=True,
     )
 
@@ -888,9 +876,7 @@ def _render_map() -> None:
     alert_id = selected_alert or next(iter(alerts))
     alert = alerts[alert_id]
     st.markdown(
-        f'<div class="map-header" style="display:flex;min-height:132px;align-items:center;'
-        f'justify-content:space-between;padding:27px 0;border-bottom:1px solid #252525;'
-        f'width:100%;box-sizing:border-box">'
+        f'<div class="map-header">'
         f'<div><span class="kicker">Live topology</span>'
         f"<h1>System architecture</h1></div>"
         f'<div class="map-meta">'
@@ -912,9 +898,7 @@ def _render_alerts() -> None:
 
     # Workspace header
     st.markdown(
-        '<div class="workspace-header" style="display:flex;min-height:132px;align-items:flex-end;'
-        'justify-content:space-between;padding:34px 0 27px;border-bottom:1px solid #252525;'
-        'width:100%;box-sizing:border-box">'
+        '<div class="workspace-header">'
         '<div><span class="kicker">Operations center</span>'
         "<h1>Incident triage</h1></div>"
         '<div class="agent-status"><span></span>Agent online</div>'
@@ -934,9 +918,7 @@ def _render_alerts() -> None:
             f"<small>{alert.service}</small></span></a>"
         )
     st.markdown(
-        f'<div class="alert-strip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));'
-        f'gap:10px;padding:20px 0;border-bottom:1px solid #252525;'
-        f'width:100%;box-sizing:border-box" aria-label="Active alerts">'
+        f'<div class="alert-strip" aria-label="Active alerts">'
         f'{"".join(cards_html)}</div>',
         unsafe_allow_html=True,
     )
