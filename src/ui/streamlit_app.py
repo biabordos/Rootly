@@ -10,7 +10,6 @@ import base64
 import json
 import sys
 from pathlib import Path
-from textwrap import dedent
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -27,263 +26,777 @@ from src.ui.system_map import render_system_map
 
 load_dotenv(ROOT / ".env")
 LOGO_PATH = Path(__file__).resolve().parent / "assets" / "rootly-mark.png"
+CORNER_LOGO_PATH = ROOT / "Material Design Ripple Effect" / "public" / "rootly-corner-logo.jpeg"
 ARCHITECTURE_PATH = ROOT / "docs" / "diagrams" / "architecture.png"
+
 st.set_page_config(
     page_title="Rootly | Incident Triage",
     page_icon=str(LOGO_PATH),
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-SEVERITY_COLOR = {"low": "#7ee2a8", "medium": "#f2c66d", "high": "#f19a66", "critical": "#ff6b6b"}
-ESCALATION_COLOR = {"auto_resolved": "#7ee2a8", "escalate_normal": "#f2c66d", "escalate_urgent_needs_approval": "#ff6b6b"}
+# ── Data ────────────────────────────────────────────────────────────────────
+ESCALATION_COLOR = {
+    "auto_resolved": "#7ee2a8",
+    "escalate_normal": "#f2c66d",
+    "escalate_urgent_needs_approval": "#ff6b6b",
+}
 alerts = {a.id: a for a in load_alerts()}
 incidents = {i.id: i for i in load_incidents()}
 results: dict = st.session_state.setdefault("results", {})
 errors: dict = st.session_state.setdefault("errors", {})
 alert_statuses: dict[str, str] = st.session_state.setdefault(
-    "alert_statuses", {alert_id: "unresolved" for alert_id in alerts}
+    "alert_statuses", {aid: "unresolved" for aid in alerts},
 )
-view = st.session_state.setdefault("view", "diagnosis")
-if view not in {"diagnosis", "system_map"}:
-    view = "diagnosis"
-    st.session_state.view = view
-st.session_state.setdefault("selected_alert", None)
 
-APP_CSS = dedent("""
-    <style>
-        :root {
-            --black:#050505; --panel:#0c0c0c; --raised:#121212; --line:#252525;
-            --muted:#8e8e8e; --white:#f5f5f2; --accent:#d9ff62;
-            --alert-unresolved:#f5f5f2; --alert-resolved:#7ee2a8; --alert-urgent:#ff6b6b;
-        }
-        .stApp { background:var(--black); color:var(--white); }
-        [data-testid="stHeader"] { background:transparent; }
-        [data-testid="stSidebar"] { background:#090909; border-right:1px solid var(--line); }
-        [data-testid="stSidebar"] > div:first-child { padding:2.4rem 1.25rem; }
-        [data-testid="stSidebar"] [data-testid="stSidebarContent"] { overflow-y:auto; }
-        .block-container { max-width:1280px; padding:3rem 4rem 5rem; }
-        h1,h2,h3,h4,p,label,[data-testid="stMetricLabel"],[data-testid="stMetricValue"] { font-family:Helvetica,Arial,sans-serif; }
-        h1 { letter-spacing:-.04em; font-weight:500; } h2,h3 { letter-spacing:-.025em; font-weight:500; }
-        p,li,label { color:#d0d0cd; line-height:1.6; } code,pre,[data-testid="stCode"] { font-family:Consolas,monospace; }
-        .rootly-eyebrow { color:var(--accent); font:500 .7rem Consolas,monospace; letter-spacing:.12em; text-transform:uppercase; }
-        .rootly-brand { display:flex; align-items:center; gap:.65rem; width:fit-content; margin:0 0 1.75rem; color:var(--white); font-size:1.05rem; font-weight:600; letter-spacing:-.03em; }
-        .rootly-brand img { display:block; width:32px; height:32px; object-fit:contain; }
-        .rootly-muted { color:var(--muted); }
-        .rootly-hero { animation:rootly-fade 900ms ease both; padding:12vh 0 8vh; max-width:820px; }
-        .rootly-hero h1 { font-size:clamp(4rem,11vw,9rem); line-height:.9; margin:1rem 0 2rem; }
-        .rootly-hero p { font-size:1.25rem; line-height:1.55; max-width:590px; }
-        .rootly-rule { border-top:1px solid var(--line); margin:2rem 0; }
-        .rootly-section { animation:rootly-rise 500ms ease both; }
-        .rootly-about-card,.rootly-alert-card { border:1px solid var(--line); background:var(--panel); padding:1.5rem; border-radius:2px; }
-        .rootly-about-card p { line-height:1.7; }
-        .rootly-alert-dot {
-            display:block; width:14px; height:14px; flex:0 0 14px; margin:0;
-            border:1px solid var(--alert-unresolved); border-radius:50%; background:var(--alert-unresolved);
-        }
-        .rootly-alert-dot.resolved { border-color:var(--alert-resolved); background:var(--alert-resolved); }
-        .rootly-alert-dot.urgent { border-color:var(--alert-urgent); background:var(--alert-urgent); }
-        .st-key-triage-panel {
-            padding:1.65rem; border:1px solid #252a20; border-radius:16px;
-            background:linear-gradient(145deg,rgba(16,18,13,.96),rgba(9,9,9,.98));
-            box-shadow:0 16px 42px rgba(0,0,0,.18);
-        }
-        .rootly-triage-heading {
-            padding-bottom:.8rem; border-bottom:1px solid rgba(255,255,255,.07);
-            margin-bottom:1.4rem;
-        }
-        .rootly-triage-heading .rootly-eyebrow { letter-spacing:.16em; }
-        .st-key-alert-bar [data-testid="stHorizontalBlock"] {
-            display:grid !important; grid-template-columns:repeat(10,minmax(0,1fr)); gap:.65rem;
-            width:100%; align-items:stretch;
-        }
-        .st-key-alert-bar [data-testid="stColumn"] {
-            width:auto !important; min-width:0 !important; flex:none !important;
-        }
-        .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"] {
-            display:flex; flex-direction:row; align-items:center; gap:.5rem; min-width:0;
-            min-height:54px; padding:0 .45rem; border:1px solid #30352a; border-radius:12px;
-            background:#11130f; transition:background 180ms ease,border-color 180ms ease,box-shadow 180ms ease,transform 180ms ease;
-        }
-        .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"]:hover {
-            transform:translateY(-2px); border-color:rgba(217,255,98,.48);
-            background:#15190d; box-shadow:0 8px 20px rgba(217,255,98,.1);
-        }
-        .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"]:has(button[kind="primary"]) {
-            border-color:var(--accent); background:rgba(217,255,98,.12);
-            box-shadow:0 0 0 1px rgba(217,255,98,.18),0 5px 18px rgba(217,255,98,.1);
-        }
-        .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:first-child {
-            width:auto !important; flex:0 0 auto !important;
-        }
-        .st-key-alert-bar [class*="st-key-alert-top-"] {
-            width:auto !important; min-width:0 !important; flex:1 1 auto !important;
-        }
-        .st-key-alert-bar [class*="st-key-alert-top-"] button {
-            width:100% !important; min-width:0 !important; min-height:50px !important; padding:0 !important;
-            justify-content:flex-start !important; border:0 !important;
-            border-radius:0 !important; background:transparent !important; color:var(--white) !important;
-            box-shadow:none !important; font-weight:600 !important; transform:none !important;
-            transition:background 180ms ease,border-color 180ms ease,box-shadow 180ms ease,transform 180ms ease;
-            white-space:nowrap !important; font-size:.8rem !important; letter-spacing:.02em !important;
-        }
-        .st-key-alert-bar [class*="st-key-alert-top-"] button p {
-            margin:0 !important; font-size:.8rem !important; line-height:1.1 !important;
-        }
-        .st-key-alert-bar [class*="st-key-alert-top-"] button:hover {
-            transform:none !important; border:0 !important; background:transparent !important; box-shadow:none !important;
-        }
-        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"] {
-            border:0 !important; background:transparent !important; box-shadow:none !important;
-            color:var(--white) !important;
-        }
-        .rootly-alert-legend {
-            display:flex; align-items:center; gap:1.8rem; margin:0;
-            color:var(--muted); font-size:.75rem; line-height:1.2; white-space:nowrap;
-        }
-        .rootly-alert-legend-item { display:inline-flex; align-items:center; gap:.4rem; }
-        .rootly-alert-legend .rootly-alert-dot { width:12px; height:12px; flex-basis:12px; }
-        .st-key-diagnosis-run { width:66%; margin:0 auto; padding-top:1.75rem; }
-        .st-key-diagnosis-run [data-testid="stButton"] button {
-            width:100% !important; min-height:58px !important; border:1px solid var(--accent) !important;
-            border-radius:12px !important; background:var(--accent) !important; color:#050505 !important;
-            font-size:1.05rem !important; font-weight:700 !important; letter-spacing:.01em !important;
-            box-shadow:0 6px 20px rgba(217,255,98,.12) !important;
-            transition:background 180ms ease,border-color 180ms ease,box-shadow 180ms ease,transform 180ms ease;
-        }
-        .st-key-diagnosis-run [data-testid="stButton"] button p {
-            margin:0 !important; color:#050505 !important; font-size:1.05rem !important; font-weight:700 !important;
-        }
-        .st-key-diagnosis-run [data-testid="stButton"] button:hover {
-            transform:translateY(-2px); background:#e4ff88 !important;
-            box-shadow:0 10px 26px rgba(217,255,98,.22) !important;
-        }
-        .st-key-diagnosis-run [data-testid="stButton"] button:active {
-            transform:translateY(0); box-shadow:0 3px 10px rgba(217,255,98,.14) !important;
-        }
-        .st-key-diagnosis-run [data-testid="stButton"] button:disabled {
-            opacity:.42; cursor:not-allowed; box-shadow:none !important; transform:none;
-        }
-        .rootly-sidebar-category {
-            margin:1.25rem 0 .5rem; color:var(--accent);
-            font:500 .68rem Consolas,monospace; letter-spacing:.1em; text-transform:uppercase;
-        }
-        .rootly-sidebar-list { display:flex; flex-direction:column; gap:.6rem; }
-        .rootly-sidebar-item { display:flex; flex-direction:column; gap:.1rem; }
-        .rootly-sidebar-item strong { color:#deded9; font-size:.76rem; font-weight:600; line-height:1.25; }
-        .rootly-sidebar-item span { color:var(--muted); font-size:.68rem; line-height:1.35; }
-        .st-key-sidebar-diagnosis button,.st-key-sidebar-system-map button {
-            width:100%; min-height:2.2rem; padding:.45rem .65rem; border-radius:8px;
-            justify-content:flex-start; font-size:.76rem; font-weight:600;
-        }
-        .st-key-sidebar-diagnosis button[kind="primary"],.st-key-sidebar-system-map button[kind="primary"] {
-            background:rgba(217,255,98,.1); border-color:rgba(217,255,98,.48); color:var(--accent) !important;
-        }
-        .rootly-sidebar-view-description { margin:.1rem 0 .65rem; color:var(--muted); font-size:.68rem; line-height:1.35; }
-        .rootly-system-architecture { margin:1.2rem 0 2rem; padding:1rem; border:1px solid var(--line); border-radius:12px; background:#090909; }
-        .rootly-system-architecture img { border-radius:6px; }
-        .rootly-kicker { color:var(--muted); font:500 .72rem Consolas,monospace; letter-spacing:.08em; text-transform:uppercase; }
-        .stButton > button,.stDownloadButton > button { border-radius:2px; border:1px solid #3b3b3b; background:transparent; color:var(--white); transition:border-color 180ms ease,background 180ms ease,transform 180ms ease; }
-        .stButton > button:hover,.stDownloadButton > button:hover { border-color:var(--accent); background:#171b0d; color:var(--white); transform:translateY(-1px); }
-        .stButton > button[kind="primary"] { background:var(--accent); border-color:var(--accent); color:#000 !important; font-weight:600; }
-        .stButton > button[kind="primary"] p,.stButton > button[kind="primary"] span,
-        .stButton > button[kind="primary"]:hover,.stButton > button[kind="primary"]:hover p,.stButton > button[kind="primary"]:hover span { color:#000 !important; }
-        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"] p,
-        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"] span,
-        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"]:hover p,
-        .st-key-alert-bar [class*="st-key-alert-top-"] button[kind="primary"]:hover span { color:var(--white) !important; }
-        [data-testid="stMetric"] { background:var(--panel); border:1px solid var(--line); padding:1rem; }
-        [data-testid="stMetricValue"] { color:var(--white); }
-        [data-testid="stExpander"],[data-testid="stForm"] { border-color:var(--line); background:var(--panel); }
-        [data-testid="stTabs"] button { color:var(--muted); } [data-testid="stTabs"] button[aria-selected="true"] { color:var(--accent); }
-        @media (max-width:1200px) {
-            .st-key-alert-bar [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(5,minmax(0,1fr)); }
-        }
-        @media (max-width:520px) {
-            .block-container { padding:1.5rem 1rem 3rem; }
-            .st-key-triage-panel { padding:1rem; border-radius:14px; }
-            .st-key-alert-bar [data-testid="stHorizontalBlock"] { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; }
-            .st-key-alert-bar [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { gap:.5rem; padding:0 .65rem; }
-            .st-key-diagnosis-run { width:100%; }
-            .rootly-alert-legend { gap:1rem; font-size:.7rem; }
-        }
-        @keyframes rootly-fade { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes rootly-rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    </style>
-""")
-st.markdown(APP_CSS, unsafe_allow_html=True)
+# ── Routing via query params ────────────────────────────────────────────────
+page = st.query_params.get("page", "landing")
+if page not in {"landing", "alerts", "about", "map"}:
+    page = "alerts"
+selected_alert = st.query_params.get("alert")
+if selected_alert and selected_alert not in alerts:
+    selected_alert = None
 
-logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+# ── Assets ──────────────────────────────────────────────────────────────────
+_logo_b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
+_corner_b64 = ""
+if CORNER_LOGO_PATH.is_file():
+    _corner_b64 = base64.b64encode(CORNER_LOGO_PATH.read_bytes()).decode()
+
+# ── SVG icons ───────────────────────────────────────────────────────────────
+_ICON_PATHS = {
+    "arrow": '<path d="m9 18 6-6-6-6M4 12h11"/>',
+    "check": '<path d="m5 12 4 4L19 6"/>',
+    "download": '<path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/>',
+    "info": '<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8v.01"/>',
+    "map": '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15m6-12v15"/>',
+    "pulse": '<path d="M3 12h4l2.5-6 4 12 2.5-6h5"/>',
+    "spark": '<path d="m12 2 1.5 5.2L18 10l-4.5 2.8L12 18l-1.5-5.2L6 10l4.5-2.8ZM19 3v4M21 5h-4"/>',
+    "users": '<circle cx="9" cy="8" r="3"/><path d="M3 20c.3-4 2.3-6 6-6s5.7 2 6 6m1-9a3 3 0 1 0 0-6m1 9c2.5.6 3.8 2.6 4 6"/>',
+    "warning": '<path d="M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 3v.01"/>',
+}
+
+
+def _icon(name: str, size: int = 18) -> str:
+    return (
+        f'<svg aria-hidden="true" class="icon" width="{size}" height="{size}" '
+        f'viewBox="0 0 24 24">{_ICON_PATHS[name]}</svg>'
+    )
+
+
+# ── Fonts ───────────────────────────────────────────────────────────────────
 st.markdown(
-    f'<div class="rootly-brand" aria-label="Rootly"><img src="data:image/png;base64,{logo_data}" alt=""><span>Rootly</span></div>',
+    '<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500'
+    "&family=Manrope:wght@400;500;600;700&display=swap\" rel=\"stylesheet\">",
     unsafe_allow_html=True,
 )
 
+# ── CSS ─────────────────────────────────────────────────────────────────────
+_TEXTURE_URL = (
+    "https://images.unsplash.com/photo-1692520883599-d543cfe6d43d"
+    "?crop=entropy&cs=tinysrgb&fit=max&fm=jpg"
+    "&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxkYXJrJTIwZ3JlZW4lMjBsZWF2ZXMl"
+    "MjBzaGFkb3clMjBib3RhbmljYWwlMjB0ZXh0dXJlfGVufDF8fHx8MTc5MjE5MDE3NHww"
+    "&ixlib=rb-4.1.0&q=80&w=1600"
+)
 
-def get_alert_status(alert_id: str) -> str:
+APP_CSS = f"""<style>
+/* ── Streamlit chrome ───────────────────────────────────────────── */
+[data-testid="stSidebar"],
+[data-testid="collapsedControl"] {{ display:none!important; }}
+[data-testid="stHeader"] {{ background:transparent!important; backdrop-filter:none!important; }}
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stBottom"] {{ display:none!important; }}
+.stMainBlockContainer {{ max-width:100%!important; }}
+.stMainBlockContainer [data-testid="stVerticalBlock"] {{ gap:0!important; }}
+.stMain {{ background:var(--bg)!important; }}
+.stApp {{ background:var(--bg); color:var(--text); font-family:var(--sans); }}
+
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root {{
+    --bg:#050505; --panel:#0c0c0c; --elevated:#121212; --border:#252525;
+    --text:#f5f5f2; --muted:#8e8e8e; --accent:#d9ff62;
+    --low:#7ee2a8; --medium:#f2c66d; --high:#f19a66; --critical:#ff6b6b;
+    --mono:"DM Mono",Consolas,monospace;
+    --sans:"Manrope","Helvetica Neue",Arial,sans-serif;
+}}
+* {{ box-sizing:border-box; }}
+a {{ text-decoration:none; color:inherit; }}
+h1,h2,h3,h4,p,label {{ font-family:var(--sans); }}
+h1 {{ letter-spacing:-.04em; font-weight:600; }}
+h2,h3 {{ letter-spacing:-.025em; font-weight:500; }}
+code,pre {{ font-family:var(--mono); }}
+
+/* ── Icon ───────────────────────────────────────────────────────── */
+.icon {{
+    display:block; flex:none; fill:none;
+    stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.7;
+}}
+
+/* ── Logo ───────────────────────────────────────────────────────── */
+.logo {{
+    display:flex; align-items:center; gap:14px;
+    color:var(--text); font-size:31px; font-weight:600; letter-spacing:-0.05em;
+}}
+.logo-mark {{
+    position:relative; display:block; width:31px; height:31px; transform:rotate(-8deg);
+}}
+.logo-mark span {{
+    position:absolute; width:15px; height:8px;
+    border:2px solid var(--accent); border-radius:100% 10% 100% 10%;
+    transform:rotate(-38deg);
+}}
+.logo-mark span:first-child {{ top:2px; left:12px; }}
+.logo-mark span:nth-child(2) {{ top:12px; left:3px; transform:rotate(30deg); }}
+.logo-mark span:last-child {{ right:0; bottom:1px; transform:rotate(-18deg); }}
+
+/* ── Landing page ───────────────────────────────────────────────── */
+.landing-page {{
+    position:relative; min-height:100vh; overflow:hidden; background:#050505;
+}}
+.leaf-texture {{
+    position:absolute; inset:-5%; opacity:0.19;
+    background-image:url("{_TEXTURE_URL}");
+    background-position:center; background-size:cover;
+    filter:grayscale(35%) contrast(120%);
+    animation:living-texture 18s ease-in-out infinite alternate;
+    transform-origin:center;
+}}
+@keyframes living-texture {{
+    0%   {{ transform:scale(1.02) translate3d(-1%,-1%,0); }}
+    50%  {{ transform:scale(1.08) translate3d(1%,0,0); }}
+    100% {{ transform:scale(1.04) translate3d(0,1%,0); }}
+}}
+.landing-vignette {{
+    position:absolute; inset:0;
+    background:
+        radial-gradient(circle at center,transparent 0%,rgb(5 5 5 / 35%) 45%,#050505 100%),
+        linear-gradient(180deg,rgb(5 5 5 / 20%),rgb(5 5 5 / 72%));
+}}
+.corner-logo {{
+    position:absolute; z-index:2;
+    top:clamp(30px,4vw,58px); right:clamp(30px,5.5vw,84px);
+    display:block; width:clamp(56px,5vw,78px); aspect-ratio:1;
+    overflow:hidden; opacity:.58; mix-blend-mode:screen; pointer-events:none;
+}}
+.corner-logo img {{
+    width:100%; height:100%; object-fit:cover;
+    filter:hue-rotate(-24deg) saturate(75%) brightness(1.35);
+    transform:scale(2.35);
+}}
+.landing-content {{
+    position:relative; z-index:1; display:flex;
+    width:100%; min-height:100vh; flex-direction:column;
+    justify-content:space-between; padding:clamp(36px,5.5vw,84px);
+}}
+.hero-copy {{ max-width:1160px; }}
+.hero-label {{
+    display:block; margin-bottom:clamp(32px,8vh,86px);
+    color:var(--accent); font-family:"DM Mono",monospace;
+    font-size:10px; font-weight:500; letter-spacing:0.19em; text-transform:uppercase;
+}}
+.hero-title-row {{
+    display:flex; align-items:flex-start; gap:clamp(16px,2vw,32px);
+}}
+.hero-title-row h1 {{
+    margin:0; color:#fafafa;
+    font-size:clamp(120px,15vw,220px); font-weight:700;
+    letter-spacing:-0.085em; line-height:0.8;
+}}
+.hero-leaf {{
+    position:relative; display:block;
+    width:clamp(34px,5vw,70px); height:clamp(34px,5vw,70px);
+    margin-top:2px; transform:rotate(-12deg);
+}}
+.hero-leaf span {{
+    position:absolute; width:58%; height:34%;
+    border:3px solid var(--accent); border-radius:100% 10% 100% 10%;
+    transform:rotate(-38deg);
+}}
+.hero-leaf span:first-child {{ top:4%; right:2%; }}
+.hero-leaf span:last-child  {{ bottom:12%; left:2%; transform:rotate(30deg); }}
+.hero-title-row + p {{
+    max-width:760px; margin:clamp(36px,6vh,66px) 0 0;
+    color:#a0a0a0; font-size:clamp(15px,1.4vw,20px); line-height:1.65;
+}}
+
+/* landing nav – uses <a> tags */
+.landing-nav {{
+    display:grid; width:100%;
+    grid-template-columns:repeat(3,1fr); gap:clamp(12px,2vw,28px);
+    padding-top:48px;
+}}
+.landing-nav a {{
+    display:flex; width:100%; align-items:center; justify-content:space-between;
+    min-height:66px; padding:0 24px;
+    border:1px solid #fafafa; border-radius:0; background:transparent;
+    cursor:pointer; font-size:16px; font-weight:500; transition:180ms ease;
+}}
+.landing-nav a:hover {{
+    border-color:var(--accent); color:var(--accent);
+    background:rgb(217 255 98 / 5%); transform:translateY(-3px);
+}}
+.landing-nav a.launch-button {{
+    border-color:var(--accent); color:#050505; background:var(--accent);
+}}
+.landing-nav a.launch-button:hover {{ color:#050505; background:#e4ff8e; }}
+.landing-nav a .icon {{ transition:transform 180ms ease; }}
+.landing-nav a:hover .icon {{ transform:translateX(3px); }}
+
+/* ── Side nav ───────────────────────────────────────────────────── */
+.side-nav {{
+    position:fixed; z-index:20; top:0; bottom:0; left:0;
+    display:flex; width:84px; flex-direction:column; align-items:center;
+    border-right:1px solid var(--border); background:#080808;
+}}
+.side-logo {{
+    display:grid; width:100%; height:83px; place-items:center;
+    border:0; border-bottom:1px solid var(--border);
+    background:transparent; cursor:pointer;
+}}
+.sidebar-custom-logo {{
+    display:block; width:42px; aspect-ratio:1;
+    overflow:hidden; opacity:.72; mix-blend-mode:screen;
+}}
+.sidebar-custom-logo img {{
+    width:100%; height:100%; object-fit:cover;
+    filter:hue-rotate(-24deg) saturate(90%) brightness(1.55);
+    transform:scale(2.35);
+}}
+.side-nav nav {{
+    display:flex; width:100%; flex:1; flex-direction:column;
+    align-items:center; gap:10px; padding-top:26px;
+}}
+.side-nav nav a {{
+    position:relative; display:flex; width:66px; height:58px;
+    flex-direction:column; align-items:center; justify-content:center;
+    gap:6px; border:0; border-radius:10px;
+    color:#777; background:transparent; cursor:pointer;
+}}
+.side-nav nav a span {{
+    font-family:"DM Mono",monospace; font-size:9px;
+}}
+.side-nav nav a:hover,
+.side-nav nav a.active {{
+    color:var(--accent); background:rgb(217 255 98 / 6%);
+}}
+.side-nav nav a.active::before {{
+    position:absolute; left:-9px; width:2px; height:24px;
+    border-radius:2px; background:var(--accent); content:"";
+}}
+
+/* ── Workspace ──────────────────────────────────────────────────── */
+.kicker {{
+    color:#777; font-family:"DM Mono",monospace;
+    font-size:10px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase;
+}}
+.workspace-header {{
+    display:flex; min-height:132px; align-items:flex-end;
+    justify-content:space-between; padding:34px 0 27px;
+    border-bottom:1px solid var(--border);
+    width:100%; box-sizing:border-box;
+}}
+.workspace-header h1 {{
+    margin:7px 0 0; font-size:27px; font-weight:500; letter-spacing:-0.035em;
+}}
+.agent-status {{
+    display:flex; align-items:center; gap:9px;
+    padding:8px 11px; border:1px solid var(--border); border-radius:8px;
+    color:var(--muted); font-family:"DM Mono",monospace; font-size:10px;
+}}
+.agent-status span {{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--low); box-shadow:0 0 8px rgb(126 226 168 / 60%);
+}}
+
+/* ── Alert strip ────────────────────────────────────────────────── */
+.alert-strip {{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px; padding:20px 0;
+    border-bottom:1px solid var(--border);
+    width:100%; box-sizing:border-box;
+}}
+.alert-card {{
+    display:flex; align-items:flex-start; gap:12px;
+    padding:15px; border:1px solid var(--border); border-radius:11px;
+    background:#0a0a0a; cursor:pointer; text-align:left; transition:160ms ease;
+    text-decoration:none!important; color:inherit!important;
+}}
+.alert-card:hover {{ background:var(--elevated); }}
+.alert-card.selected {{
+    border-color:var(--accent);
+    box-shadow:inset 0 0 0 1px rgb(217 255 98 / 12%);
+}}
+.status-dot {{
+    width:7px; height:7px; margin-top:5px; flex:none;
+    border-radius:50%; background:#606060;
+}}
+.status-dot.resolved {{ background:var(--low); }}
+.status-dot.urgent {{
+    background:var(--critical); box-shadow:0 0 7px rgb(255 107 107 / 50%);
+}}
+.alert-card > span:last-child {{
+    display:flex; flex-direction:column; gap:5px; line-height:1.45;
+}}
+.alert-card strong {{
+    font-family:"DM Mono",monospace; font-size:11px; font-weight:500; line-height:1.4;
+}}
+.alert-card small {{ color:var(--muted); font-size:12px; line-height:1.4; margin-top:2px; }}
+
+/* ── Context panel ──────────────────────────────────────────────── */
+.panel {{
+    border:1px solid var(--border); border-radius:14px; background:var(--panel);
+}}
+.context-panel {{ padding:26px 28px 28px; }}
+.section-heading {{
+    display:flex; align-items:center; justify-content:space-between;
+}}
+.section-heading h2, .approval-heading h2 {{
+    margin:5px 0 0; font-size:18px; font-weight:500; letter-spacing:-0.025em;
+}}
+.severity-badge {{
+    padding:6px 9px; border:1px solid currentColor; border-radius:999px;
+    font-family:"DM Mono",monospace; font-size:9px; text-transform:uppercase;
+    background:transparent!important;
+}}
+.severity-badge.low    {{ color:var(--low); }}
+.severity-badge.medium {{ color:var(--medium); }}
+.severity-badge.high   {{ color:var(--high); }}
+.severity-badge.critical {{ color:var(--critical); }}
+.context-grid {{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:0;
+    margin-top:25px; border:1px solid #202020; border-radius:10px; overflow:hidden;
+}}
+.context-grid > div {{
+    display:flex; min-width:0; flex-direction:column; gap:8px;
+    padding:18px; border-right:1px solid #202020; background:#0a0a0a;
+}}
+.context-grid > div:last-child {{ border-right:0; }}
+.context-grid span {{
+    color:#717171; font-family:"DM Mono",monospace;
+    font-size:9px; letter-spacing:0.04em; text-transform:uppercase;
+}}
+.context-grid strong {{
+    overflow:hidden; font-family:"DM Mono",monospace;
+    font-size:11px; font-weight:500; text-overflow:ellipsis; white-space:nowrap;
+}}
+.severity-value {{
+    display:flex; align-items:center; gap:8px; text-transform:capitalize;
+}}
+.severity-dot {{
+    width:6px; height:6px; border-radius:50%;
+}}
+.severity-dot.low {{ background:var(--low); }}
+.severity-dot.medium {{ background:var(--medium); }}
+.severity-dot.high {{ background:var(--high); }}
+.severity-dot.critical {{ background:var(--critical); }}
+
+/* ── Run button ─────────────────────────────────────────────────── */
+.run-button {{
+    display:inline-flex; min-height:38px; align-items:center; justify-content:center;
+    gap:8px; padding:0 17px; margin-top:14px;
+    border:1px solid var(--accent); border-radius:8px;
+    color:#111; background:var(--accent);
+    cursor:pointer; font-size:12px; font-weight:700; transition:150ms ease;
+}}
+.run-button:hover {{
+    background:#e4ff8e; box-shadow:0 0 22px rgb(217 255 98 / 15%);
+}}
+
+/* ── Empty state ────────────────────────────────────────────────── */
+.empty-state {{
+    display:flex; min-height:250px; flex-direction:column;
+    align-items:center; justify-content:center; color:var(--muted); text-align:center;
+}}
+.empty-state > span {{
+    display:grid; width:46px; height:46px; place-items:center;
+    border:1px solid var(--border); border-radius:50%;
+    color:var(--accent); background:var(--panel);
+}}
+.empty-state p {{ margin:15px 0 5px; color:#ccc; font-size:13px; }}
+.empty-state small {{ max-width:380px; font-size:11px; line-height:1.6; }}
+
+/* ── Investigation ──────────────────────────────────────────────── */
+.investigation {{ margin-top:48px; }}
+.investigation-title {{ margin-bottom:25px; }}
+.complete-label {{
+    display:flex; align-items:center; gap:6px;
+    color:var(--low); font-family:"DM Mono",monospace; font-size:10px;
+}}
+.progress-track {{
+    display:grid; margin-bottom:25px;
+}}
+.progress-item {{
+    position:relative; display:flex; flex-direction:column;
+    align-items:center; gap:9px; color:#777; text-align:center;
+}}
+.progress-item::before {{
+    position:absolute; z-index:0; top:13px; right:50%;
+    width:100%; height:1px; background:var(--accent); content:"";
+}}
+.progress-item:first-child::before {{ display:none; }}
+.progress-item > span {{
+    position:relative; z-index:1; display:grid;
+    width:27px; height:27px; place-items:center;
+    border:1px solid #444; border-radius:50%; background:var(--bg);
+    font-family:"DM Mono",monospace; font-size:10px;
+}}
+.progress-item > span.complete {{
+    border-color:var(--accent); color:#111; background:var(--accent);
+}}
+.progress-item small {{ font-family:"DM Mono",monospace; font-size:9px; }}
+
+/* ── Trace blocks ───────────────────────────────────────────────── */
+.trace-block {{
+    padding:13px 15px; border:1px solid #232323; border-radius:8px;
+    background:#090909; margin-bottom:8px;
+}}
+.trace-block > span {{
+    display:flex; justify-content:space-between; margin-bottom:7px;
+    color:#696969; font-family:"DM Mono",monospace;
+    font-size:9px; letter-spacing:0.08em; text-transform:uppercase;
+}}
+.trace-block em {{ color:#626262; font-style:normal; }}
+.trace-block p {{ margin:0; color:#b6b6b3; font-size:12px; line-height:1.65; }}
+.trace-block code {{
+    color:#b9d96c; font-family:"DM Mono",monospace;
+    font-size:10px; line-height:1.6; overflow-wrap:anywhere;
+}}
+.trace-block.thought {{
+    border-color:rgb(217 255 98 / 14%); background:rgb(217 255 98 / 3%);
+}}
+
+/* ── Approval ───────────────────────────────────────────────────── */
+.approval-panel {{
+    margin-top:34px; padding:26px;
+    border:1px solid rgb(255 107 107 / 35%); border-radius:14px;
+    background:rgb(255 107 107 / 5%);
+}}
+.approval-heading {{
+    display:flex; align-items:center; gap:13px;
+}}
+.warning-icon {{
+    display:grid; width:38px; height:38px; place-items:center;
+    border-radius:9px; color:var(--critical); background:rgb(255 107 107 / 10%);
+}}
+.approval-description {{
+    margin:20px 0 16px; color:#bcbcb8; font-size:13px; line-height:1.7;
+}}
+.approval-description strong {{ color:var(--text); font-weight:600; }}
+.warning-box {{
+    display:flex; align-items:flex-start; gap:11px;
+    padding:13px 14px; border:1px solid rgb(255 107 107 / 18%);
+    border-radius:8px; color:#dd8585; background:rgb(255 107 107 / 5%);
+}}
+.warning-box p {{ margin:0; font-size:11px; line-height:1.6; }}
+
+/* ── Decision complete ──────────────────────────────────────────── */
+.decision-complete {{
+    display:flex; margin-top:34px; align-items:center; gap:13px; padding:20px;
+    border:1px solid rgb(126 226 168 / 26%); border-radius:12px;
+    background:rgb(126 226 168 / 5%);
+}}
+.decision-icon {{
+    display:grid; width:34px; height:34px; place-items:center;
+    border-radius:50%; color:#111; background:var(--low);
+}}
+.decision-complete strong {{ font-size:13px; }}
+.decision-complete p {{ margin:4px 0 0; color:var(--muted); font-size:11px; }}
+
+/* ── Export bar ──────────────────────────────────────────────────── */
+.export-bar {{
+    display:flex; margin-top:34px; align-items:center;
+    justify-content:space-between; padding-top:20px;
+    border-top:1px solid var(--border);
+}}
+.export-bar > span {{
+    color:#696969; font-family:"DM Mono",monospace;
+    font-size:9px; letter-spacing:0.08em; text-transform:uppercase;
+}}
+
+/* ── About page ─────────────────────────────────────────────────── */
+.about-page {{
+    display:grid; width:100%; min-height:100vh; place-items:center;
+    padding:70px 8vw;
+    background:
+        radial-gradient(circle at 80% 20%,rgb(217 255 98 / 4%),transparent 25%),
+        var(--bg);
+}}
+.about-content {{ width:min(100%,810px); }}
+.about-content > .logo {{ margin-bottom:90px; }}
+.about-content h1 {{
+    max-width:720px; margin:18px 0 43px;
+    font-size:clamp(38px,6vw,66px); font-weight:500;
+    letter-spacing:-0.06em; line-height:1.08;
+}}
+.about-copy {{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:48px;
+    padding-top:30px; border-top:1px solid var(--border);
+}}
+.about-copy p {{ margin:0; color:#9a9a97; font-size:14px; line-height:1.9; }}
+.about-principles {{
+    display:grid; margin-top:55px; grid-template-columns:repeat(3,1fr);
+    border:1px solid var(--border); border-radius:12px; overflow:hidden;
+}}
+.about-principles div {{
+    display:flex; min-height:100px; flex-direction:column;
+    justify-content:space-between; padding:18px;
+    border-right:1px solid var(--border); background:var(--panel);
+}}
+.about-principles div:last-child {{ border-right:0; }}
+.about-principles span {{
+    color:var(--accent); font-family:"DM Mono",monospace; font-size:9px;
+}}
+.about-principles strong {{ font-size:13px; font-weight:500; }}
+
+/* ── Map page ───────────────────────────────────────────────────── */
+.map-header {{
+    display:flex; min-height:132px; align-items:center;
+    justify-content:space-between; padding:27px 0;
+    border-bottom:1px solid var(--border);
+    width:100%; box-sizing:border-box;
+}}
+.map-header h1 {{
+    margin:7px 0 0; font-size:27px; font-weight:500; letter-spacing:-0.035em;
+}}
+.map-meta {{
+    display:flex; gap:20px; color:#727272;
+    font-family:"DM Mono",monospace; font-size:9px;
+}}
+.map-meta span {{ display:flex; align-items:center; gap:7px; }}
+.map-meta i {{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--low); box-shadow:0 0 8px rgb(126 226 168 / 60%);
+}}
+
+/* ── Workspace content container ────────────────────────────────── */
+.st-key-workspace-content {{
+    width:min(100% - 64px,1040px)!important;
+    margin:0 auto!important;
+    padding:40px 0 64px!important;
+}}
+.st-key-workspace-content [data-testid="stVerticalBlock"] {{ gap:1rem!important; }}
+.st-key-map-content [data-testid="stVerticalBlock"] {{ gap:1rem!important; }}
+
+/* ── Streamlit component overrides ──────────────────────────────── */
+.st-key-run-btn .stButton button {{
+    width:auto!important; min-height:38px!important;
+    padding:0 17px!important;
+    border:1px solid var(--accent)!important; border-radius:8px!important;
+    color:#111!important; background:var(--accent)!important;
+    font-size:12px!important; font-weight:700!important;
+    box-shadow:none!important; transition:150ms ease;
+}}
+.st-key-run-btn .stButton button:hover {{
+    background:#e4ff8e!important;
+    box-shadow:0 0 22px rgb(217 255 98 / 15%)!important;
+}}
+.st-key-run-btn .stButton button p {{ color:#111!important; }}
+
+.st-key-approve-btn .stButton button {{
+    min-height:38px!important; padding:0 17px!important;
+    border:1px solid var(--accent)!important; border-radius:8px!important;
+    color:#111!important; background:var(--accent)!important;
+    font-size:11px!important; font-weight:700!important;
+}}
+.st-key-approve-btn .stButton button:hover {{ background:#e4ff8e!important; }}
+.st-key-approve-btn .stButton button p {{ color:#111!important; }}
+
+.st-key-downgrade-btn .stButton button {{
+    min-height:38px!important; padding:0 17px!important;
+    border:1px solid #343434!important; border-radius:8px!important;
+    color:var(--text)!important; background:#111!important;
+    font-size:11px!important;
+}}
+.st-key-downgrade-btn .stButton button:hover {{ border-color:#555!important; }}
+
+.st-key-export-wrap .stDownloadButton button {{
+    height:34px!important; padding:0 11px!important;
+    border:1px solid #2d2d2d!important; border-radius:7px!important;
+    color:#9b9b9b!important; background:#0a0a0a!important;
+    font-family:"DM Mono",monospace!important; font-size:9px!important;
+}}
+.st-key-export-wrap .stDownloadButton button:hover {{
+    border-color:#555!important; color:var(--text)!important;
+}}
+
+[data-testid="stMetric"] {{
+    background:var(--panel); border:1px solid var(--border);
+    padding:1rem; border-radius:11px;
+}}
+[data-testid="stMetricValue"] {{ color:var(--text); font-family:var(--mono); }}
+[data-testid="stMetricLabel"] {{
+    font-family:var(--mono); font-size:.65rem;
+    letter-spacing:.04em; text-transform:uppercase; color:var(--muted);
+}}
+[data-testid="stExpander"],[data-testid="stForm"] {{
+    border-color:var(--border)!important; background:var(--panel)!important;
+    border-radius:14px!important;
+}}
+[data-testid="stExpander"] summary {{
+    font-family:var(--sans); font-weight:500;
+}}
+[data-testid="stTabs"] button {{ color:var(--muted); font-family:var(--mono); }}
+[data-testid="stTabs"] button[aria-selected="true"] {{ color:var(--accent); }}
+[data-testid="stProgress"] > div {{ border-radius:999px; }}
+
+.stButton > button,.stDownloadButton > button {{
+    border-radius:8px; border:1px solid #3b3b3b;
+    background:transparent; color:var(--text); font-family:var(--sans);
+    transition:border-color 180ms ease,background 180ms ease;
+}}
+.stButton > button:hover,.stDownloadButton > button:hover {{
+    border-color:var(--accent); background:#171b0d; color:var(--text);
+}}
+
+.escalation-tag {{
+    display:inline-block; padding:4px 10px; border-radius:999px;
+    font:600 .6rem var(--mono); text-transform:uppercase; letter-spacing:.04em;
+}}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width:1000px) {{
+    .context-grid {{ grid-template-columns:repeat(2,1fr); }}
+    .context-grid > div:nth-child(2) {{ border-right:0; }}
+    .context-grid > div:nth-child(-n+2) {{ border-bottom:1px solid #202020; }}
+}}
+@media (max-width:720px) {{
+    .corner-logo {{ top:24px; right:20px; width:48px; }}
+    .landing-content {{ min-height:100svh; padding:30px 20px; }}
+    .hero-label {{ max-width:280px; margin-bottom:52px; line-height:1.7; }}
+    .hero-title-row {{ gap:12px; }}
+    .hero-title-row h1 {{ font-size:clamp(72px,24vw,110px); }}
+    .hero-leaf {{ width:34px; height:34px; }}
+    .hero-leaf span {{ border-width:2px; }}
+    .hero-title-row + p {{ margin-top:30px; font-size:14px; }}
+    .landing-nav {{ gap:8px; padding-top:40px; }}
+    .landing-nav a {{ min-height:58px; padding:0 13px; font-size:12px; }}
+    .landing-nav a .icon {{ display:none; }}
+    .side-nav {{
+        top:auto; right:0; width:auto; height:66px;
+        flex-direction:row; border-top:1px solid var(--border); border-right:0;
+    }}
+    .side-logo {{ display:none; }}
+    .side-nav nav {{
+        flex:1; flex-direction:row; justify-content:space-around;
+        gap:0; padding:0;
+    }}
+    .side-nav nav a {{ height:54px; }}
+    .side-nav nav a.active::before {{
+        top:-6px; left:auto; width:24px; height:2px;
+    }}
+    .stMainBlockContainer {{ margin-left:0!important; padding-bottom:66px!important; }}
+    .workspace-header {{ min-height:110px; padding:25px 20px 20px; }}
+    .alert-strip {{ padding:15px 20px; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); }}
+    .st-key-workspace-content {{ width:calc(100% - 40px)!important; padding-top:28px!important; }}
+    .context-grid {{ grid-template-columns:1fr; }}
+    .context-grid > div {{ border-right:0; border-bottom:1px solid #202020; }}
+    .context-grid > div:last-child {{ border-bottom:0; }}
+    .about-page {{ display:block; padding:45px 24px 100px; }}
+    .about-content > .logo {{ margin-bottom:70px; }}
+    .about-copy, .about-principles {{ grid-template-columns:1fr; }}
+    .about-principles div {{ border-right:0; border-bottom:1px solid var(--border); }}
+    .about-principles div:last-child {{ border-bottom:0; }}
+    .map-meta {{ display:none; }}
+}}
+@media (prefers-reduced-motion:reduce) {{
+    .leaf-texture {{ animation:none; }}
+    * {{ scroll-behavior:auto!important; transition-duration:.01ms!important; }}
+}}
+</style>"""
+
+st.markdown(APP_CSS, unsafe_allow_html=True)
+
+# Non-landing pages get sidebar offset + padding
+if page == "landing":
+    st.markdown(
+        "<style>.stMainBlockContainer{padding:0!important}</style>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        "<style>"
+        ".stMainBlockContainer,.block-container,"
+        "[data-testid='stAppViewBlockContainer'],[class*='BlockContainer']"
+        "{margin-left:84px!important;padding-left:46px!important;padding-right:46px!important;"
+        "padding-top:0!important;padding-bottom:0!important}"
+        "</style>"
+        "<script>"
+        "const _applyPad=()=>{"
+        "const el=document.querySelector('[class*=\"BlockContainer\"]')"
+        "||document.querySelector('.block-container')"
+        "||document.querySelector('.stMainBlockContainer');"
+        "if(el){el.style.setProperty('margin-left','84px','important');"
+        "el.style.setProperty('padding-left','46px','important');"
+        "el.style.setProperty('padding-right','46px','important');"
+        "el.style.setProperty('padding-top','0','important');"
+        "el.style.setProperty('padding-bottom','0','important');}"
+        "};_applyPad();setTimeout(_applyPad,500);setTimeout(_applyPad,1500);"
+        "</script>",
+        unsafe_allow_html=True,
+    )
+
+
+# ── Helpers ─────────────────────────────────────────────────────────────────
+def _get_alert_status(alert_id: str) -> str:
     return alert_statuses.get(alert_id, "unresolved")
 
 
-def render_landing() -> None:
+def _render_sidebar(active: str) -> None:
+    logo_src = (
+        f"data:image/jpeg;base64,{_corner_b64}"
+        if _corner_b64
+        else f"data:image/png;base64,{_logo_b64}"
+    )
     st.markdown(
-        '<div class="rootly-hero"><div class="rootly-eyebrow">AI incident triage / ReAct orchestration</div><h1>Rootly</h1><p>A smart diagnosis orchestrator for IT incidents, correlating CMDB context, log evidence, and historical incidents into a clear path to resolution.</p></div>',
+        f'<aside class="side-nav">'
+        f'<a class="side-logo" href="?" target="_top" aria-label="Back to home">'
+        f'<span class="sidebar-custom-logo" aria-hidden="true">'
+        f'<img src="{logo_src}" alt="">'
+        f"</span></a>"
+        f'<nav aria-label="Workspace navigation">'
+        f'<a class="{"active" if active == "alerts" else ""}" href="?page=alerts" target="_top" title="Progress">'
+        f'{_icon("pulse", 19)}<span>Progress</span></a>'
+        f'<a class="{"active" if active == "map" else ""}" href="?page=map" target="_top" title="Map">'
+        f'{_icon("map", 19)}<span>Map</span></a>'
+        f'<a class="{"active" if active == "about" else ""}" href="?page=about" target="_top" title="About us">'
+        f'{_icon("users", 19)}<span>About us</span></a>'
+        f"</nav></aside>",
         unsafe_allow_html=True,
     )
-    launch, about, system_map = st.columns([1, 1, 1])
-    if launch.button("Launch Rootly", type="primary", width="stretch"):
-        st.session_state.view = "dashboard"
-        st.rerun()
-    if about.button("About Rootly", width="stretch"):
-        st.session_state.view = "about"
-        st.rerun()
-    if system_map.button("System Map", width="stretch"):
-        st.session_state.view = "system_map"
-        st.rerun()
 
 
-def render_about() -> None:
-    st.markdown('<div class="rootly-eyebrow">About the orchestrator</div>', unsafe_allow_html=True)
-    st.title("Diagnosis, assembled with context.")
-    st.markdown(
-        '<div class="rootly-about-card"><h2>Rootly is an AI Diagnosis Orchestrator for IT incident triage.</h2><p>It follows a ReAct-style reasoning loop to automate initial triage and preliminary diagnosis. The agent investigates simulated alerts through CMDB lookup, log search, and optional historical-incident retrieval.</p><p>Historical incidents can use ChromaDB with a BM25 keyword fallback. The result is a structured diagnosis package containing severity, affected components, critical dependencies, log evidence, a root-cause hypothesis, confidence, and an escalation recommendation.</p><p>Urgent escalations pause for human-in-the-loop approval before the run can continue. The MVP does not perform automated remediation, connect to real production systems, create real escalations, or provide multi-tenant support.</p></div>',
-        unsafe_allow_html=True,
-    )
-    if st.button("Back to launch", width="content"):
-        st.session_state.view = "landing"
-        st.rerun()
-
-
-def render_system_map_view() -> None:
-    if st.button("Back to diagnosis", key="system-map-back"):
-        st.session_state.view = "diagnosis"
-        st.rerun()
-
-    st.markdown('<div class="rootly-eyebrow">Operational topology</div>', unsafe_allow_html=True)
-    st.title("System Map")
-    selected = st.session_state.selected_alert or next(iter(alerts))
-    if ARCHITECTURE_PATH.is_file():
-        st.markdown('<div class="rootly-system-architecture">', unsafe_allow_html=True)
-        st.image(str(ARCHITECTURE_PATH), width="stretch")
-        st.caption("Rootly system architecture: investigation orchestration, tools, and observability.")
-        st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        st.info("The architecture diagram is not available yet.")
-    st.caption("Live dependency map for the selected alert scenario, built from CMDB and same-day log evidence.")
-    render_system_map(alerts[selected])
-
-
-def render_event(event: dict) -> None:
+def _render_event(event: dict) -> None:
     kind = event["kind"]
     if kind == "thought":
-        st.markdown(f"**Thought**  \n{event['content']}")
+        st.markdown(
+            f'<div class="trace-block thought"><span>Thought</span>'
+            f'<p>{event["content"]}</p></div>',
+            unsafe_allow_html=True,
+        )
     elif kind == "routing":
-        st.markdown(f"**Handoff** → `{event['tool']}` agent  \n{event['content']}")
+        st.markdown(
+            f'<div class="trace-block"><span>Handoff → {event["tool"]} agent</span>'
+            f'<p>{event["content"]}</p></div>',
+            unsafe_allow_html=True,
+        )
     elif kind == "action":
         args = ", ".join(f"{k}={v!r}" for k, v in event["input"].items())
-        st.code(f"{event['tool']}({args})", language="python")
+        st.markdown(
+            f'<div class="trace-block"><span>Action</span>'
+            f'<code>{event["tool"]}({args})</code></div>',
+            unsafe_allow_html=True,
+        )
     elif kind == "observation":
-        label = f"Observation / {event['tool']} / {event.get('duration_ms', 0):.0f} ms"
-        with st.expander(label, expanded=False):
+        duration = event.get("duration_ms", 0)
+        st.markdown(
+            f'<div class="trace-block"><span><span>Observation / {event["tool"]}</span>'
+            f"<em>{duration:.0f} ms</em></span></div>",
+            unsafe_allow_html=True,
+        )
+        with st.expander("Result data", expanded=False):
             st.json(event["result"], expanded=False)
     elif kind == "guardrail":
         (st.error if event.get("is_error") else st.success)(f"Guardrail: {event['content']}")
@@ -295,7 +808,7 @@ def render_event(event: dict) -> None:
         st.warning(event["content"])
 
 
-def step_title(step: int, events: list[dict]) -> str:
+def _step_title(step: int, events: list[dict]) -> str:
     tools = [f"→ {e['tool']} agent" for e in events if e["kind"] == "routing"]
     tools += [e["tool"] for e in events if e["kind"] == "action"]
     if any(e["kind"] == "guardrail" for e in events):
@@ -307,265 +820,412 @@ def step_title(step: int, events: list[dict]) -> str:
     return f"Step {step}: " + (" → ".join(tools) if tools else "reasoning")
 
 
-# ── Sidebar navigation ──────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown('<div class="rootly-eyebrow">Rootly / workspace</div>', unsafe_allow_html=True)
+# ── Page renderers ──────────────────────────────────────────────────────────
+
+def _render_landing() -> None:
+    corner_img = ""
+    if _corner_b64:
+        corner_img = (
+            '<span class="corner-logo" aria-hidden="true">'
+            f'<img src="data:image/jpeg;base64,{_corner_b64}" alt="">'
+            "</span>"
+        )
     st.markdown(
-        """
-        <div class="rootly-sidebar-category">Investigation</div>
-        <div class="rootly-sidebar-list">
-          <div class="rootly-sidebar-item"><strong>Alert intake</strong><span>Loads one of 10 mock alert scenarios</span></div>
-          <div class="rootly-sidebar-item"><strong>CMDB lookup</strong><span>Component details, dependency chain, blast radius, owner team</span></div>
-          <div class="rootly-sidebar-item"><strong>Log search</strong><span>Filters logs by service, time window, and level</span></div>
-          <div class="rootly-sidebar-item"><strong>Similar incidents (RAG)</strong><span>ChromaDB with BM25 fallback over past incidents</span></div>
-        </div>
-        <div class="rootly-sidebar-category">Multi-agent orchestration</div>
-        <div class="rootly-sidebar-list">
-          <div class="rootly-sidebar-item"><strong>Orchestrator</strong><span>Routes the investigation to specialists</span></div>
-          <div class="rootly-sidebar-item"><strong>CMDB / Log / Synthesis agents</strong><span>Each owns one part of the toolset</span></div>
-        </div>
-        <div class="rootly-sidebar-category">Safety &amp; decisions</div>
-        <div class="rootly-sidebar-list">
-          <div class="rootly-sidebar-item"><strong>Guardrail</strong><span>Validates components, incidents, and log evidence against real data</span></div>
-          <div class="rootly-sidebar-item"><strong>Escalation policy</strong><span>Auto-resolved / normal / urgent</span></div>
-          <div class="rootly-sidebar-item"><strong>Human approval</strong><span>Approve or downgrade urgent escalations</span></div>
-        </div>
-        <div class="rootly-sidebar-category">Output</div>
-        <div class="rootly-sidebar-list">
-          <div class="rootly-sidebar-item"><strong>Diagnosis package</strong><span>Root cause, evidence, confidence, escalation recommendation</span></div>
-          <div class="rootly-sidebar-item"><strong>Reasoning trace</strong><span>Thought → Action → Observation steps</span></div>
-          <div class="rootly-sidebar-item"><strong>Export</strong><span>JSON and Markdown</span></div>
-        </div>
-        <div class="rootly-sidebar-category">Observability &amp; quality</div>
-        <div class="rootly-sidebar-list">
-          <div class="rootly-sidebar-item"><strong>Phoenix tracing</strong><span>Agent tracing and observability</span></div>
-          <div class="rootly-sidebar-item"><strong>Statistical &amp; RAG evaluation</strong><span>Evaluation with RAGAS</span></div>
-        </div>
-        <div class="rootly-sidebar-category">Views</div>
-        """,
+        f'<main class="landing-page">'
+        f'<div class="leaf-texture" aria-hidden="true"></div>'
+        f'<div class="landing-vignette" aria-hidden="true"></div>'
+        f"{corner_img}"
+        f'<div class="landing-content">'
+        f'<div class="hero-copy">'
+        f'<span class="hero-label">AI incident triage / ReAct orchestration</span>'
+        f'<div class="hero-title-row">'
+        f"<h1>Rootly</h1>"
+        f'<span class="hero-leaf" aria-hidden="true"><span></span><span></span></span>'
+        f"</div>"
+        f"<p>A smart diagnosis orchestrator for IT incidents, correlating CMDB "
+        f"context, log evidence, and historical incidents into a clear path to resolution.</p>"
+        f"</div>"
+        f'<nav class="landing-nav" aria-label="Main navigation">'
+        f'<a class="launch-button" href="?page=alerts" target="_top">'
+        f'<span>Launch Rootly</span>{_icon("arrow")}</a>'
+        f'<a href="?page=about" target="_top">'
+        f'<span>About Rootly</span>{_icon("arrow")}</a>'
+        f'<a href="?page=map" target="_top">'
+        f'<span>System Map</span>{_icon("arrow")}</a>'
+        f"</nav></div></main>",
         unsafe_allow_html=True,
     )
-    if st.button(
-        "Diagnosis",
-        key="sidebar-diagnosis",
-        type="primary" if view == "diagnosis" else "secondary",
-        use_container_width=True,
-    ):
-        st.session_state.view = "diagnosis"
-        st.rerun()
-    st.markdown('<div class="rootly-sidebar-view-description">Default incident triage workspace</div>', unsafe_allow_html=True)
-    if st.button(
-        "System map",
-        key="sidebar-system-map",
-        type="primary" if view == "system_map" else "secondary",
-        use_container_width=True,
-    ):
-        st.session_state.view = "system_map"
-        st.rerun()
-    st.markdown('<div class="rootly-sidebar-view-description">Architecture and live CMDB dependencies</div>', unsafe_allow_html=True)
 
-if view == "system_map":
-    render_system_map_view()
-    st.stop()
 
-selected = st.session_state.selected_alert
-
-# ── Header & alert card ──────────────────────────────────────────────────
-with st.container(key="triage-panel"):
+def _render_about() -> None:
+    _render_sidebar("about")
     st.markdown(
-        '<div class="rootly-triage-heading"><div class="rootly-eyebrow">Incident triage</div></div>',
+        '<main class="about-page"><div class="about-content">'
+        '<div class="logo">'
+        '<span class="logo-mark"><span></span><span></span><span></span></span>'
+        "<span>Rootly</span></div>"
+        '<span class="kicker">About the project</span>'
+        "<h1>Calm thinking for your most critical moments.</h1>"
+        '<div class="about-copy">'
+        "<p>Rootly is an AI-powered incident triage agent built for modern IT "
+        "operations teams. It connects fragmented operational signals, investigates "
+        "likely causes, and turns noisy alerts into clear, auditable decisions.</p>"
+        "<p>We are a small team of engineers, operators, and designers who believe "
+        "incident response should feel less like searching in the dark. Rootly works "
+        "alongside people—not around them—surfacing its reasoning and "
+        "keeping humans in control of high-impact actions.</p></div>"
+        '<div class="about-principles">'
+        "<div><span>01</span><strong>Evidence first</strong></div>"
+        "<div><span>02</span><strong>Human control</strong></div>"
+        "<div><span>03</span><strong>Built for clarity</strong></div>"
+        "</div></div></main>",
         unsafe_allow_html=True,
     )
-    alert_strip = st.container(key="alert-bar")
-    with alert_strip:
-        alert_cols = st.columns(len(alerts))
-        for index, (alert_id, item) in enumerate(alerts.items()):
-            with alert_cols[index]:
-                status = get_alert_status(alert_id)
-                button_type = "primary" if alert_id == selected else "secondary"
-                status_label = {
-                    "unresolved": "Unresolved",
-                    "resolved": "Resolved",
-                    "urgent": "Urgent",
-                }[status]
-                st.markdown(
-                    f'<span class="rootly-alert-dot {status}" title="{status_label}" '
-                    f'aria-label="{status_label}" role="img"></span>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(f"{alert_id}", key=f"alert-top-{alert_id}", type=button_type, use_container_width=True):
-                    st.session_state.selected_alert = alert_id
-                    st.rerun()
 
+
+def _render_map() -> None:
+    _render_sidebar("map")
+    alert_id = selected_alert or next(iter(alerts))
+    alert = alerts[alert_id]
     st.markdown(
-        '<div class="rootly-alert-legend">'
-        '<span class="rootly-alert-legend-item"><span class="rootly-alert-dot unresolved" '
-        'title="Unresolved" aria-label="Unresolved" role="img"></span><span>= unresolved</span></span>'
-        '<span class="rootly-alert-legend-item"><span class="rootly-alert-dot resolved" '
-        'title="Resolved" aria-label="Resolved" role="img"></span><span>= resolved</span></span>'
-        '<span class="rootly-alert-legend-item"><span class="rootly-alert-dot urgent" '
-        'title="Urgent" aria-label="Urgent" role="img"></span><span>= urgent</span></span>'
-        '</div>',
+        f'<div class="map-header" style="display:flex;min-height:132px;align-items:center;'
+        f'justify-content:space-between;padding:27px 0;border-bottom:1px solid #252525;'
+        f'width:100%;box-sizing:border-box">'
+        f'<div><span class="kicker">Live topology</span>'
+        f"<h1>System architecture</h1></div>"
+        f'<div class="map-meta">'
+        f"<span><i></i>{len(alerts)} alerts tracked</span>"
+        f"<span>Alert: {alert_id}</span></div>"
+        f"</div>",
         unsafe_allow_html=True,
     )
-    if selected:
-        with st.container(key="diagnosis-run"):
-            run_clicked = st.button("Run diagnosis", type="primary", width="stretch")
+    with st.container(key="map-content"):
+        if ARCHITECTURE_PATH.is_file():
+            st.image(str(ARCHITECTURE_PATH), use_container_width=True)
+            st.caption("Rootly system architecture: investigation orchestration, tools, and observability.")
+        st.caption("Live dependency map for the selected alert scenario, built from CMDB and same-day log evidence.")
+        render_system_map(alert)
 
-if not selected:
-    st.markdown('<div class="rootly-section"><div class="rootly-eyebrow">Workspace ready</div>', unsafe_allow_html=True)
-    st.title("Select an alert to begin.")
-    st.write("Choose an incident from the alert list to open its context, run the orchestrator, and review the diagnosis package.")
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()
 
-alert = alerts[selected]
+def _render_alerts() -> None:
+    _render_sidebar("alerts")
 
-st.markdown('<div class="rootly-eyebrow">Active investigation</div>', unsafe_allow_html=True)
-st.title(f"{alert.id} / {alert.service}")
-st.caption("Thought / Action / Observation over CMDB, logs, and historical incidents, with human approval for urgent escalations.")
+    # Workspace header
+    st.markdown(
+        '<div class="workspace-header" style="display:flex;min-height:132px;align-items:flex-end;'
+        'justify-content:space-between;padding:34px 0 27px;border-bottom:1px solid #252525;'
+        'width:100%;box-sizing:border-box">'
+        '<div><span class="kicker">Operations center</span>'
+        "<h1>Incident triage</h1></div>"
+        '<div class="agent-status"><span></span>Agent online</div>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
-with st.container(border=True):
-    st.subheader("Alert context")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Alert type", alert.alert_type.value)
-    c2.metric("Reported severity", alert.severity_reported.value)
-    c3.metric("Metric value", f"{alert.metric_value:g}")
-    c4.metric("Fired at (UTC)", alert.timestamp.strftime("%m-%d %H:%M"))
-    st.write(alert.description)
+    # Alert strip
+    cards_html = []
+    for aid, alert in alerts.items():
+        status = _get_alert_status(aid)
+        sel = " selected" if aid == selected_alert else ""
+        cards_html.append(
+            f'<a class="alert-card{sel}" href="?page=alerts&alert={aid}" target="_top">'
+            f'<span class="status-dot {status}"></span>'
+            f"<span><strong>{aid}</strong>"
+            f"<small>{alert.service}</small></span></a>"
+        )
+    st.markdown(
+        f'<div class="alert-strip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));'
+        f'gap:10px;padding:20px 0;border-bottom:1px solid #252525;'
+        f'width:100%;box-sizing:border-box" aria-label="Active alerts">'
+        f'{"".join(cards_html)}</div>',
+        unsafe_allow_html=True,
+    )
 
-# ── Run ──────────────────────────────────────────────────────────────────
-if run_clicked:
-    errors.pop(selected, None)
-    st.subheader("Orchestrator trace")
-    with st.status("Investigating…", expanded=True) as status:
-        current_step = {"n": 0}
+    # Workspace content
+    with st.container(key="workspace-content"):
+        if not selected_alert:
+            st.markdown(
+                '<div class="empty-state">'
+                f'<span>{_icon("spark", 20)}</span>'
+                "<p>Ready to investigate</p>"
+                "<small>Select an alert from the strip, then run the agent to "
+                "correlate services, logs, and incident history.</small>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            return
 
-        def on_event(event: dict) -> None:
-            if event["step"] != current_step["n"]:
-                current_step["n"] = event["step"]
-                st.markdown(f"#### Step {event['step']}")
-                status.update(label=f"Investigating… step {event['step']}")
-            render_event(event)
+        alert = alerts[selected_alert]
+        severity = alert.severity_reported.value
 
-        try:
-            diagnosis_result = run_diagnosis(alert, on_event=on_event)
-            results[selected] = diagnosis_result
-            escalation_decision = diagnosis_result.diagnosis.escalation_decision
-            if diagnosis_result.needs_approval or (
-                escalation_decision
-                and escalation_decision.value == "escalate_urgent_needs_approval"
-            ):
-                alert_statuses[selected] = "urgent"
-            elif escalation_decision and escalation_decision.value in {"auto_resolved", "escalate_normal"}:
-                alert_statuses[selected] = "resolved"
-            else:
-                alert_statuses[selected] = "unresolved"
-            status.update(label="Diagnosis complete", state="complete", expanded=False)
-        except DiagnosisError as exc:
-            errors[selected] = f"Diagnosis failed: {exc}"
-        if selected in errors:
-            status.update(label="Diagnosis failed", state="error", expanded=True)
-    st.rerun()
+        # Context panel
+        st.markdown(
+            f'<section class="panel context-panel">'
+            f'<div class="section-heading">'
+            f'<div><span class="kicker">Selected signal</span>'
+            f"<h2>Alert context</h2></div>"
+            f'<span class="severity-badge {severity}">{severity}</span></div>'
+            f'<div class="context-grid">'
+            f"<div><span>Alert type</span><strong>{alert.alert_type.value}</strong></div>"
+            f'<div><span>Reported severity</span><strong class="severity-value">'
+            f'<i class="severity-dot {severity}"></i>{severity}</strong></div>'
+            f"<div><span>Metric value</span><strong>{alert.metric_value:g}</strong></div>"
+            f"<div><span>Fired at · UTC</span>"
+            f'<strong>{alert.timestamp.strftime("%Y-%m-%d %H:%M")}</strong></div>'
+            f"</div></section>",
+            unsafe_allow_html=True,
+        )
 
-if selected in errors:
-    st.error(errors[selected])
+        # Run button
+        with st.container(key="run-btn"):
+            run_clicked = st.button(
+                "Run" if selected_alert not in results else "Run again",
+                key="run-diagnosis",
+            )
 
-result = results.get(selected)
+        # Execute diagnosis
+        if run_clicked:
+            errors.pop(selected_alert, None)
+            st.markdown(
+                '<div class="section-heading investigation-title">'
+                '<div><span class="kicker">Agent trace</span>'
+                "<h2>Orchestrator trace</h2></div></div>",
+                unsafe_allow_html=True,
+            )
+            with st.status("Investigating…", expanded=True) as status:
+                current_step = {"n": 0}
 
-if not result:
-    st.stop()
+                def on_event(event: dict) -> None:
+                    if event["step"] != current_step["n"]:
+                        current_step["n"] = event["step"]
+                        st.markdown(f"#### Step {event['step']}")
+                        status.update(label=f"Investigating… step {event['step']}")
+                    _render_event(event)
 
-d = result.diagnosis
-
-# Export stays above the operational detail so a completed package is immediately actionable.
-st.markdown('<div class="rootly-section">', unsafe_allow_html=True)
-st.subheader("Export your data")
-export_json, export_markdown, export_trace = st.columns(3)
-export_json.download_button("Diagnosis JSON", json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
-                            file_name=f"{selected}_diagnosis.json", mime="application/json", width="stretch")
-export_markdown.download_button("Diagnosis Markdown", to_markdown(result),
-                                 file_name=f"{selected}_diagnosis.md", mime="text/markdown", width="stretch")
-export_trace.download_button("Trace JSON", json.dumps(result.trace, indent=2, ensure_ascii=False),
-                              file_name=f"{selected}_trace.json", mime="application/json", width="stretch")
-st.markdown('</div>', unsafe_allow_html=True)
-
-# ── Human approval ───────────────────────────────────────────────────────
-if result.needs_approval:
-    request = result.approval_request or {}
-    with st.container(border=True):
-        st.subheader("Human approval required")
-        st.write(f"Urgent escalation of **{request.get('component')}** to **{request.get('owner_team')}**.")
-        st.warning(request.get("reason"))
-        note = st.text_input("Note for the audit trail (optional)", key=f"note-{result.thread_id}")
-        approve_col, downgrade_col = st.columns(2)
-        decision = None
-        if approve_col.button("Approve urgent escalation", type="primary", width="stretch"):
-            decision = HUMAN_APPROVE
-        if downgrade_col.button("Downgrade / not urgent", width="stretch"):
-            decision = HUMAN_DOWNGRADE
-        if decision:
-            try:
-                results[selected] = resume_diagnosis(result.thread_id, decision, note=note)
-            except DiagnosisError as exc:
-                errors[selected] = f"Resume failed: {exc}"
+                try:
+                    diagnosis_result = run_diagnosis(alert, on_event=on_event)
+                    results[selected_alert] = diagnosis_result
+                    esc = diagnosis_result.diagnosis.escalation_decision
+                    if diagnosis_result.needs_approval or (
+                        esc and esc.value == "escalate_urgent_needs_approval"
+                    ):
+                        alert_statuses[selected_alert] = "urgent"
+                    elif esc and esc.value in {"auto_resolved", "escalate_normal"}:
+                        alert_statuses[selected_alert] = "resolved"
+                    else:
+                        alert_statuses[selected_alert] = "unresolved"
+                    status.update(label="Diagnosis complete", state="complete", expanded=False)
+                except DiagnosisError as exc:
+                    errors[selected_alert] = f"Diagnosis failed: {exc}"
+                if selected_alert in errors:
+                    status.update(label="Diagnosis failed", state="error", expanded=True)
             st.rerun()
 
-# ── Trace ────────────────────────────────────────────────────────────────
-st.subheader("Orchestrator trace")
-by_step: dict[int, list[dict]] = {}
-for event in result.trace:
-    by_step.setdefault(event["step"], []).append(event)
-for step, events in by_step.items():
-    with st.expander(step_title(step, events), expanded=False):
-        for event in events:
-            render_event(event)
+        if selected_alert in errors:
+            st.error(errors[selected_alert])
 
-# ── Diagnosis package ────────────────────────────────────────────────────
-st.subheader("Diagnosis package")
-with st.container(border=True):
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Affected component", d.affected_component)
-    c2.metric("Assessed severity", d.severity_assessed.value)
-    c3.metric("Confidence", f"{d.confidence:.0%}")
-    st.progress(d.confidence)
+        result = results.get(selected_alert)
 
-    st.markdown("**Summary**")
-    st.write(d.summary)
-    st.markdown("**Root cause hypothesis**")
-    st.write(d.root_cause_hypothesis)
-    st.markdown("**Escalation recommendation**")
-    st.info(d.escalation_recommendation)
+        if not result:
+            st.markdown(
+                '<div class="empty-state">'
+                f'<span>{_icon("spark", 20)}</span>'
+                "<p>Ready to investigate</p>"
+                "<small>Run the triage agent to correlate services, logs, and "
+                "incident history.</small></div>",
+                unsafe_allow_html=True,
+            )
+            return
 
-    if d.escalation_decision:
-        decision_value = d.escalation_decision.value
-        st.markdown("**Escalation decision**")
-        st.markdown(f'<span style="color:{ESCALATION_COLOR[decision_value]}">{ESCALATION_LABEL[decision_value]}</span> · owner team `{d.owner_team}`', unsafe_allow_html=True)
-        st.caption(d.escalation_reason)
-        if d.human_decision:
-            st.write(f"Human {HUMAN_DECISION_LABEL.get(d.human_decision, d.human_decision)}"
-                     + (f" — _{d.human_decision_note}_" if d.human_decision_note else ""))
+        d = result.diagnosis
 
-    left, right = st.columns(2)
-    with left:
-        st.markdown("**Critical dependencies**")
-        st.write(" ".join(f"`{dep}`" for dep in d.critical_dependencies) or "—")
-        st.markdown("**Similar historical incidents**")
-        for incident_id in d.similar_incidents:
-            inc = incidents[incident_id]
-            st.markdown(f"- **{inc.id}** ({inc.duration_minutes} min) — {inc.description}")
-        if not d.similar_incidents:
-            st.write("—")
-    with right:
-        st.markdown("**Log evidence**")
-        st.code("\n".join(d.log_evidence), language="log")
+        # ── Investigation trace ─────────────────────────────────────
+        by_step: dict[int, list[dict]] = {}
+        for event in result.trace:
+            by_step.setdefault(event["step"], []).append(event)
 
-tab_json, tab_md = st.tabs(["JSON", "Markdown"])
-with tab_json:
-    st.json(diagnosis_dict(result))
-with tab_md:
-    st.markdown(to_markdown(result))
+        # Progress track
+        step_labels = []
+        for sn, evts in by_step.items():
+            routing = [e for e in evts if e["kind"] == "routing"]
+            actions = [e for e in evts if e["kind"] == "action"]
+            if routing:
+                step_labels.append(routing[0]["tool"])
+            elif actions:
+                step_labels.append(actions[0]["tool"])
+            else:
+                step_labels.append(f"Step {sn}")
 
-with st.expander("Evaluation ground truth (hidden from the agent)"):
-    st.write(f"Root-cause category: `{alert.root_cause_category.value if alert.root_cause_category else '—'}`")
-    st.write(f"Failure mode: `{alert.failure_mode.value if alert.failure_mode else '—'}`")
+        cols = len(step_labels) or 1
+        track_items = "".join(
+            f'<div class="progress-item">'
+            f'<span class="complete">{_icon("check", 13)}</span>'
+            f"<small>{lbl}</small></div>"
+            for lbl in step_labels
+        )
+        st.markdown(
+            f'<section class="investigation">'
+            f'<div class="section-heading investigation-title">'
+            f'<div><span class="kicker">Agent trace</span>'
+            f"<h2>Investigation steps</h2></div>"
+            f'<span class="complete-label">{_icon("check", 14)} Complete</span>'
+            f"</div>"
+            f'<div class="progress-track" style="grid-template-columns:repeat({cols},1fr)">'
+            f"{track_items}</div></section>",
+            unsafe_allow_html=True,
+        )
+
+        # Step list
+        for step_num, events in by_step.items():
+            with st.expander(_step_title(step_num, events), expanded=False):
+                for event in events:
+                    _render_event(event)
+
+        # ── Human approval ──────────────────────────────────────────
+        if result.needs_approval:
+            request = result.approval_request or {}
+            component = request.get("component", "unknown")
+            owner = request.get("owner_team", "unknown")
+            st.markdown(
+                f'<section class="approval-panel">'
+                f'<div class="approval-heading">'
+                f'<span class="warning-icon">{_icon("warning")}</span>'
+                f'<div><span class="kicker">Action gate</span>'
+                f"<h2>Human approval required</h2></div></div>"
+                f'<p class="approval-description">'
+                f"Escalate <strong>{component}</strong> to the "
+                f"<strong>{owner}</strong> on-call team as an urgent production incident.</p>"
+                f'<div class="warning-box">{_icon("info", 17)}'
+                f"<p>Urgent escalation pages two engineers and starts a coordinated "
+                f"restart. Approval is required because this action may briefly "
+                f"invalidate active sessions.</p></div></section>",
+                unsafe_allow_html=True,
+            )
+            note = st.text_input("Audit trail note (optional)", key=f"note-{result.thread_id}")
+            col_a, col_d = st.columns(2)
+            decision = None
+            with col_a:
+                with st.container(key="approve-btn"):
+                    if st.button("Approve urgent escalation", use_container_width=True):
+                        decision = HUMAN_APPROVE
+            with col_d:
+                with st.container(key="downgrade-btn"):
+                    if st.button("Downgrade, not urgent", use_container_width=True):
+                        decision = HUMAN_DOWNGRADE
+            if decision:
+                try:
+                    results[selected_alert] = resume_diagnosis(result.thread_id, decision, note=note)
+                except DiagnosisError as exc:
+                    errors[selected_alert] = f"Resume failed: {exc}"
+                st.rerun()
+
+        elif d.human_decision:
+            label = "approved" if d.human_decision == HUMAN_APPROVE else "downgraded"
+            st.markdown(
+                f'<section class="decision-complete">'
+                f'<span class="decision-icon">{_icon("check")}</span>'
+                f"<div><strong>Urgent escalation {label}</strong>"
+                f"<p>Decision recorded in the incident audit trail.</p></div></section>",
+                unsafe_allow_html=True,
+            )
+
+        # ── Export bar ──────────────────────────────────────────────
+        st.markdown(
+            '<div class="export-bar"><span>Export artifacts</span></div>',
+            unsafe_allow_html=True,
+        )
+        with st.container(key="export-wrap"):
+            ecol1, ecol2, ecol3 = st.columns(3)
+            ecol1.download_button(
+                "Diagnosis JSON",
+                json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
+                file_name=f"{selected_alert}_diagnosis.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+            ecol2.download_button(
+                "Diagnosis Markdown",
+                to_markdown(result),
+                file_name=f"{selected_alert}_diagnosis.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
+            ecol3.download_button(
+                "Trace JSON",
+                json.dumps(result.trace, indent=2, ensure_ascii=False),
+                file_name=f"{selected_alert}_trace.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+        # ── Diagnosis package ───────────────────────────────────────
+        st.markdown(
+            '<div class="section-heading" style="margin-top:40px">'
+            '<div><span class="kicker">Output</span>'
+            "<h2>Diagnosis package</h2></div></div>",
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Affected component", d.affected_component)
+            c2.metric("Assessed severity", d.severity_assessed.value)
+            c3.metric("Confidence", f"{d.confidence:.0%}")
+            st.progress(d.confidence)
+
+            st.markdown("**Summary**")
+            st.write(d.summary)
+            st.markdown("**Root cause hypothesis**")
+            st.write(d.root_cause_hypothesis)
+            st.markdown("**Escalation recommendation**")
+            st.info(d.escalation_recommendation)
+
+            if d.escalation_decision:
+                dv = d.escalation_decision.value
+                color = ESCALATION_COLOR[dv]
+                st.markdown("**Escalation decision**")
+                st.markdown(
+                    f'<span class="escalation-tag" style="color:{color};border:1px solid {color}">'
+                    f"{ESCALATION_LABEL[dv]}</span> &nbsp; owner team <code>{d.owner_team}</code>",
+                    unsafe_allow_html=True,
+                )
+                st.caption(d.escalation_reason)
+                if d.human_decision:
+                    st.write(
+                        f"Human {HUMAN_DECISION_LABEL.get(d.human_decision, d.human_decision)}"
+                        + (f" — _{d.human_decision_note}_" if d.human_decision_note else "")
+                    )
+
+            left, right = st.columns(2)
+            with left:
+                st.markdown("**Critical dependencies**")
+                st.write(" ".join(f"`{dep}`" for dep in d.critical_dependencies) or "—")
+                st.markdown("**Similar historical incidents**")
+                for inc_id in d.similar_incidents:
+                    inc = incidents[inc_id]
+                    st.markdown(f"- **{inc.id}** ({inc.duration_minutes} min) — {inc.description}")
+                if not d.similar_incidents:
+                    st.write("—")
+            with right:
+                st.markdown("**Log evidence**")
+                st.code("\n".join(d.log_evidence), language="log")
+
+        tab_json, tab_md = st.tabs(["JSON", "Markdown"])
+        with tab_json:
+            st.json(diagnosis_dict(result))
+        with tab_md:
+            st.markdown(to_markdown(result))
+
+        with st.expander("Evaluation ground truth (hidden from the agent)"):
+            st.write(f"Root-cause category: `{alert.root_cause_category.value if alert.root_cause_category else '—'}`")
+            st.write(f"Failure mode: `{alert.failure_mode.value if alert.failure_mode else '—'}`")
+
+
+# ── Page routing ────────────────────────────────────────────────────────────
+if page == "landing":
+    _render_landing()
+elif page == "about":
+    _render_about()
+elif page == "map":
+    _render_map()
+else:
+    _render_alerts()

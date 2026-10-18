@@ -1,0 +1,10 @@
+{
+  "description": "Delivers interactive material design ripple effects that expand from click points with smooth fade-out, enhancing user interface feedback and engagement.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

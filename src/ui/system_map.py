@@ -157,19 +157,46 @@ def render_system_map(alert: Alert) -> None:
 
     payload = json.dumps(data, separators=(",", ":"))
     document = f"""
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      * {{ box-sizing: border-box; }} body {{ margin:0; background:#050505; color:#f5f5f2; font-family:Helvetica,Arial,sans-serif; }}
-      .map-shell {{ border:1px solid #252525; background:#090909; padding:18px; overflow:hidden; }}
-      .map-header {{ display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:12px; }}
-      .eyebrow {{ color:#d9ff62; font:500 11px Consolas,monospace; letter-spacing:.12em; text-transform:uppercase; }}
-      .map-title {{ margin:5px 0 0; font-size:21px; font-weight:500; }} .map-subtitle {{ color:#8e8e8e; font-size:12px; line-height:1.45; max-width:550px; }}
-      .legend {{ color:#8e8e8e; font:11px Consolas,monospace; white-space:nowrap; }} .legend i {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }}
+      * {{ box-sizing: border-box; }}
+      body {{ margin:0; background:#050505; color:#f5f5f2; font-family:"Manrope",sans-serif; }}
+      .map-shell {{
+        border:1px solid #252525; border-radius:14px; background:#090909; padding:22px; overflow:hidden;
+        background-image:radial-gradient(#1a1a1a .7px, transparent .7px);
+        background-size:22px 22px;
+      }}
+      .map-shell::after {{
+        content:""; position:absolute; inset:0; pointer-events:none;
+        background:radial-gradient(circle at center, transparent 30%, #090909 100%);
+      }}
+      .map-shell {{ position:relative; }}
+      .map-header {{ display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:16px; position:relative; z-index:1; }}
+      .eyebrow {{ color:#d9ff62; font:500 .65rem "DM Mono",monospace; letter-spacing:.16em; text-transform:uppercase; }}
+      .map-title {{ margin:6px 0 0; font-size:22px; font-weight:500; letter-spacing:-.025em; }}
+      .map-subtitle {{ color:#8e8e8e; font-size:12px; line-height:1.5; max-width:550px; font-family:"Manrope",sans-serif; }}
+      .legend {{ color:#8e8e8e; font:11px "DM Mono",monospace; white-space:nowrap; padding:12px 14px; border:1px solid #252525; border-radius:10px; background:rgba(12,12,12,.92); backdrop-filter:blur(8px); }}
+      .legend i {{ display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; }}
       .legend .green {{ background:#d9ff62; }} .legend .gray {{ background:#555; }} .legend .line {{ width:20px; height:2px; border-radius:0; background:#d9ff62; vertical-align:middle; }}
-      svg {{ width:100%; min-width:920px; display:block; }} .edge line {{ stroke:#353535; stroke-width:3; }} .edge.active line {{ stroke:#d9ff62; stroke-width:4; stroke-dasharray:8 10; animation:flow 2.5s linear infinite; }}
-    .station circle {{ fill:#555; stroke:#050505; stroke-width:4; }} .station .station-core {{ fill:#555; stroke:none; }}
-      .station.active circle {{ fill:#d9ff62; }} .station.active .station-core,.station.root .station-core {{ fill:#050505; }} .station.root circle {{ fill:#ff6b6b; }}
-      .station text {{ fill:#f5f5f2; font-size:14px; }} .station .node-meta {{ fill:#777; font:10px Consolas,monospace; }} .station.dim {{ opacity:.35; }}
-      .station:hover circle {{ stroke:#fff; stroke-width:5; }} .tooltip {{ position:fixed; display:none; max-width:360px; padding:10px 12px; background:#171717; border:1px solid #454545; color:#f5f5f2; font:11px Consolas,monospace; line-height:1.5; pointer-events:none; z-index:2; }}
+      svg {{ width:100%; min-width:920px; display:block; position:relative; z-index:1; }}
+      .edge line {{ stroke:#393939; stroke-width:2; }}
+      .edge.active line {{ stroke:#d9ff62; stroke-width:3; stroke-dasharray:6 8; animation:flow 2.5s linear infinite; }}
+      .station circle {{ fill:#555; stroke:#0d0d0d; stroke-width:4; }}
+      .station .station-core {{ fill:#555; stroke:none; }}
+      .station.active circle {{ fill:#d9ff62; }}
+      .station.active .station-core,.station.root .station-core {{ fill:#050505; }}
+      .station.root circle {{ fill:#ff6b6b; box-shadow:0 0 20px rgba(255,107,107,.3); }}
+      .station text {{ fill:#f5f5f2; font:14px "Manrope",sans-serif; font-weight:500; }}
+      .station .node-meta {{ fill:#717171; font:10px "DM Mono",monospace; }}
+      .station.dim {{ opacity:.30; }}
+      .station:hover circle {{ stroke:#fff; stroke-width:5; }}
+      .tooltip {{
+        position:fixed; display:none; max-width:360px; padding:12px 14px;
+        background:rgba(12,12,12,.95); border:1px solid #353535; border-radius:10px;
+        color:#f5f5f2; font:11px "DM Mono",monospace; line-height:1.55;
+        pointer-events:none; z-index:10; backdrop-filter:blur(8px);
+        box-shadow:0 8px 24px rgba(0,0,0,.4);
+      }}
       @keyframes flow {{ to {{ stroke-dashoffset:-36; }} }}
     </style>
     <div class="map-shell"><div class="map-header"><div><div class="eyebrow">Live incident map / {html.escape(alert.id)}</div><div class="map-title">{html.escape(alert.service)} dependency transit</div><div class="map-subtitle">Stations are real CMDB components. The highlighted route follows the selected alert's connected dependency graph; animated lines indicate dependency flow.</div></div><div class="legend"><span><i class="green"></i>investigation chain</span><br><span><i class="gray"></i>unaffected</span><br><span><i class="line"></i>dependency</span></div></div><svg viewBox="0 0 {width} {height}" role="img" aria-label="CMDB dependency map">{''.join(svg_edges)}{''.join(svg_nodes)}</svg><div class="tooltip" id="tooltip"></div></div>
