@@ -294,7 +294,7 @@ code,pre {{ font-family:var(--mono); }}
 /* ── Workspace ──────────────────────────────────────────────────── */
 .kicker {{
     color:#777; font-family:"DM Mono",monospace;
-    font-size:11px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase;
+    font-size:10px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase;
 }}
 .workspace-header {{
     display:flex; min-height:132px; align-items:flex-end;
@@ -303,12 +303,12 @@ code,pre {{ font-family:var(--mono); }}
     width:100%; box-sizing:border-box;
 }}
 .workspace-header h1 {{
-    margin:7px 0 0; font-size:30px; font-weight:500; letter-spacing:-0.035em;
+    margin:7px 0 0; font-size:27px; font-weight:500; letter-spacing:-0.035em;
 }}
 .agent-status {{
     display:flex; align-items:center; gap:9px;
     padding:8px 11px; border:1px solid var(--border); border-radius:8px;
-    color:var(--muted); font-family:"DM Mono",monospace; font-size:11px;
+    color:var(--muted); font-family:"DM Mono",monospace; font-size:10px;
 }}
 .agent-status span {{
     width:6px; height:6px; border-radius:50%;
@@ -345,9 +345,9 @@ code,pre {{ font-family:var(--mono); }}
     display:flex; flex-direction:column; gap:5px; line-height:1.45;
 }}
 .alert-card strong {{
-    font-family:"DM Mono",monospace; font-size:13px; font-weight:500; line-height:1.4;
+    font-family:"DM Mono",monospace; font-size:11px; font-weight:500; line-height:1.4;
 }}
-.alert-card small {{ color:var(--muted); font-size:13px; line-height:1.4; margin-top:2px; }}
+.alert-card small {{ color:var(--muted); font-size:12px; line-height:1.4; margin-top:2px; }}
 
 /* ── Context panel ──────────────────────────────────────────────── */
 .panel {{
@@ -358,11 +358,11 @@ code,pre {{ font-family:var(--mono); }}
     display:flex; align-items:center; justify-content:space-between;
 }}
 .section-heading h2, .approval-heading h2 {{
-    margin:5px 0 0; font-size:20px; font-weight:500; letter-spacing:-0.025em;
+    margin:5px 0 0; font-size:18px; font-weight:500; letter-spacing:-0.025em;
 }}
 .severity-badge {{
     padding:6px 9px; border:1px solid currentColor; border-radius:999px;
-    font-family:"DM Mono",monospace; font-size:10px; text-transform:uppercase;
+    font-family:"DM Mono",monospace; font-size:9px; text-transform:uppercase;
     background:transparent!important;
 }}
 .severity-badge.low    {{ color:var(--low); }}
@@ -380,11 +380,11 @@ code,pre {{ font-family:var(--mono); }}
 .context-grid > div:last-child {{ border-right:0; }}
 .context-grid span {{
     color:#717171; font-family:"DM Mono",monospace;
-    font-size:10px; letter-spacing:0.04em; text-transform:uppercase;
+    font-size:9px; letter-spacing:0.04em; text-transform:uppercase;
 }}
 .context-grid strong {{
     overflow:hidden; font-family:"DM Mono",monospace;
-    font-size:13px; font-weight:500; text-overflow:ellipsis; white-space:nowrap;
+    font-size:11px; font-weight:500; text-overflow:ellipsis; white-space:nowrap;
 }}
 .severity-value {{
     display:flex; align-items:center; gap:8px; text-transform:capitalize;
@@ -419,8 +419,8 @@ code,pre {{ font-family:var(--mono); }}
     border:1px solid var(--border); border-radius:50%;
     color:var(--accent); background:var(--panel);
 }}
-.empty-state p {{ margin:15px 0 5px; color:#ccc; font-size:15px; }}
-.empty-state small {{ max-width:380px; font-size:13px; line-height:1.6; }}
+.empty-state p {{ margin:15px 0 5px; color:#ccc; font-size:13px; }}
+.empty-state small {{ max-width:380px; font-size:11px; line-height:1.6; }}
 
 /* ── Investigation ──────────────────────────────────────────────── */
 .investigation {{ margin-top:48px; }}
@@ -463,10 +463,10 @@ code,pre {{ font-family:var(--mono); }}
     font-size:9px; letter-spacing:0.08em; text-transform:uppercase;
 }}
 .trace-block em {{ color:#626262; font-style:normal; }}
-.trace-block p {{ margin:0; color:#b6b6b3; font-size:14px; line-height:1.65; }}
+.trace-block p {{ margin:0; color:#b6b6b3; font-size:12px; line-height:1.65; }}
 .trace-block code {{
     color:#b9d96c; font-family:"DM Mono",monospace;
-    font-size:12px; line-height:1.6; overflow-wrap:anywhere;
+    font-size:10px; line-height:1.6; overflow-wrap:anywhere;
 }}
 .trace-block.thought {{
     border-color:rgb(217 255 98 / 14%); background:rgb(217 255 98 / 3%);
@@ -486,7 +486,7 @@ code,pre {{ font-family:var(--mono); }}
     border-radius:9px; color:var(--critical); background:rgb(255 107 107 / 10%);
 }}
 .approval-description {{
-    margin:20px 0 16px; color:#bcbcb8; font-size:15px; line-height:1.7;
+    margin:20px 0 16px; color:#bcbcb8; font-size:13px; line-height:1.7;
 }}
 .approval-description strong {{ color:var(--text); font-weight:600; }}
 .warning-box {{
@@ -494,7 +494,7 @@ code,pre {{ font-family:var(--mono); }}
     padding:13px 14px; border:1px solid rgb(255 107 107 / 18%);
     border-radius:8px; color:#dd8585; background:rgb(255 107 107 / 5%);
 }}
-.warning-box p {{ margin:0; font-size:13px; line-height:1.6; }}
+.warning-box p {{ margin:0; font-size:11px; line-height:1.6; }}
 
 /* ── Decision complete ──────────────────────────────────────────── */
 .decision-complete {{
@@ -506,8 +506,8 @@ code,pre {{ font-family:var(--mono); }}
     display:grid; width:34px; height:34px; place-items:center;
     border-radius:50%; color:#111; background:var(--low);
 }}
-.decision-complete strong {{ font-size:15px; }}
-.decision-complete p {{ margin:4px 0 0; color:var(--muted); font-size:13px; }}
+.decision-complete strong {{ font-size:13px; }}
+.decision-complete p {{ margin:4px 0 0; color:var(--muted); font-size:11px; }}
 
 /* ── Export bar ──────────────────────────────────────────────────── */
 .export-bar {{
@@ -540,7 +540,7 @@ code,pre {{ font-family:var(--mono); }}
     display:grid; grid-template-columns:repeat(2,1fr); gap:48px;
     padding-top:30px; border-top:1px solid var(--border);
 }}
-.about-copy p {{ margin:0; color:#9a9a97; font-size:16px; line-height:1.9; }}
+.about-copy p {{ margin:0; color:#9a9a97; font-size:14px; line-height:1.9; }}
 .about-principles {{
     display:grid; margin-top:55px; grid-template-columns:repeat(3,1fr);
     border:1px solid var(--border); border-radius:12px; overflow:hidden;
@@ -554,7 +554,7 @@ code,pre {{ font-family:var(--mono); }}
 .about-principles span {{
     color:var(--accent); font-family:"DM Mono",monospace; font-size:9px;
 }}
-.about-principles strong {{ font-size:15px; font-weight:500; }}
+.about-principles strong {{ font-size:13px; font-weight:500; }}
 
 /* ── Map page ───────────────────────────────────────────────────── */
 .map-header {{
@@ -564,11 +564,11 @@ code,pre {{ font-family:var(--mono); }}
     width:100%; box-sizing:border-box;
 }}
 .map-header h1 {{
-    margin:7px 0 0; font-size:30px; font-weight:500; letter-spacing:-0.035em;
+    margin:7px 0 0; font-size:27px; font-weight:500; letter-spacing:-0.035em;
 }}
 .map-meta {{
     display:flex; gap:20px; color:#727272;
-    font-family:"DM Mono",monospace; font-size:10px;
+    font-family:"DM Mono",monospace; font-size:9px;
 }}
 .map-meta span {{ display:flex; align-items:center; gap:7px; }}
 .map-meta i {{
@@ -583,30 +583,12 @@ code,pre {{ font-family:var(--mono); }}
     padding:40px 0 64px!important;
 }}
 .st-key-workspace-content [data-testid="stVerticalBlock"] {{ gap:1rem!important; }}
+.st-key-map-content {{
+    width:100%!important;
+    box-sizing:border-box!important;
+    padding:32px 46px 64px!important;
+}}
 .st-key-map-content [data-testid="stVerticalBlock"] {{ gap:1rem!important; }}
-
-/* ── Map alert-strip (Streamlit buttons styled as cards) ────────── */
-.st-key-map-alert-strip {{
-    padding:12px 46px; border-bottom:1px solid var(--border);
-    width:100%; box-sizing:border-box;
-}}
-.st-key-map-alert-strip [data-testid="stHorizontalBlock"] {{ gap:10px!important; }}
-.st-key-map-alert-strip .stButton button {{
-    width:100%!important; min-height:52px!important;
-    padding:12px 15px!important;
-    border:1px solid var(--border)!important; border-radius:11px!important;
-    background:var(--panel)!important; color:var(--text)!important;
-    font-family:"DM Mono",monospace!important; font-size:12px!important;
-    font-weight:500!important; text-align:left!important;
-    transition:160ms ease!important; white-space:nowrap!important;
-}}
-.st-key-map-alert-strip .stButton button:hover {{
-    background:var(--elevated)!important;
-}}
-.st-key-map-alert-strip .stButton button p {{
-    color:var(--text)!important; font-family:"DM Mono",monospace!important;
-    font-size:12px!important;
-}}
 
 /* ── Streamlit component overrides ──────────────────────────────── */
 .st-key-run-btn .stButton button {{
@@ -721,6 +703,8 @@ code,pre {{ font-family:var(--mono); }}
     .workspace-header {{ min-height:110px; padding:25px 20px 20px; }}
     .alert-strip {{ padding:15px 20px; }}
     .st-key-workspace-content {{ width:calc(100% - 40px)!important; padding-top:28px!important; }}
+    .map-header {{ min-height:110px; padding:25px 20px 20px; }}
+    .st-key-map-content {{ padding:24px 20px 48px!important; }}
     .context-grid {{ grid-template-columns:1fr; }}
     .context-grid > div {{ border-right:0; border-bottom:1px solid #202020; }}
     .context-grid > div:last-child {{ border-bottom:0; }}
@@ -908,24 +892,6 @@ def _render_map() -> None:
             f"<span><i></i>{len(alerts)} alerts tracked</span>"
             f"<span>Alert: {alert_id}</span></div>"
             f"</div>",
-            unsafe_allow_html=True,
-        )
-
-        # Alert strip (Streamlit buttons → soft rerun, no hard refresh)
-        with st.container(key="map-alert-strip"):
-            map_cols = st.columns(len(alerts))
-            for i, (aid, a) in enumerate(alerts.items()):
-                with map_cols[i]:
-                    with st.container(key=f"map-sel-{aid}"):
-                        if st.button(f"{aid} · {a.service}", key=f"map-btn-{aid}", use_container_width=True):
-                            st.query_params["alert"] = aid
-                            st.query_params["page"] = "map"
-                            st.rerun()
-        # Highlight selected alert card
-        st.markdown(
-            f"<style>.st-key-map-sel-{alert_id} .stButton button"
-            f"{{border-color:var(--accent)!important;"
-            f"box-shadow:inset 0 0 0 1px rgb(217 255 98 / 12%)!important;}}</style>",
             unsafe_allow_html=True,
         )
 
