@@ -590,12 +590,16 @@ code,pre {{ font-family:var(--mono); }}
 }}
 .st-key-map-content [data-testid="stVerticalBlock"] {{ gap:1rem!important; }}
 
-/* ── Map alert-strip (Streamlit buttons styled as cards) ────────── */
-/* st.columns() divides the row width evenly and shrinks every column to
+/* ── Map alert-strip (native button for clicks, HTML card for looks) ──
+   st.columns() divides the row width evenly and shrinks every column to
    fit, with no horizontal scroll — that's what was cramming all 10 alert
    buttons into the container width. To match the <a>-card strip on the
-   alerts page (fixed-width cards + horizontal scrollbar), the horizontal
-   block itself has to scroll and its columns must stop shrinking. */
+   alerts page (fixed-width cards, two-line id/service text, horizontal
+   scrollbar) the horizontal block has to scroll and its columns must
+   stop shrinking. A plain st.button can't render the bold-id/muted-
+   service two-line markup, so the real button is kept but made
+   invisible and stretched over an HTML .map-alert-visual card that
+   supplies the actual look, identical to .alert-card on the alerts page. */
 .st-key-map-alert-strip {{
     padding:12px 46px; border-bottom:1px solid var(--border);
     width:100%; box-sizing:border-box;
@@ -607,22 +611,38 @@ code,pre {{ font-family:var(--mono); }}
 .st-key-map-alert-strip [data-testid="stColumn"] {{
     flex:none!important; width:194px!important; min-width:194px!important;
 }}
+.st-key-map-alert-strip [class*="st-key-map-sel-"] {{ position:relative!important; }}
+.map-alert-visual {{
+    display:flex; align-items:flex-start; gap:12px;
+    padding:15px; border:1px solid var(--border); border-radius:11px;
+    background:var(--panel); transition:160ms ease; pointer-events:none;
+}}
+.map-alert-visual.selected {{
+    border-color:var(--accent);
+    box-shadow:inset 0 0 0 1px rgb(217 255 98 / 12%);
+}}
+.map-alert-visual > span:last-child {{
+    display:flex; flex-direction:column; gap:5px; line-height:1.45; min-width:0;
+}}
+.map-alert-visual strong {{
+    font-family:"DM Mono",monospace; font-size:11px; font-weight:500; line-height:1.4;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}}
+.map-alert-visual small {{
+    color:var(--muted); font-size:12px; line-height:1.4; margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}}
+.st-key-map-alert-strip [class*="st-key-map-sel-"] .stButton {{
+    position:absolute!important; inset:0!important; z-index:2;
+}}
 .st-key-map-alert-strip .stButton button {{
-    width:100%!important; min-height:52px!important;
-    padding:12px 15px!important;
-    border:1px solid var(--border)!important; border-radius:11px!important;
-    background:var(--panel)!important; color:var(--text)!important;
-    font-family:"DM Mono",monospace!important; font-size:12px!important;
-    font-weight:500!important; text-align:left!important;
-    transition:160ms ease!important; white-space:nowrap!important;
-    overflow:hidden!important; text-overflow:ellipsis!important;
+    position:absolute!important; inset:0!important;
+    width:100%!important; height:100%!important; min-height:0!important;
+    padding:0!important; margin:0!important; border:none!important;
+    background:transparent!important; opacity:0!important;
 }}
-.st-key-map-alert-strip .stButton button:hover {{
-    background:var(--elevated)!important;
-}}
-.st-key-map-alert-strip .stButton button p {{
-    color:var(--text)!important; font-family:"DM Mono",monospace!important;
-    font-size:12px!important; overflow:hidden!important; text-overflow:ellipsis!important;
+.st-key-map-alert-strip [class*="st-key-map-sel-"]:hover .map-alert-visual {{
+    background:var(--elevated);
 }}
 
 /* ── Streamlit component overrides ──────────────────────────────── */
@@ -931,23 +951,30 @@ def _render_map() -> None:
             unsafe_allow_html=True,
         )
 
-        # Alert strip – Streamlit buttons (soft rerun, no hard refresh)
+        # Alert strip – same two-line card look as the alerts page strip
+        # (status dot + bold id + muted service name, stacked). st.button
+        # labels can't render that markup, so a real Streamlit button
+        # still handles the click (kept functional but invisible, laid
+        # over the card via absolute positioning) while an HTML div drawn
+        # underneath supplies the actual card visuals.
         with st.container(key="map-alert-strip"):
             cols = st.columns(len(alerts))
             for i, (aid, a) in enumerate(alerts.items()):
                 with cols[i]:
                     with st.container(key=f"map-sel-{aid}"):
-                        if st.button(f"{aid} · {a.service}", key=f"map-btn-{aid}", use_container_width=True):
+                        status = _get_alert_status(aid)
+                        sel = " selected" if aid == alert_id else ""
+                        st.markdown(
+                            f'<div class="map-alert-visual{sel}">'
+                            f'<span class="status-dot {status}"></span>'
+                            f'<span><strong>{aid}</strong>'
+                            f'<small>{a.service}</small></span></div>',
+                            unsafe_allow_html=True,
+                        )
+                        if st.button(" ", key=f"map-btn-{aid}", use_container_width=True):
                             st.query_params["alert"] = aid
                             st.query_params["page"] = "map"
                             st.rerun()
-        # Highlight the currently selected alert card
-        st.markdown(
-            f"<style>.st-key-map-sel-{alert_id} .stButton button"
-            f"{{border-color:var(--accent)!important;"
-            f"box-shadow:inset 0 0 0 1px rgb(217 255 98 / 12%)!important;}}</style>",
-            unsafe_allow_html=True,
-        )
 
         with st.container(key="map-content"):
             render_system_map(alert)
