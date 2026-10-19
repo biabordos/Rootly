@@ -142,7 +142,7 @@ code,pre {{ font-family:var(--mono); }}
 /* ── Logo ───────────────────────────────────────────────────────── */
 .logo {{
     display:flex; align-items:center; gap:14px;
-    color:var(--text); font-size:31px; font-weight:600; letter-spacing:-0.05em;
+    color:var(--text); font-size:36px; font-weight:600; letter-spacing:-0.05em;
 }}
 .logo-mark {{
     position:relative; display:block; width:31px; height:31px; transform:rotate(-8deg);
@@ -199,14 +199,14 @@ code,pre {{ font-family:var(--mono); }}
 .hero-label {{
     display:block; margin-bottom:clamp(32px,8vh,86px);
     color:var(--accent); font-family:"DM Mono",monospace;
-    font-size:10px; font-weight:500; letter-spacing:0.19em; text-transform:uppercase;
+    font-size:12px; font-weight:500; letter-spacing:0.19em; text-transform:uppercase;
 }}
 .hero-title-row {{
     display:flex; align-items:flex-start; gap:clamp(16px,2vw,32px);
 }}
 .hero-title-row h1 {{
     margin:0; color:#fafafa;
-    font-size:clamp(120px,15vw,220px); font-weight:700;
+    font-size:clamp(138px,17.25vw,253px); font-weight:700;
     letter-spacing:-0.085em; line-height:0.8;
 }}
 .hero-leaf {{
@@ -223,7 +223,7 @@ code,pre {{ font-family:var(--mono); }}
 .hero-leaf span:last-child  {{ bottom:12%; left:2%; transform:rotate(30deg); }}
 .hero-title-row + p {{
     max-width:760px; margin:clamp(36px,6vh,66px) 0 0;
-    color:#a0a0a0; font-size:clamp(15px,1.4vw,20px); line-height:1.65;
+    color:#a0a0a0; font-size:clamp(17px,1.61vw,23px); line-height:1.65;
 }}
 
 /* landing nav – uses <a> tags */
@@ -236,7 +236,7 @@ code,pre {{ font-family:var(--mono); }}
     display:flex; width:100%; align-items:center; justify-content:space-between;
     min-height:66px; padding:0 24px;
     border:1px solid #fafafa; border-radius:0; background:transparent;
-    cursor:pointer; font-size:16px; font-weight:500; transition:180ms ease;
+    cursor:pointer; font-size:18px; font-weight:500; transition:180ms ease;
 }}
 .landing-nav a:hover {{
     border-color:var(--accent); color:var(--accent);
@@ -280,7 +280,7 @@ code,pre {{ font-family:var(--mono); }}
     color:#777; background:transparent; cursor:pointer;
 }}
 .side-nav nav a span {{
-    font-family:"DM Mono",monospace; font-size:9px;
+    font-family:"DM Mono",monospace; font-size:10px;
 }}
 .side-nav nav a:hover,
 .side-nav nav a.active {{
@@ -294,7 +294,7 @@ code,pre {{ font-family:var(--mono); }}
 /* ── Workspace ──────────────────────────────────────────────────── */
 .kicker {{
     color:#777; font-family:"DM Mono",monospace;
-    font-size:10px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase;
+    font-size:12px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase;
 }}
 .workspace-header {{
     display:flex; min-height:132px; align-items:flex-end;
@@ -303,12 +303,12 @@ code,pre {{ font-family:var(--mono); }}
     width:100%; box-sizing:border-box;
 }}
 .workspace-header h1 {{
-    margin:7px 0 0; font-size:27px; font-weight:500; letter-spacing:-0.035em;
+    margin:7px 0 0; font-size:31px; font-weight:500; letter-spacing:-0.035em;
 }}
 .agent-status {{
     display:flex; align-items:center; gap:9px;
     padding:8px 11px; border:1px solid var(--border); border-radius:8px;
-    color:var(--muted); font-family:"DM Mono",monospace; font-size:10px;
+    color:var(--muted); font-family:"DM Mono",monospace; font-size:12px;
 }}
 .agent-status span {{
     width:6px; height:6px; border-radius:50%;
@@ -345,9 +345,9 @@ code,pre {{ font-family:var(--mono); }}
     display:flex; flex-direction:column; gap:5px; line-height:1.45;
 }}
 .alert-card strong {{
-    font-family:"DM Mono",monospace; font-size:11px; font-weight:500; line-height:1.4;
+    font-family:"DM Mono",monospace; font-size:13px; font-weight:500; line-height:1.4;
 }}
-.alert-card small {{ color:var(--muted); font-size:12px; line-height:1.4; margin-top:2px; }}
+.alert-card small {{ color:var(--muted); font-size:14px; line-height:1.4; margin-top:2px; }}
 
 /* ── Context panel ──────────────────────────────────────────────── */
 .panel {{
@@ -358,11 +358,11 @@ code,pre {{ font-family:var(--mono); }}
     display:flex; align-items:center; justify-content:space-between;
 }}
 .section-heading h2, .approval-heading h2 {{
-    margin:5px 0 0; font-size:18px; font-weight:500; letter-spacing:-0.025em;
+    margin:5px 0 0; font-size:21px; font-weight:500; letter-spacing:-0.025em;
 }}
 .severity-badge {{
     padding:6px 9px; border:1px solid currentColor; border-radius:999px;
-    font-family:"DM Mono",monospace; font-size:9px; text-transform:uppercase;
+    font-family:"DM Mono",monospace; font-size:10px; text-transform:uppercase;
     background:transparent!important;
 }}
 .severity-badge.low    {{ color:var(--low); }}
@@ -380,11 +380,11 @@ code,pre {{ font-family:var(--mono); }}
 .context-grid > div:last-child {{ border-right:0; }}
 .context-grid span {{
     color:#717171; font-family:"DM Mono",monospace;
-    font-size:9px; letter-spacing:0.04em; text-transform:uppercase;
+    font-size:10px; letter-spacing:0.04em; text-transform:uppercase;
 }}
 .context-grid strong {{
     overflow:hidden; font-family:"DM Mono",monospace;
-    font-size:11px; font-weight:500; text-overflow:ellipsis; white-space:nowrap;
+    font-size:13px; font-weight:500; text-overflow:ellipsis; white-space:nowrap;
 }}
 .severity-value {{
     display:flex; align-items:center; gap:8px; text-transform:capitalize;
@@ -403,7 +403,7 @@ code,pre {{ font-family:var(--mono); }}
     gap:8px; padding:0 17px; margin-top:14px;
     border:1px solid var(--accent); border-radius:8px;
     color:#111; background:var(--accent);
-    cursor:pointer; font-size:12px; font-weight:700; transition:150ms ease;
+    cursor:pointer; font-size:14px; font-weight:700; transition:150ms ease;
 }}
 .run-button:hover {{
     background:#e4ff8e; box-shadow:0 0 22px rgb(217 255 98 / 15%);
@@ -419,15 +419,15 @@ code,pre {{ font-family:var(--mono); }}
     border:1px solid var(--border); border-radius:50%;
     color:var(--accent); background:var(--panel);
 }}
-.empty-state p {{ margin:15px 0 5px; color:#ccc; font-size:13px; }}
-.empty-state small {{ max-width:380px; font-size:11px; line-height:1.6; }}
+.empty-state p {{ margin:15px 0 5px; color:#ccc; font-size:15px; }}
+.empty-state small {{ max-width:380px; font-size:13px; line-height:1.6; }}
 
 /* ── Investigation ──────────────────────────────────────────────── */
 .investigation {{ margin-top:48px; }}
 .investigation-title {{ margin-bottom:25px; }}
 .complete-label {{
     display:flex; align-items:center; gap:6px;
-    color:var(--low); font-family:"DM Mono",monospace; font-size:10px;
+    color:var(--low); font-family:"DM Mono",monospace; font-size:12px;
 }}
 .progress-track {{
     display:grid; margin-bottom:25px;
@@ -445,12 +445,12 @@ code,pre {{ font-family:var(--mono); }}
     position:relative; z-index:1; display:grid;
     width:27px; height:27px; place-items:center;
     border:1px solid #444; border-radius:50%; background:var(--bg);
-    font-family:"DM Mono",monospace; font-size:10px;
+    font-family:"DM Mono",monospace; font-size:12px;
 }}
 .progress-item > span.complete {{
     border-color:var(--accent); color:#111; background:var(--accent);
 }}
-.progress-item small {{ font-family:"DM Mono",monospace; font-size:9px; }}
+.progress-item small {{ font-family:"DM Mono",monospace; font-size:10px; }}
 
 /* ── Trace blocks ───────────────────────────────────────────────── */
 .trace-block {{
@@ -460,13 +460,13 @@ code,pre {{ font-family:var(--mono); }}
 .trace-block > span {{
     display:flex; justify-content:space-between; margin-bottom:7px;
     color:#696969; font-family:"DM Mono",monospace;
-    font-size:9px; letter-spacing:0.08em; text-transform:uppercase;
+    font-size:10px; letter-spacing:0.08em; text-transform:uppercase;
 }}
 .trace-block em {{ color:#626262; font-style:normal; }}
-.trace-block p {{ margin:0; color:#b6b6b3; font-size:12px; line-height:1.65; }}
+.trace-block p {{ margin:0; color:#b6b6b3; font-size:14px; line-height:1.65; }}
 .trace-block code {{
     color:#b9d96c; font-family:"DM Mono",monospace;
-    font-size:10px; line-height:1.6; overflow-wrap:anywhere;
+    font-size:12px; line-height:1.6; overflow-wrap:anywhere;
 }}
 .trace-block.thought {{
     border-color:rgb(217 255 98 / 14%); background:rgb(217 255 98 / 3%);
@@ -486,7 +486,7 @@ code,pre {{ font-family:var(--mono); }}
     border-radius:9px; color:var(--critical); background:rgb(255 107 107 / 10%);
 }}
 .approval-description {{
-    margin:20px 0 16px; color:#bcbcb8; font-size:13px; line-height:1.7;
+    margin:20px 0 16px; color:#bcbcb8; font-size:15px; line-height:1.7;
 }}
 .approval-description strong {{ color:var(--text); font-weight:600; }}
 .warning-box {{
@@ -494,7 +494,7 @@ code,pre {{ font-family:var(--mono); }}
     padding:13px 14px; border:1px solid rgb(255 107 107 / 18%);
     border-radius:8px; color:#dd8585; background:rgb(255 107 107 / 5%);
 }}
-.warning-box p {{ margin:0; font-size:11px; line-height:1.6; }}
+.warning-box p {{ margin:0; font-size:13px; line-height:1.6; }}
 
 /* ── Decision complete ──────────────────────────────────────────── */
 .decision-complete {{
@@ -506,8 +506,8 @@ code,pre {{ font-family:var(--mono); }}
     display:grid; width:34px; height:34px; place-items:center;
     border-radius:50%; color:#111; background:var(--low);
 }}
-.decision-complete strong {{ font-size:13px; }}
-.decision-complete p {{ margin:4px 0 0; color:var(--muted); font-size:11px; }}
+.decision-complete strong {{ font-size:15px; }}
+.decision-complete p {{ margin:4px 0 0; color:var(--muted); font-size:13px; }}
 
 /* ── Export bar ──────────────────────────────────────────────────── */
 .export-bar {{
@@ -517,7 +517,7 @@ code,pre {{ font-family:var(--mono); }}
 }}
 .export-bar > span {{
     color:#696969; font-family:"DM Mono",monospace;
-    font-size:9px; letter-spacing:0.08em; text-transform:uppercase;
+    font-size:10px; letter-spacing:0.08em; text-transform:uppercase;
 }}
 
 /* ── About page ─────────────────────────────────────────────────── */
@@ -533,14 +533,14 @@ code,pre {{ font-family:var(--mono); }}
 .about-content > .logo {{ margin-bottom:90px; }}
 .about-content h1 {{
     max-width:720px; margin:18px 0 43px;
-    font-size:clamp(38px,6vw,66px); font-weight:500;
+    font-size:clamp(44px,6.9vw,76px); font-weight:500;
     letter-spacing:-0.06em; line-height:1.08;
 }}
 .about-copy {{
     display:grid; grid-template-columns:repeat(2,1fr); gap:48px;
     padding-top:30px; border-top:1px solid var(--border);
 }}
-.about-copy p {{ margin:0; color:#9a9a97; font-size:14px; line-height:1.9; }}
+.about-copy p {{ margin:0; color:#9a9a97; font-size:16px; line-height:1.9; }}
 .about-principles {{
     display:grid; margin-top:55px; grid-template-columns:repeat(3,1fr);
     border:1px solid var(--border); border-radius:12px; overflow:hidden;
@@ -552,9 +552,9 @@ code,pre {{ font-family:var(--mono); }}
 }}
 .about-principles div:last-child {{ border-right:0; }}
 .about-principles span {{
-    color:var(--accent); font-family:"DM Mono",monospace; font-size:9px;
+    color:var(--accent); font-family:"DM Mono",monospace; font-size:10px;
 }}
-.about-principles strong {{ font-size:13px; font-weight:500; }}
+.about-principles strong {{ font-size:15px; font-weight:500; }}
 
 /* ── Map page ───────────────────────────────────────────────────── */
 .map-header {{
@@ -564,11 +564,11 @@ code,pre {{ font-family:var(--mono); }}
     width:100%; box-sizing:border-box;
 }}
 .map-header h1 {{
-    margin:7px 0 0; font-size:27px; font-weight:500; letter-spacing:-0.035em;
+    margin:7px 0 0; font-size:31px; font-weight:500; letter-spacing:-0.035em;
 }}
 .map-meta {{
     display:flex; gap:20px; color:#727272;
-    font-family:"DM Mono",monospace; font-size:9px;
+    font-family:"DM Mono",monospace; font-size:10px;
 }}
 .map-meta span {{ display:flex; align-items:center; gap:7px; }}
 .map-meta i {{
@@ -590,59 +590,27 @@ code,pre {{ font-family:var(--mono); }}
 }}
 .st-key-map-content [data-testid="stVerticalBlock"] {{ gap:1rem!important; }}
 
-/* ── Map alert-strip (native button for clicks, HTML card for looks) ──
-   st.columns() divides the row width evenly and shrinks every column to
-   fit, with no horizontal scroll — that's what was cramming all 10 alert
-   buttons into the container width. To match the <a>-card strip on the
-   alerts page (fixed-width cards, two-line id/service text, horizontal
-   scrollbar) the horizontal block has to scroll and its columns must
-   stop shrinking. A plain st.button can't render the bold-id/muted-
-   service two-line markup, so the real button is kept but made
-   invisible and stretched over an HTML .map-alert-visual card that
-   supplies the actual look, identical to .alert-card on the alerts page. */
+/* ── Map alert-strip (Streamlit buttons styled as cards) ────────── */
 .st-key-map-alert-strip {{
     padding:12px 46px; border-bottom:1px solid var(--border);
     width:100%; box-sizing:border-box;
-    overflow-x:auto; overflow-y:hidden;
 }}
-.st-key-map-alert-strip [data-testid="stHorizontalBlock"] {{
-    gap:10px!important; flex-wrap:nowrap!important; width:max-content!important;
-}}
-.st-key-map-alert-strip [data-testid="stColumn"] {{
-    flex:none!important; width:194px!important; min-width:194px!important;
-}}
-.st-key-map-alert-strip [class*="st-key-map-sel-"] {{ position:relative!important; }}
-.map-alert-visual {{
-    display:flex; align-items:flex-start; gap:12px;
-    padding:15px; border:1px solid var(--border); border-radius:11px;
-    background:var(--panel); transition:160ms ease; pointer-events:none;
-}}
-.map-alert-visual.selected {{
-    border-color:var(--accent);
-    box-shadow:inset 0 0 0 1px rgb(217 255 98 / 12%);
-}}
-.map-alert-visual > span:last-child {{
-    display:flex; flex-direction:column; gap:5px; line-height:1.45; min-width:0;
-}}
-.map-alert-visual strong {{
-    font-family:"DM Mono",monospace; font-size:11px; font-weight:500; line-height:1.4;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}}
-.map-alert-visual small {{
-    color:var(--muted); font-size:12px; line-height:1.4; margin-top:2px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}}
-.st-key-map-alert-strip [class*="st-key-map-sel-"] .stButton {{
-    position:absolute!important; inset:0!important; z-index:2;
-}}
+.st-key-map-alert-strip [data-testid="stHorizontalBlock"] {{ gap:10px!important; }}
 .st-key-map-alert-strip .stButton button {{
-    position:absolute!important; inset:0!important;
-    width:100%!important; height:100%!important; min-height:0!important;
-    padding:0!important; margin:0!important; border:none!important;
-    background:transparent!important; opacity:0!important;
+    width:100%!important; min-height:52px!important;
+    padding:12px 15px!important;
+    border:1px solid var(--border)!important; border-radius:11px!important;
+    background:var(--panel)!important; color:var(--text)!important;
+    font-family:"DM Mono",monospace!important; font-size:14px!important;
+    font-weight:500!important; text-align:left!important;
+    transition:160ms ease!important; white-space:nowrap!important;
 }}
-.st-key-map-alert-strip [class*="st-key-map-sel-"]:hover .map-alert-visual {{
-    background:var(--elevated);
+.st-key-map-alert-strip .stButton button:hover {{
+    background:var(--elevated)!important;
+}}
+.st-key-map-alert-strip .stButton button p {{
+    color:var(--text)!important; font-family:"DM Mono",monospace!important;
+    font-size:14px!important;
 }}
 
 /* ── Streamlit component overrides ──────────────────────────────── */
@@ -651,7 +619,7 @@ code,pre {{ font-family:var(--mono); }}
     padding:0 17px!important;
     border:1px solid var(--accent)!important; border-radius:8px!important;
     color:#111!important; background:var(--accent)!important;
-    font-size:12px!important; font-weight:700!important;
+    font-size:14px!important; font-weight:700!important;
     box-shadow:none!important; transition:150ms ease;
 }}
 .st-key-run-btn .stButton button:hover {{
@@ -664,7 +632,7 @@ code,pre {{ font-family:var(--mono); }}
     min-height:38px!important; padding:0 17px!important;
     border:1px solid var(--accent)!important; border-radius:8px!important;
     color:#111!important; background:var(--accent)!important;
-    font-size:11px!important; font-weight:700!important;
+    font-size:13px!important; font-weight:700!important;
 }}
 .st-key-approve-btn .stButton button:hover {{ background:#e4ff8e!important; }}
 .st-key-approve-btn .stButton button p {{ color:#111!important; }}
@@ -673,7 +641,7 @@ code,pre {{ font-family:var(--mono); }}
     min-height:38px!important; padding:0 17px!important;
     border:1px solid #343434!important; border-radius:8px!important;
     color:var(--text)!important; background:#111!important;
-    font-size:11px!important;
+    font-size:13px!important;
 }}
 .st-key-downgrade-btn .stButton button:hover {{ border-color:#555!important; }}
 
@@ -681,7 +649,7 @@ code,pre {{ font-family:var(--mono); }}
     height:34px!important; padding:0 11px!important;
     border:1px solid #2d2d2d!important; border-radius:7px!important;
     color:#9b9b9b!important; background:#0a0a0a!important;
-    font-family:"DM Mono",monospace!important; font-size:9px!important;
+    font-family:"DM Mono",monospace!important; font-size:10px!important;
 }}
 .st-key-export-wrap .stDownloadButton button:hover {{
     border-color:#555!important; color:var(--text)!important;
@@ -693,7 +661,7 @@ code,pre {{ font-family:var(--mono); }}
 }}
 [data-testid="stMetricValue"] {{ color:var(--text); font-family:var(--mono); }}
 [data-testid="stMetricLabel"] {{
-    font-family:var(--mono); font-size:.65rem;
+    font-family:var(--mono); font-size:0.75rem;
     letter-spacing:.04em; text-transform:uppercase; color:var(--muted);
 }}
 [data-testid="stExpander"],[data-testid="stForm"] {{
@@ -732,12 +700,12 @@ code,pre {{ font-family:var(--mono); }}
     .landing-content {{ min-height:100svh; padding:30px 20px; }}
     .hero-label {{ max-width:280px; margin-bottom:52px; line-height:1.7; }}
     .hero-title-row {{ gap:12px; }}
-    .hero-title-row h1 {{ font-size:clamp(72px,24vw,110px); }}
+    .hero-title-row h1 {{ font-size:clamp(83px,27.6vw,126px); }}
     .hero-leaf {{ width:34px; height:34px; }}
     .hero-leaf span {{ border-width:2px; }}
-    .hero-title-row + p {{ margin-top:30px; font-size:14px; }}
+    .hero-title-row + p {{ margin-top:30px; font-size:16px; }}
     .landing-nav {{ gap:8px; padding-top:40px; }}
-    .landing-nav a {{ min-height:58px; padding:0 13px; font-size:12px; }}
+    .landing-nav a {{ min-height:58px; padding:0 13px; font-size:14px; }}
     .landing-nav a .icon {{ display:none; }}
     .side-nav {{
         top:auto; right:0; width:auto; height:66px;
@@ -804,7 +772,7 @@ def _render_sidebar(active: str) -> None:
     )
     st.markdown(
         f'<aside class="side-nav">'
-        f'<a class="side-logo" href="?page=landing" target="_top" aria-label="Back to home">'
+        f'<a class="side-logo" href="/" target="_top" aria-label="Back to home">'
         f'<span class="sidebar-custom-logo" aria-hidden="true">'
         f'<img src="{logo_src}" alt="">'
         f"</span></a>"
@@ -951,30 +919,23 @@ def _render_map() -> None:
             unsafe_allow_html=True,
         )
 
-        # Alert strip – same two-line card look as the alerts page strip
-        # (status dot + bold id + muted service name, stacked). st.button
-        # labels can't render that markup, so a real Streamlit button
-        # still handles the click (kept functional but invisible, laid
-        # over the card via absolute positioning) while an HTML div drawn
-        # underneath supplies the actual card visuals.
+        # Alert strip – Streamlit buttons (soft rerun, no hard refresh)
         with st.container(key="map-alert-strip"):
             cols = st.columns(len(alerts))
             for i, (aid, a) in enumerate(alerts.items()):
                 with cols[i]:
                     with st.container(key=f"map-sel-{aid}"):
-                        status = _get_alert_status(aid)
-                        sel = " selected" if aid == alert_id else ""
-                        st.markdown(
-                            f'<div class="map-alert-visual{sel}">'
-                            f'<span class="status-dot {status}"></span>'
-                            f'<span><strong>{aid}</strong>'
-                            f'<small>{a.service}</small></span></div>',
-                            unsafe_allow_html=True,
-                        )
-                        if st.button(" ", key=f"map-btn-{aid}", use_container_width=True):
+                        if st.button(f"{aid} · {a.service}", key=f"map-btn-{aid}", use_container_width=True):
                             st.query_params["alert"] = aid
                             st.query_params["page"] = "map"
                             st.rerun()
+        # Highlight the currently selected alert card
+        st.markdown(
+            f"<style>.st-key-map-sel-{alert_id} .stButton button"
+            f"{{border-color:var(--accent)!important;"
+            f"box-shadow:inset 0 0 0 1px rgb(217 255 98 / 12%)!important;}}</style>",
+            unsafe_allow_html=True,
+        )
 
         with st.container(key="map-content"):
             render_system_map(alert)

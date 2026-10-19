@@ -300,12 +300,12 @@ def render_system_map(alert: Alert) -> None:
       .graph-node .node-status {{ width:8px; height:8px; flex:none; border-radius:50%; background:var(--low); }}
       .graph-node > div {{ display:flex; min-width:0; flex-direction:column; gap:5px; }}
       .graph-node strong {{
-        overflow:hidden; font-family:"DM Mono",monospace; font-size:11px; font-weight:500; text-overflow:ellipsis;
+        overflow:hidden; font-family:"DM Mono",monospace; font-size:13px; font-weight:500; text-overflow:ellipsis;
       }}
-      .graph-node small {{ color:#717171; font-size:9px; }}
+      .graph-node small {{ color:#717171; font-size:10px; }}
       .graph-node em {{
         position:absolute; top:-9px; right:9px; padding:3px 6px; border-radius:4px; color:#111;
-        background:var(--accent); font-family:"DM Mono",monospace; font-size:7px; font-style:normal;
+        background:var(--accent); font-family:"DM Mono",monospace; font-size:8px; font-style:normal;
         font-weight:600; letter-spacing:.04em; text-transform:uppercase;
       }}
       .graph-node.degraded .node-status {{ background:var(--high); }}
@@ -321,17 +321,17 @@ def render_system_map(alert: Alert) -> None:
       }}
       .legend {{ right:18px; bottom:18px; display:grid; min-width:155px; gap:10px; padding:15px; }}
       .legend strong {{
-        margin-bottom:3px; color:#777; font-family:"DM Mono",monospace; font-size:8px; font-weight:500;
+        margin-bottom:3px; color:#777; font-family:"DM Mono",monospace; font-size:9px; font-weight:500;
         letter-spacing:.08em; text-transform:uppercase;
       }}
-      .legend span {{ display:flex; align-items:center; gap:8px; color:#aaa; font-size:10px; }}
+      .legend span {{ display:flex; align-items:center; gap:8px; color:#aaa; font-size:12px; }}
       .legend i {{ width:6px; height:6px; border-radius:50%; background:var(--low); }}
       .legend i.degraded {{ background:var(--high); }}
       .legend i.critical {{ background:var(--critical); }}
       .legend i.investigating {{ background:var(--accent); }}
       .graph-note {{
         bottom:18px; left:18px; display:flex; align-items:center; gap:8px; padding:11px 13px;
-        color:var(--accent); font-family:"DM Mono",monospace; font-size:9px; max-width:calc(100% - 200px);
+        color:var(--accent); font-family:"DM Mono",monospace; font-size:10px; max-width:calc(100% - 200px);
       }}
       .graph-note span {{ margin-left:10px; color:#777; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
       .tooltip {{
