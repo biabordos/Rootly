@@ -590,6 +590,29 @@ code,pre {{ font-family:var(--mono); }}
 }}
 .st-key-map-content [data-testid="stVerticalBlock"] {{ gap:1rem!important; }}
 
+/* ── Map alert-strip (Streamlit buttons styled as cards) ────────── */
+.st-key-map-alert-strip {{
+    padding:12px 46px; border-bottom:1px solid var(--border);
+    width:100%; box-sizing:border-box;
+}}
+.st-key-map-alert-strip [data-testid="stHorizontalBlock"] {{ gap:10px!important; }}
+.st-key-map-alert-strip .stButton button {{
+    width:100%!important; min-height:52px!important;
+    padding:12px 15px!important;
+    border:1px solid var(--border)!important; border-radius:11px!important;
+    background:var(--panel)!important; color:var(--text)!important;
+    font-family:"DM Mono",monospace!important; font-size:12px!important;
+    font-weight:500!important; text-align:left!important;
+    transition:160ms ease!important; white-space:nowrap!important;
+}}
+.st-key-map-alert-strip .stButton button:hover {{
+    background:var(--elevated)!important;
+}}
+.st-key-map-alert-strip .stButton button p {{
+    color:var(--text)!important; font-family:"DM Mono",monospace!important;
+    font-size:12px!important;
+}}
+
 /* ── Streamlit component overrides ──────────────────────────────── */
 .st-key-run-btn .stButton button {{
     width:auto!important; min-height:38px!important;
@@ -705,6 +728,7 @@ code,pre {{ font-family:var(--mono); }}
     .st-key-workspace-content {{ width:calc(100% - 40px)!important; padding-top:28px!important; }}
     .map-header {{ min-height:110px; padding:25px 20px 20px; }}
     .st-key-map-content {{ padding:24px 20px 48px!important; }}
+    .st-key-map-alert-strip {{ padding:10px 20px; }}
     .context-grid {{ grid-template-columns:1fr; }}
     .context-grid > div {{ border-right:0; border-bottom:1px solid #202020; }}
     .context-grid > div:last-child {{ border-bottom:0; }}
@@ -892,6 +916,24 @@ def _render_map() -> None:
             f"<span><i></i>{len(alerts)} alerts tracked</span>"
             f"<span>Alert: {alert_id}</span></div>"
             f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Alert strip – Streamlit buttons (soft rerun, no hard refresh)
+        with st.container(key="map-alert-strip"):
+            cols = st.columns(len(alerts))
+            for i, (aid, a) in enumerate(alerts.items()):
+                with cols[i]:
+                    with st.container(key=f"map-sel-{aid}"):
+                        if st.button(f"{aid} · {a.service}", key=f"map-btn-{aid}", use_container_width=True):
+                            st.query_params["alert"] = aid
+                            st.query_params["page"] = "map"
+                            st.rerun()
+        # Highlight the currently selected alert card
+        st.markdown(
+            f"<style>.st-key-map-sel-{alert_id} .stButton button"
+            f"{{border-color:var(--accent)!important;"
+            f"box-shadow:inset 0 0 0 1px rgb(217 255 98 / 12%)!important;}}</style>",
             unsafe_allow_html=True,
         )
 
