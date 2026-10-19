@@ -887,6 +887,23 @@ def _render_map() -> None:
             f"</div>",
             unsafe_allow_html=True,
         )
+
+        # Alert strip (select scenario for the map)
+        cards_html = []
+        for aid, a in alerts.items():
+            sel = " selected" if aid == alert_id else ""
+            cards_html.append(
+                f'<a class="alert-card{sel}" href="?page=map&alert={aid}" target="_top">'
+                f'<span class="status-dot"></span>'
+                f"<span><strong>{aid}</strong>"
+                f"<small>{a.service}</small></span></a>"
+            )
+        st.markdown(
+            f'<div class="alert-strip" aria-label="Select alert scenario">'
+            f'{"".join(cards_html)}</div>',
+            unsafe_allow_html=True,
+        )
+
         with st.container(key="map-content"):
             render_system_map(alert)
 
