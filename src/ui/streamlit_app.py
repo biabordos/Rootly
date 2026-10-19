@@ -644,6 +644,9 @@ code,pre {{ font-family:var(--mono); }}
 }}
 
 /* ── Streamlit component overrides ──────────────────────────────── */
+.st-key-run-btn {{
+    margin:28px 0 36px!important;
+}}
 .st-key-run-btn .stButton button {{
     width:auto!important; min-height:38px!important;
     padding:0 17px!important;
