@@ -591,11 +591,22 @@ code,pre {{ font-family:var(--mono); }}
 .st-key-map-content [data-testid="stVerticalBlock"] {{ gap:1rem!important; }}
 
 /* ── Map alert-strip (Streamlit buttons styled as cards) ────────── */
+/* st.columns() divides the row width evenly and shrinks every column to
+   fit, with no horizontal scroll — that's what was cramming all 10 alert
+   buttons into the container width. To match the <a>-card strip on the
+   alerts page (fixed-width cards + horizontal scrollbar), the horizontal
+   block itself has to scroll and its columns must stop shrinking. */
 .st-key-map-alert-strip {{
     padding:12px 46px; border-bottom:1px solid var(--border);
     width:100%; box-sizing:border-box;
+    overflow-x:auto; overflow-y:hidden;
 }}
-.st-key-map-alert-strip [data-testid="stHorizontalBlock"] {{ gap:10px!important; }}
+.st-key-map-alert-strip [data-testid="stHorizontalBlock"] {{
+    gap:10px!important; flex-wrap:nowrap!important; width:max-content!important;
+}}
+.st-key-map-alert-strip [data-testid="stColumn"] {{
+    flex:none!important; width:194px!important; min-width:194px!important;
+}}
 .st-key-map-alert-strip .stButton button {{
     width:100%!important; min-height:52px!important;
     padding:12px 15px!important;
@@ -604,13 +615,14 @@ code,pre {{ font-family:var(--mono); }}
     font-family:"DM Mono",monospace!important; font-size:12px!important;
     font-weight:500!important; text-align:left!important;
     transition:160ms ease!important; white-space:nowrap!important;
+    overflow:hidden!important; text-overflow:ellipsis!important;
 }}
 .st-key-map-alert-strip .stButton button:hover {{
     background:var(--elevated)!important;
 }}
 .st-key-map-alert-strip .stButton button p {{
     color:var(--text)!important; font-family:"DM Mono",monospace!important;
-    font-size:12px!important;
+    font-size:12px!important; overflow:hidden!important; text-overflow:ellipsis!important;
 }}
 
 /* ── Streamlit component overrides ──────────────────────────────── */
