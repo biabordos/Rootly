@@ -804,7 +804,7 @@ def _render_sidebar(active: str) -> None:
     )
     st.markdown(
         f'<aside class="side-nav">'
-        f'<a class="side-logo" href="/" target="_top" aria-label="Back to home">'
+        f'<a class="side-logo" href="?page=landing" target="_top" aria-label="Back to home">'
         f'<span class="sidebar-custom-logo" aria-hidden="true">'
         f'<img src="{logo_src}" alt="">'
         f"</span></a>"
