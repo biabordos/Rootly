@@ -203,7 +203,13 @@ def _node_positions(nodes: list[dict[str, Any]]) -> dict[str, tuple[float, float
 
     positions: dict[str, tuple[float, float]] = {}
     for layer, layer_nodes in sorted(layers.items()):
-        x = 50.0 if num_layers <= 1 else 6 + layer * (88 / (num_layers - 1))
+        # Cards are a fixed 180px wide (145/140px on the responsive
+        # breakpoints below), so the rightmost column must stop well
+        # short of 100% or it gets clipped by the container's
+        # overflow:hidden on narrower screens. 68 keeps the last
+        # column's right edge comfortably inside the container down to
+        # roughly 900px of available width.
+        x = 50.0 if num_layers <= 1 else 6 + layer * (68 / (num_layers - 1))
         count = len(layer_nodes)
         layer_nodes = sorted(layer_nodes, key=lambda n: (not n["root"], n["id"]))
         for index, node in enumerate(layer_nodes):

@@ -27,7 +27,6 @@ from src.ui.system_map import render_system_map
 load_dotenv(ROOT / ".env")
 LOGO_PATH = Path(__file__).resolve().parent / "assets" / "rootly-mark.png"
 CORNER_LOGO_PATH = ROOT / "Material Design Ripple Effect" / "public" / "rootly-corner-logo.jpeg"
-ARCHITECTURE_PATH = ROOT / "docs" / "diagrams" / "architecture.png"
 
 st.set_page_config(
     page_title="Rootly | Incident Triage",
@@ -523,7 +522,8 @@ code,pre {{ font-family:var(--mono); }}
 
 /* ── About page ─────────────────────────────────────────────────── */
 .about-page {{
-    display:grid; width:100%; min-height:100vh; place-items:center;
+    display:grid; width:calc(100% - 84px); min-height:100vh;
+    margin-left:84px; place-items:center;
     padding:70px 8vw;
     background:
         radial-gradient(circle at 80% 20%,rgb(217 255 98 / 4%),transparent 25%),
@@ -716,7 +716,11 @@ code,pre {{ font-family:var(--mono); }}
 
 st.markdown(APP_CSS, unsafe_allow_html=True)
 
-# Non-landing pages get sidebar offset + padding
+# Landing page gets full-bleed, no default Streamlit padding.
+# Non-landing pages get their 84px sidebar offset via .st-key-page-shell
+# (see APP_CSS) rather than overriding Streamlit's own block-container,
+# which Streamlit re-applies its own padding/margin to and will not
+# reliably yield to external CSS.
 if page == "landing":
     st.markdown(
         "<style>.stMainBlockContainer{padding:0!important}</style>",
@@ -884,17 +888,12 @@ def _render_map() -> None:
             unsafe_allow_html=True,
         )
         with st.container(key="map-content"):
-            if ARCHITECTURE_PATH.is_file():
-                st.image(str(ARCHITECTURE_PATH), use_container_width=True)
-                st.caption("Rootly system architecture: investigation orchestration, tools, and observability.")
-            st.caption("Live dependency map for the selected alert scenario, built from CMDB and same-day log evidence.")
             render_system_map(alert)
 
 
 def _render_alerts() -> None:
     _render_sidebar("alerts")
     with st.container(key="page-shell"):
-
         # Workspace header
         st.markdown(
             '<div class="workspace-header">'
