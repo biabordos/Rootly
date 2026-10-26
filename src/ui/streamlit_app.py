@@ -624,6 +624,13 @@ code,pre {{ font-family:var(--mono); }}
 }}
 .st-key-run-btn .stButton button p {{ color:#111!important; }}
 
+.st-key-approval-actions {{
+    margin-top:22px;
+}}
+.st-key-approval-actions [data-testid="stTextInput"] {{
+    margin-bottom:16px;
+}}
+
 .st-key-approve-btn .stButton button {{
     min-height:38px!important; padding:0 17px!important;
     border:1px solid var(--accent)!important; border-radius:8px!important;
@@ -1163,17 +1170,18 @@ def _render_alerts() -> None:
                     f"invalidate active sessions.</p></div></section>",
                     unsafe_allow_html=True,
                 )
-                note = st.text_input("Audit trail note (optional)", key=f"note-{result.thread_id}")
-                col_a, col_d = st.columns(2)
-                decision = None
-                with col_a:
-                    with st.container(key="approve-btn"):
-                        if st.button("Approve urgent escalation", use_container_width=True):
-                            decision = HUMAN_APPROVE
-                with col_d:
-                    with st.container(key="downgrade-btn"):
-                        if st.button("Downgrade, not urgent", use_container_width=True):
-                            decision = HUMAN_DOWNGRADE
+                with st.container(key="approval-actions"):
+                    note = st.text_input("Audit trail note (optional)", key=f"note-{result.thread_id}")
+                    col_a, col_d = st.columns(2)
+                    decision = None
+                    with col_a:
+                        with st.container(key="approve-btn"):
+                            if st.button("Approve urgent escalation", use_container_width=True):
+                                decision = HUMAN_APPROVE
+                    with col_d:
+                        with st.container(key="downgrade-btn"):
+                            if st.button("Downgrade, not urgent", use_container_width=True):
+                                decision = HUMAN_DOWNGRADE
                 if decision:
                     try:
                         results[selected_alert] = resume_diagnosis(result.thread_id, decision, note=note)
