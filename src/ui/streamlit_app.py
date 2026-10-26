@@ -627,26 +627,29 @@ code,pre {{ font-family:var(--mono); }}
 .st-key-approval-actions {{
     margin-top:22px;
 }}
+.st-key-approval-actions [data-testid="stForm"] {{
+    border:none!important; padding:0!important;
+}}
 .st-key-approval-actions [data-testid="stTextInput"] {{
     margin-bottom:16px;
 }}
 
-.st-key-approve-btn .stButton button {{
+.st-key-approve-btn .stFormSubmitButton button {{
     min-height:38px!important; padding:0 17px!important;
     border:1px solid var(--accent)!important; border-radius:8px!important;
     color:#111!important; background:var(--accent)!important;
     font-size:13px!important; font-weight:700!important;
 }}
-.st-key-approve-btn .stButton button:hover {{ background:#e4ff8e!important; }}
-.st-key-approve-btn .stButton button p {{ color:#111!important; }}
+.st-key-approve-btn .stFormSubmitButton button:hover {{ background:#e4ff8e!important; }}
+.st-key-approve-btn .stFormSubmitButton button p {{ color:#111!important; }}
 
-.st-key-downgrade-btn .stButton button {{
+.st-key-downgrade-btn .stFormSubmitButton button {{
     min-height:38px!important; padding:0 17px!important;
     border:1px solid #343434!important; border-radius:8px!important;
     color:var(--text)!important; background:#111!important;
     font-size:13px!important;
 }}
-.st-key-downgrade-btn .stButton button:hover {{ border-color:#555!important; }}
+.st-key-downgrade-btn .stFormSubmitButton button:hover {{ border-color:#555!important; }}
 
 /* Download menu — a single "Download diagnosis" trigger that opens a
    small menu of the 3 export options (JSON / Markdown / Trace), matching
@@ -1171,17 +1174,18 @@ def _render_alerts() -> None:
                     unsafe_allow_html=True,
                 )
                 with st.container(key="approval-actions"):
-                    note = st.text_input("Audit trail note (optional)", key=f"note-{result.thread_id}")
-                    col_a, col_d = st.columns(2)
-                    decision = None
-                    with col_a:
-                        with st.container(key="approve-btn"):
-                            if st.button("Approve urgent escalation", use_container_width=True):
-                                decision = HUMAN_APPROVE
-                    with col_d:
-                        with st.container(key="downgrade-btn"):
-                            if st.button("Downgrade, not urgent", use_container_width=True):
-                                decision = HUMAN_DOWNGRADE
+                    with st.form(key=f"approval-form-{result.thread_id}"):
+                        note = st.text_input("Audit trail note (optional)")
+                        col_a, col_d = st.columns(2)
+                        decision = None
+                        with col_a:
+                            with st.container(key="approve-btn"):
+                                if st.form_submit_button("Approve urgent escalation", use_container_width=True):
+                                    decision = HUMAN_APPROVE
+                        with col_d:
+                            with st.container(key="downgrade-btn"):
+                                if st.form_submit_button("Downgrade, not urgent", use_container_width=True):
+                                    decision = HUMAN_DOWNGRADE
                 if decision:
                     try:
                         results[selected_alert] = resume_diagnosis(result.thread_id, decision, note=note)
