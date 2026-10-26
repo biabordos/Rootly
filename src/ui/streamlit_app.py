@@ -1273,11 +1273,11 @@ def _render_alerts() -> None:
                     st.markdown("**Log evidence**")
                     st.code("\n".join(d.log_evidence), language="log")
 
-            tab_json, tab_md = st.tabs(["JSON", "Markdown"])
-            with tab_json:
-                st.json(diagnosis_dict(result))
+            tab_md, tab_json = st.tabs(["Markdown", "JSON"])
             with tab_md:
                 st.markdown(to_markdown(result))
+            with tab_json:
+                st.json(diagnosis_dict(result))
 
             with st.expander("Evaluation ground truth (hidden from the agent)"):
                 st.write(f"Root-cause category: `{alert.root_cause_category.value if alert.root_cause_category else '—'}`")
