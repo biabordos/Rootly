@@ -510,14 +510,23 @@ code,pre {{ font-family:var(--mono); }}
 .decision-complete p {{ margin:4px 0 0; color:var(--muted); font-size:13px; }}
 
 /* ── Export bar ──────────────────────────────────────────────────── */
-.export-bar {{
-    display:flex; margin-top:34px; align-items:center;
-    justify-content:space-between; padding-top:20px;
+/* The label and the download trigger sit in one row via st.columns
+   inside .st-key-export-wrap (label left, button right). */
+.st-key-export-wrap {{
+    margin-top:34px; padding-top:20px;
     border-top:1px solid var(--border);
 }}
-.export-bar > span {{
+.st-key-export-wrap [data-testid="stHorizontalBlock"] {{
+    display:flex!important; align-items:center!important;
+    justify-content:space-between!important; gap:16px!important;
+}}
+.st-key-export-wrap [data-testid="stColumn"] {{
+    flex:none!important; width:auto!important; min-width:0!important;
+}}
+.export-bar-label {{
     color:#696969; font-family:"DM Mono",monospace;
     font-size:10px; letter-spacing:0.08em; text-transform:uppercase;
+    white-space:nowrap;
 }}
 
 /* ── About page ─────────────────────────────────────────────────── */
@@ -1183,33 +1192,35 @@ def _render_alerts() -> None:
                 )
 
             # ── Export bar ──────────────────────────────────────────────
-            st.markdown(
-                '<div class="export-bar"><span>Export artifacts</span></div>',
-                unsafe_allow_html=True,
-            )
             with st.container(key="export-wrap"):
-                with st.popover("Download diagnosis"):
-                    st.download_button(
-                        "Diagnosis JSON",
-                        json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
-                        file_name=f"{selected_alert}_diagnosis.json",
-                        mime="application/json",
-                        use_container_width=True,
-                    )
-                    st.download_button(
-                        "Diagnosis Markdown",
-                        to_markdown(result),
-                        file_name=f"{selected_alert}_diagnosis.md",
-                        mime="text/markdown",
-                        use_container_width=True,
-                    )
-                    st.download_button(
-                        "Trace JSON",
-                        json.dumps(result.trace, indent=2, ensure_ascii=False),
-                        file_name=f"{selected_alert}_trace.json",
-                        mime="application/json",
-                        use_container_width=True,
-                    )
+                label_col, btn_col = st.columns(2)
+                label_col.markdown(
+                    '<span class="export-bar-label">Export artifacts</span>',
+                    unsafe_allow_html=True,
+                )
+                with btn_col:
+                    with st.popover("Download diagnosis"):
+                        st.download_button(
+                            "Diagnosis JSON",
+                            json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
+                            file_name=f"{selected_alert}_diagnosis.json",
+                            mime="application/json",
+                            use_container_width=True,
+                        )
+                        st.download_button(
+                            "Diagnosis Markdown",
+                            to_markdown(result),
+                            file_name=f"{selected_alert}_diagnosis.md",
+                            mime="text/markdown",
+                            use_container_width=True,
+                        )
+                        st.download_button(
+                            "Trace JSON",
+                            json.dumps(result.trace, indent=2, ensure_ascii=False),
+                            file_name=f"{selected_alert}_trace.json",
+                            mime="application/json",
+                            use_container_width=True,
+                        )
 
             # ── Diagnosis package ───────────────────────────────────────
             st.markdown(
