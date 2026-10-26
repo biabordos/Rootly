@@ -639,20 +639,22 @@ code,pre {{ font-family:var(--mono); }}
    portal attached to the document root (not inside our own container),
    so it has to be styled by its own data-testid rather than scoped
    through .st-key-export-wrap like the rest of the app's buttons. */
-.st-key-export-wrap [data-testid="stPopoverButton"] button {{
-    min-width:194px; min-height:38px!important;
+/* stPopoverButton's data-testid is on the <button> element itself, not
+   a wrapper div around a nested <button> — no trailing " button". */
+.st-key-export-wrap [data-testid="stPopoverButton"] {{
+    min-width:194px!important; min-height:38px!important;
     padding:0 17px!important;
     border:1px solid var(--accent)!important; border-radius:8px!important;
     color:#111!important; background:var(--accent)!important;
-    font-family:var(--sans); font-size:14px!important; font-weight:700!important;
+    font-family:var(--sans)!important; font-size:14px!important; font-weight:700!important;
     transition:150ms ease;
 }}
-.st-key-export-wrap [data-testid="stPopoverButton"] button:hover {{
+.st-key-export-wrap [data-testid="stPopoverButton"]:hover {{
     background:#e4ff8e!important;
     box-shadow:0 0 22px rgb(217 255 98 / 15%)!important;
 }}
-.st-key-export-wrap [data-testid="stPopoverButton"] button p,
-.st-key-export-wrap [data-testid="stPopoverButton"] button span {{ color:#111!important; }}
+.st-key-export-wrap [data-testid="stPopoverButton"] p,
+.st-key-export-wrap [data-testid="stPopoverButton"] span {{ color:#111!important; }}
 
 [data-testid="stPopoverBody"] {{
     min-width:216px!important; padding:6px!important;
