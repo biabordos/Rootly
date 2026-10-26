@@ -713,6 +713,9 @@ code,pre {{ font-family:var(--mono); }}
 [data-testid="stExpander"] summary {{
     font-family:var(--sans); font-weight:500;
 }}
+.st-key-diagnosis-package [data-testid="stExpander"] summary p {{
+    font-size:21px!important; font-weight:500!important; letter-spacing:-0.025em;
+}}
 [data-testid="stTabs"] button {{ color:var(--muted); font-family:var(--mono); }}
 [data-testid="stTabs"] button[aria-selected="true"] {{ color:var(--accent); }}
 [data-testid="stProgress"] > div {{ border-radius:999px; }}
@@ -1235,61 +1238,56 @@ def _render_alerts() -> None:
                         )
 
             # ── Diagnosis package ───────────────────────────────────────
-            st.markdown(
-                '<div class="section-heading" style="margin-top:40px">'
-                '<div><span class="kicker">Output</span>'
-                "<h2>Diagnosis package</h2></div></div>",
-                unsafe_allow_html=True,
-            )
-            with st.container(border=True):
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Affected component", d.affected_component)
-                c2.metric("Assessed severity", d.severity_assessed.value)
-                c3.metric("Confidence", f"{d.confidence:.0%}")
-                st.progress(d.confidence)
+            with st.container(key="diagnosis-package"):
+                with st.expander("Diagnosis package", expanded=False):
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Affected component", d.affected_component)
+                    c2.metric("Assessed severity", d.severity_assessed.value)
+                    c3.metric("Confidence", f"{d.confidence:.0%}")
+                    st.progress(d.confidence)
 
-                st.markdown("**Summary**")
-                st.write(d.summary)
-                st.markdown("**Root cause hypothesis**")
-                st.write(d.root_cause_hypothesis)
-                st.markdown("**Escalation recommendation**")
-                st.info(d.escalation_recommendation)
+                    st.markdown("**Summary**")
+                    st.write(d.summary)
+                    st.markdown("**Root cause hypothesis**")
+                    st.write(d.root_cause_hypothesis)
+                    st.markdown("**Escalation recommendation**")
+                    st.info(d.escalation_recommendation)
 
-                if d.escalation_decision:
-                    dv = d.escalation_decision.value
-                    color = ESCALATION_COLOR[dv]
-                    st.markdown("**Escalation decision**")
-                    st.markdown(
-                        f'<span class="escalation-tag" style="color:{color};border:1px solid {color}">'
-                        f"{ESCALATION_LABEL[dv]}</span> &nbsp; owner team <code>{d.owner_team}</code>",
-                        unsafe_allow_html=True,
-                    )
-                    st.caption(d.escalation_reason)
-                    if d.human_decision:
-                        st.write(
-                            f"Human {HUMAN_DECISION_LABEL.get(d.human_decision, d.human_decision)}"
-                            + (f" — _{d.human_decision_note}_" if d.human_decision_note else "")
+                    if d.escalation_decision:
+                        dv = d.escalation_decision.value
+                        color = ESCALATION_COLOR[dv]
+                        st.markdown("**Escalation decision**")
+                        st.markdown(
+                            f'<span class="escalation-tag" style="color:{color};border:1px solid {color}">'
+                            f"{ESCALATION_LABEL[dv]}</span> &nbsp; owner team <code>{d.owner_team}</code>",
+                            unsafe_allow_html=True,
                         )
+                        st.caption(d.escalation_reason)
+                        if d.human_decision:
+                            st.write(
+                                f"Human {HUMAN_DECISION_LABEL.get(d.human_decision, d.human_decision)}"
+                                + (f" — _{d.human_decision_note}_" if d.human_decision_note else "")
+                            )
 
-                left, right = st.columns(2)
-                with left:
-                    st.markdown("**Critical dependencies**")
-                    st.write(" ".join(f"`{dep}`" for dep in d.critical_dependencies) or "—")
-                    st.markdown("**Similar historical incidents**")
-                    for inc_id in d.similar_incidents:
-                        inc = incidents[inc_id]
-                        st.markdown(f"- **{inc.id}** ({inc.duration_minutes} min) — {inc.description}")
-                    if not d.similar_incidents:
-                        st.write("—")
-                with right:
-                    st.markdown("**Log evidence**")
-                    st.code("\n".join(d.log_evidence), language="log")
+                    left, right = st.columns(2)
+                    with left:
+                        st.markdown("**Critical dependencies**")
+                        st.write(" ".join(f"`{dep}`" for dep in d.critical_dependencies) or "—")
+                        st.markdown("**Similar historical incidents**")
+                        for inc_id in d.similar_incidents:
+                            inc = incidents[inc_id]
+                            st.markdown(f"- **{inc.id}** ({inc.duration_minutes} min) — {inc.description}")
+                        if not d.similar_incidents:
+                            st.write("—")
+                    with right:
+                        st.markdown("**Log evidence**")
+                        st.code("\n".join(d.log_evidence), language="log")
 
-            tab_md, tab_json = st.tabs(["Markdown", "JSON"])
-            with tab_md:
-                st.markdown(to_markdown(result))
-            with tab_json:
-                st.json(diagnosis_dict(result))
+                    tab_md, tab_json = st.tabs(["Markdown", "JSON"])
+                    with tab_md:
+                        st.markdown(to_markdown(result))
+                    with tab_json:
+                        st.json(diagnosis_dict(result))
 
             with st.expander("Evaluation ground truth (hidden from the agent)"):
                 st.write(f"Root-cause category: `{alert.root_cause_category.value if alert.root_cause_category else '—'}`")
