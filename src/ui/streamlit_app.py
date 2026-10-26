@@ -713,6 +713,9 @@ code,pre {{ font-family:var(--mono); }}
 [data-testid="stExpander"] summary {{
     font-family:var(--sans); font-weight:500;
 }}
+.st-key-diagnosis-package {{
+    margin-top:36px;
+}}
 .st-key-diagnosis-package [data-testid="stExpander"] summary p {{
     font-size:21px!important; font-weight:500!important; letter-spacing:-0.025em;
 }}
