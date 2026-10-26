@@ -632,15 +632,49 @@ code,pre {{ font-family:var(--mono); }}
 }}
 .st-key-downgrade-btn .stButton button:hover {{ border-color:#555!important; }}
 
-.st-key-export-wrap .stDownloadButton button {{
-    height:34px!important; padding:0 11px!important;
-    border:1px solid #2d2d2d!important; border-radius:7px!important;
-    color:#9b9b9b!important; background:#0a0a0a!important;
+/* Download menu — a single "Download diagnosis" trigger that opens a
+   small menu of the 3 export options (JSON / Markdown / Trace), matching
+   the reference design's .download-menu-trigger + .download-options.
+   st.popover is the trigger; its dropdown body renders in a floating
+   portal attached to the document root (not inside our own container),
+   so it has to be styled by its own data-testid rather than scoped
+   through .st-key-export-wrap like the rest of the app's buttons. */
+.st-key-export-wrap [data-testid="stPopoverButton"] button {{
+    min-width:194px; min-height:38px!important;
+    padding:0 17px!important;
+    border:1px solid var(--accent)!important; border-radius:8px!important;
+    color:#111!important; background:var(--accent)!important;
+    font-family:var(--sans); font-size:14px!important; font-weight:700!important;
+    transition:150ms ease;
+}}
+.st-key-export-wrap [data-testid="stPopoverButton"] button:hover {{
+    background:#e4ff8e!important;
+    box-shadow:0 0 22px rgb(217 255 98 / 15%)!important;
+}}
+.st-key-export-wrap [data-testid="stPopoverButton"] button p,
+.st-key-export-wrap [data-testid="stPopoverButton"] button span {{ color:#111!important; }}
+
+[data-testid="stPopoverBody"] {{
+    min-width:216px!important; padding:6px!important;
+    border:1px solid #2d2d2d!important; border-radius:8px!important;
+    background:#0a0a0a!important;
+    box-shadow:0 14px 40px rgb(0 0 0 / 45%)!important;
+}}
+[data-testid="stPopoverBody"] .stDownloadButton button {{
+    width:100%!important; height:auto!important; min-height:39px!important;
+    padding:0 12px!important; justify-content:flex-start!important;
+    border:0!important; border-radius:6px!important;
+    color:#9b9b9b!important; background:transparent!important;
     font-family:"DM Mono",monospace!important; font-size:10px!important;
+    font-weight:400!important; text-align:left!important;
 }}
-.st-key-export-wrap .stDownloadButton button:hover {{
-    border-color:#555!important; color:var(--text)!important;
+[data-testid="stPopoverBody"] .stDownloadButton button p {{
+    color:inherit!important; font-family:"DM Mono",monospace!important; font-size:10px!important;
 }}
+[data-testid="stPopoverBody"] .stDownloadButton button:hover {{
+    color:var(--text)!important; background:#141414!important;
+}}
+[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"] {{ gap:2px!important; }}
 
 [data-testid="stMetric"] {{
     background:var(--panel); border:1px solid var(--border);
@@ -1152,28 +1186,28 @@ def _render_alerts() -> None:
                 unsafe_allow_html=True,
             )
             with st.container(key="export-wrap"):
-                ecol1, ecol2, ecol3 = st.columns(3)
-                ecol1.download_button(
-                    "Diagnosis JSON",
-                    json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
-                    file_name=f"{selected_alert}_diagnosis.json",
-                    mime="application/json",
-                    use_container_width=True,
-                )
-                ecol2.download_button(
-                    "Diagnosis Markdown",
-                    to_markdown(result),
-                    file_name=f"{selected_alert}_diagnosis.md",
-                    mime="text/markdown",
-                    use_container_width=True,
-                )
-                ecol3.download_button(
-                    "Trace JSON",
-                    json.dumps(result.trace, indent=2, ensure_ascii=False),
-                    file_name=f"{selected_alert}_trace.json",
-                    mime="application/json",
-                    use_container_width=True,
-                )
+                with st.popover("Download diagnosis"):
+                    st.download_button(
+                        "Diagnosis JSON",
+                        json.dumps(diagnosis_dict(result), indent=2, ensure_ascii=False),
+                        file_name=f"{selected_alert}_diagnosis.json",
+                        mime="application/json",
+                        use_container_width=True,
+                    )
+                    st.download_button(
+                        "Diagnosis Markdown",
+                        to_markdown(result),
+                        file_name=f"{selected_alert}_diagnosis.md",
+                        mime="text/markdown",
+                        use_container_width=True,
+                    )
+                    st.download_button(
+                        "Trace JSON",
+                        json.dumps(result.trace, indent=2, ensure_ascii=False),
+                        file_name=f"{selected_alert}_trace.json",
+                        mime="application/json",
+                        use_container_width=True,
+                    )
 
             # ── Diagnosis package ───────────────────────────────────────
             st.markdown(
