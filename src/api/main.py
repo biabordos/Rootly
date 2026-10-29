@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 from src.agent import DiagnosisError, resume_diagnosis, run_diagnosis  # noqa: E402
-from src.agent.observability import setup_phoenix  # noqa: E402
+from src.agent.observability import init_observability, setup_phoenix, shutdown_observability  # noqa: E402
 from src.agent.report import diagnosis_dict  # noqa: E402
 from src.data_loader import get_alert, load_alerts  # noqa: E402
 
@@ -76,7 +76,9 @@ def _run_background(alert_id: str, thread_id: str) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_phoenix()
+    init_observability()
     yield
+    shutdown_observability()
 
 
 app = FastAPI(title="Rootly — AI Incident Triage", lifespan=lifespan)

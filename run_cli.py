@@ -26,7 +26,7 @@ from rich.table import Table
 
 from src.agent import DiagnosisError, DiagnosisResult, resume_diagnosis, run_diagnosis
 from src.agent.escalation_policy import HUMAN_DECISIONS
-from src.agent.observability import setup_phoenix, tracing_status
+from src.agent.observability import flush_observability, init_observability, setup_phoenix, tracing_status
 from src.agent.report import diagnosis_dict, to_markdown
 from src.data_loader import get_alert, load_alerts
 
@@ -155,6 +155,7 @@ def resume(thread_id: str, decision: str, note: str | None, verbose: bool, expor
 def main() -> int:
     load_dotenv()
     setup_phoenix()
+    init_observability()
     console.print(f"[dim]{tracing_status()}[/dim]")
     parser = argparse.ArgumentParser(description="Rootly — AI incident diagnosis agent")
     parser.add_argument("alert_id", nargs="?", help="Alert scenario to diagnose, e.g. ALRT-001")
@@ -169,13 +170,17 @@ def main() -> int:
     if args.resume:
         if not args.decision:
             parser.error("--resume requires --decision approve|downgrade")
-        return resume(args.resume, args.decision, args.note, args.verbose, args.export)
+        rc = resume(args.resume, args.decision, args.note, args.verbose, args.export)
+        flush_observability()
+        return rc
     if args.decision or args.note:
         parser.error("--decision and --note are only valid with --resume")
     if not args.alert_id:
         list_scenarios()
         return 0
-    return run(args.alert_id, args.verbose, args.export)
+    rc = run(args.alert_id, args.verbose, args.export)
+    flush_observability()
+    return rc
 
 
 if __name__ == "__main__":

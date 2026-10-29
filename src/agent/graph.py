@@ -27,8 +27,10 @@ resume_diagnosis(thread_id, ...) can continue it later, from any process.
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
+import sys
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -63,7 +65,15 @@ from src.agent.system_prompt import format_alert
 from src.data_loader import get_alert
 from src.models.schemas import Alert, DiagnosisPackage, EscalationDecision
 
+logger = logging.getLogger(__name__)
+
 CHECKPOINT_DB = Path(__file__).resolve().parents[2] / ".checkpoints" / "rootly.sqlite"
+
+try:
+    from ai_observability import workflow as _obs_workflow
+except ImportError:
+    _obs_workflow = None
+    logger.debug("ai-observability-sdk not installed; workflow tracing disabled")
 
 
 @dataclass
@@ -243,65 +253,108 @@ def run_diagnosis(
         llm = build_llm(model)  # raises before any call if the API key is missing
     thread_id = thread_id or f"{alert.id}-{uuid.uuid4().hex[:8]}"
 
-    graph = get_graph()
-    config = _config(
-        thread_id,
-        max_steps,
-        run_name=f"rootly-{alert.id}",
-        tags=["rootly", alert.alert_type.value, model],
-        metadata={
-            "alert_id": alert.id,
-            "service": alert.service,
-            "severity_reported": alert.severity_reported.value,
-            "model": model,
-        },
-    )
-    if graph.get_state(config).values:
-        raise DiagnosisError(f"Run '{thread_id}' already exists; use resume_diagnosis or a new thread_id.")
+    return _run_diagnosis_inner(alert, llm, llms, on_event, model, max_steps, thread_id)
 
-    initial: RootlyState = {
-        # The alert opens the shared audit log; each agent's own system prompt is local to
-        # its run (see graph_nodes.run_specialist), not part of this conversation.
-        "messages": [HumanMessage(format_alert(alert))],
-        "alert_id": alert.id,
-        "max_steps": max_steps,
-        "step_count": 0,
-        "tool_calls": 0,
-        "truncated_responses": 0,
-        "used_tool_call_ids": [],
-        "investigated_services": [],
-        "started_at": time.time(),
-        "model": model,
-        "usage": {"input_tokens": 0, "output_tokens": 0},
-        "next_specialist": None,
-        "assignment": None,
-        "cmdb_context": [],
-        "log_evidence_gathered": [],
-        "replan_reasons": [],
-        "rejection_count": 0,
-        "log_search_cache": {},
-        "diagnosis": None,
-        "trace": [],
-    }
-    context = _build_context(llm, llms, on_event)
+
+def _run_diagnosis_inner(alert, llm, llms, on_event, model, max_steps, thread_id):
+    wf_ctx = (
+        _obs_workflow(
+            name="rootly-diagnosis",
+            workflow_id=thread_id,
+            version="1.0.0",
+            context={"alert_id": alert.id, "service": alert.service, "model": model},
+        )
+        if _obs_workflow
+        else None
+    )
+    if wf_ctx:
+        wf_ctx.__enter__()
     try:
-        graph.invoke(initial, config, context=context)
-    except GraphRecursionError as exc:
-        raise DiagnosisError(f"No valid diagnosis package after {max_steps} steps.") from exc
-    return _result(graph, thread_id)
+        graph = get_graph()
+        config = _config(
+            thread_id,
+            max_steps,
+            run_name=f"rootly-{alert.id}",
+            tags=["rootly", alert.alert_type.value, model],
+            metadata={
+                "alert_id": alert.id,
+                "service": alert.service,
+                "severity_reported": alert.severity_reported.value,
+                "model": model,
+            },
+        )
+        if graph.get_state(config).values:
+            raise DiagnosisError(f"Run '{thread_id}' already exists; use resume_diagnosis or a new thread_id.")
+
+        initial: RootlyState = {
+            "messages": [HumanMessage(format_alert(alert))],
+            "alert_id": alert.id,
+            "max_steps": max_steps,
+            "step_count": 0,
+            "tool_calls": 0,
+            "truncated_responses": 0,
+            "used_tool_call_ids": [],
+            "investigated_services": [],
+            "started_at": time.time(),
+            "model": model,
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+            "next_specialist": None,
+            "assignment": None,
+            "cmdb_context": [],
+            "log_evidence_gathered": [],
+            "replan_reasons": [],
+            "rejection_count": 0,
+            "log_search_cache": {},
+            "diagnosis": None,
+            "trace": [],
+        }
+        context = _build_context(llm, llms, on_event)
+        try:
+            graph.invoke(initial, config, context=context)
+        except GraphRecursionError as exc:
+            raise DiagnosisError(f"No valid diagnosis package after {max_steps} steps.") from exc
+        result = _result(graph, thread_id)
+    except BaseException:
+        if wf_ctx:
+            wf_ctx.__exit__(*sys.exc_info())
+        raise
+    if wf_ctx:
+        wf_ctx.__exit__(None, None, None)
+    return result
 
 
 def resume_diagnosis(thread_id: str, decision: str, *, note: str | None = None, on_event=None) -> DiagnosisResult:
     """Answer a paused run's approval request: decision is 'approve' or 'downgrade'."""
     if decision not in HUMAN_DECISIONS:
         raise DiagnosisError(f"Unknown decision '{decision}'. Use one of: {', '.join(HUMAN_DECISIONS)}.")
-    graph = get_graph()
-    config = _config(thread_id)
-    snapshot = graph.get_state(config)
-    if not snapshot.values:
-        raise DiagnosisError(f"No run found with thread id '{thread_id}'.")
-    if not snapshot.interrupts:
-        raise DiagnosisError(f"Run '{thread_id}' is not waiting for approval.")
 
-    graph.invoke(Command(resume={"decision": decision, "note": note}), config, context=RootlyContext(on_event=on_event))
-    return _result(graph, thread_id)
+    wf_ctx = (
+        _obs_workflow(
+            name="rootly-diagnosis",
+            workflow_id=thread_id,
+            version="1.0.0",
+            context={"decision": decision},
+        )
+        if _obs_workflow
+        else None
+    )
+    if wf_ctx:
+        wf_ctx.__enter__()
+    try:
+        graph = get_graph()
+        config = _config(thread_id)
+        snapshot = graph.get_state(config)
+        if not snapshot.values:
+            raise DiagnosisError(f"No run found with thread id '{thread_id}'.")
+        if not snapshot.interrupts:
+            raise DiagnosisError(f"Run '{thread_id}' is not waiting for approval.")
+
+        graph.invoke(Command(resume={"decision": decision, "note": note}), config, context=RootlyContext(on_event=on_event))
+        result = _result(graph, thread_id)
+    except BaseException:
+        if wf_ctx:
+            wf_ctx.__exit__(*sys.exc_info())
+        raise
+    if wf_ctx:
+        wf_ctx.__exit__(None, None, None)
+    return result
