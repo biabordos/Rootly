@@ -837,25 +837,30 @@ code,pre {{ font-family:var(--mono); }}
     margin-bottom:3px; color:#555; font-family:"DM Mono",monospace;
     font-size:8px; letter-spacing:0.08em; text-transform:uppercase; text-align:center;
 }}
-.theme-toggle {{
-    position:relative; display:grid; width:58px; height:30px;
-    grid-template-columns:1fr 1fr; overflow:hidden;
+/* Qualified as ".side-nav nav a.theme-toggle" (not just ".theme-toggle")
+   so it outranks the generic ".side-nav nav a" rule above, which would
+   otherwise force its own width/height/display onto this link too and
+   blow the pill layout up into the giant blob we saw. */
+.side-nav nav a.theme-toggle {{
+    position:relative; display:grid; width:58px!important; height:30px!important;
+    grid-template-columns:1fr 1fr; flex-direction:row; gap:0;
+    overflow:hidden; padding:0;
     border:1px solid #30322b; border-radius:999px;
     color:#777b70; background:#11120f; transition:border-color 160ms ease;
 }}
-.theme-toggle:hover {{ border-color:#555b44; color:#aeb593; }}
-.toggle-icon {{
-    position:relative; z-index:2; display:grid; height:28px;
+.side-nav nav a.theme-toggle:hover {{ border-color:#555b44; color:#aeb593; }}
+.side-nav nav a.theme-toggle .toggle-icon {{
+    position:relative; z-index:2; display:grid; width:100%; height:28px;
     place-items:center; transition:color 160ms ease;
 }}
-.toggle-thumb {{
+.side-nav nav a.theme-toggle .toggle-thumb {{
     position:absolute; z-index:1; top:3px; left:3px; width:22px; height:22px;
     border-radius:50%; background:var(--accent);
     box-shadow:0 2px 8px rgb(0 0 0 / 35%); transition:transform 180ms ease;
 }}
-.theme-toggle.day .toggle-icon:first-child,
-.theme-toggle.night .toggle-icon:nth-child(2) {{ color:#111; }}
-.theme-toggle.night .toggle-thumb {{ transform:translateX(28px); }}
+.side-nav nav a.theme-toggle.day .toggle-icon:first-child,
+.side-nav nav a.theme-toggle.night .toggle-icon:nth-child(2) {{ color:#111; }}
+.side-nav nav a.theme-toggle.night .toggle-thumb {{ transform:translateX(28px); }}
 </style>"""
 
 if theme == "day":
@@ -889,8 +894,8 @@ if theme == "day":
 [data-testid="stPopoverBody"] .stDownloadButton button:hover {
     color:var(--text)!important; background:#f1f3ed!important;
 }
-.theme-toggle { border-color:#d2d6ca; color:#767b70; background:#eef0e9; }
-.theme-toggle:hover { border-color:#b8bdaf; }
+.side-nav nav a.theme-toggle { border-color:#d2d6ca; color:#767b70; background:#eef0e9; }
+.side-nav nav a.theme-toggle:hover { border-color:#b8bdaf; }
 </style>"""
 
 st.markdown(APP_CSS, unsafe_allow_html=True)
