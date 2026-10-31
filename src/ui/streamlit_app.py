@@ -43,11 +43,32 @@ ESCALATION_COLOR = {
 }
 alerts = {a.id: a for a in load_alerts()}
 incidents = {i.id: i for i in load_incidents()}
-results: dict = st.session_state.setdefault("results", {})
-errors: dict = st.session_state.setdefault("errors", {})
-alert_statuses: dict[str, str] = st.session_state.setdefault(
-    "alert_statuses", {aid: "unresolved" for aid in alerts},
-)
+
+# st.session_state resets on every full browser navigation (clicking any
+# of our <a href="?..."> links — page nav, alert selection, the day/night
+# toggle — not just st.rerun()), so a diagnosis you'd already run would
+# vanish the moment you switched theme or paged away and back. These three
+# stores live for the whole server process instead (st.cache_resource runs
+# the factory once and hands back the same dict every time), so they
+# survive any reload, not just reruns within one browser session.
+@st.cache_resource
+def _results_store() -> dict:
+    return {}
+
+
+@st.cache_resource
+def _errors_store() -> dict:
+    return {}
+
+
+@st.cache_resource
+def _alert_statuses_store() -> dict[str, str]:
+    return {aid: "unresolved" for aid in alerts}
+
+
+results: dict = _results_store()
+errors: dict = _errors_store()
+alert_statuses: dict[str, str] = _alert_statuses_store()
 
 # ── Routing via query params ────────────────────────────────────────────────
 page = st.query_params.get("page", "landing")
