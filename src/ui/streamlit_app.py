@@ -57,6 +57,37 @@ selected_alert = st.query_params.get("alert")
 if selected_alert and selected_alert not in alerts:
     selected_alert = None
 
+# Theme is a plain query param too (same full-page-reload <a href> pattern
+# as page/alert navigation) — no client-side JS, no session_state, so it
+# survives refreshes and can't silently desync from what's rendered.
+theme = st.query_params.get("theme", "night")
+if theme not in {"day", "night"}:
+    theme = "night"
+
+_THEME_TOKENS = {
+    "night": {
+        "bg": "#050505", "panel": "#0c0c0c", "elevated": "#121212", "border": "#252525",
+        "text": "#f5f5f2", "muted": "#8e8e8e",
+        "low": "#7ee2a8", "medium": "#f2c66d", "high": "#f19a66", "critical": "#ff6b6b",
+    },
+    "day": {
+        "bg": "#f4f5ef", "panel": "#ffffff", "elevated": "#eceee6", "border": "#d7d9cf",
+        "text": "#171914", "muted": "#666b61",
+        "low": "#258553", "medium": "#9a6b0c", "high": "#b45c27", "critical": "#c93e3e",
+    },
+}
+tk = _THEME_TOKENS[theme]
+
+
+def _nav_href(*, page_: str, alert: str | None = None, theme_: str | None = None) -> str:
+    """Build a '?page=...' link that always carries the current theme
+    forward, so switching pages never resets day/night back to default."""
+    params = {"page": page_}
+    if alert:
+        params["alert"] = alert
+    params["theme"] = theme_ if theme_ is not None else theme
+    return "?" + "&".join(f"{k}={v}" for k, v in params.items())
+
 # ── Assets ──────────────────────────────────────────────────────────────────
 _logo_b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
 _corner_b64 = ""
@@ -70,7 +101,9 @@ _ICON_PATHS = {
     "download": '<path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/>',
     "info": '<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8v.01"/>',
     "map": '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15m6-12v15"/>',
+    "moon": '<path d="M20.5 14.5A8 8 0 0 1 9.5 3.5 8.5 8.5 0 1 0 20.5 14.5Z"/>',
     "pulse": '<path d="M3 12h4l2.5-6 4 12 2.5-6h5"/>',
+    "sun": '<circle cx="12" cy="12" r="3.5"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     "spark": '<path d="m12 2 1.5 5.2L18 10l-4.5 2.8L12 18l-1.5-5.2L6 10l4.5-2.8ZM19 3v4M21 5h-4"/>',
     "users": '<circle cx="9" cy="8" r="3"/><path d="M3 20c.3-4 2.3-6 6-6s5.7 2 6 6m1-9a3 3 0 1 0 0-6m1 9c2.5.6 3.8 2.6 4 6"/>',
     "warning": '<path d="M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 3v.01"/>',
@@ -119,10 +152,13 @@ APP_CSS = f"""<style>
 }}
 
 /* ── Design tokens ──────────────────────────────────────────────── */
+/* Values come from tk (night or day), chosen in Python above from the
+   ?theme= query param — same server-rendered approach as page/font-size,
+   no client-side JS needed. */
 :root {{
-    --bg:#050505; --panel:#0c0c0c; --elevated:#121212; --border:#252525;
-    --text:#f5f5f2; --muted:#8e8e8e; --accent:#d9ff62;
-    --low:#7ee2a8; --medium:#f2c66d; --high:#f19a66; --critical:#ff6b6b;
+    --bg:{tk['bg']}; --panel:{tk['panel']}; --elevated:{tk['elevated']}; --border:{tk['border']};
+    --text:{tk['text']}; --muted:{tk['muted']}; --accent:#d9ff62;
+    --low:{tk['low']}; --medium:{tk['medium']}; --high:{tk['high']}; --critical:{tk['critical']};
     --mono:"DM Mono",Consolas,monospace;
     --sans:"Manrope","Helvetica Neue",Arial,sans-serif;
 }}
@@ -791,6 +827,70 @@ code,pre {{ font-family:var(--mono); }}
     .leaf-texture {{ animation:none; }}
     * {{ scroll-behavior:auto!important; transition-duration:.01ms!important; }}
 }}
+
+/* ── Theme switcher (sidebar) ──────────────────────────────────── */
+.theme-switcher {{
+    display:flex; width:66px; flex-direction:column; align-items:center;
+    gap:5px; margin-top:2px; padding-top:10px; border-top:1px solid var(--border);
+}}
+.theme-label {{
+    margin-bottom:3px; color:#555; font-family:"DM Mono",monospace;
+    font-size:8px; letter-spacing:0.08em; text-transform:uppercase; text-align:center;
+}}
+.theme-toggle {{
+    position:relative; display:grid; width:58px; height:30px;
+    grid-template-columns:1fr 1fr; overflow:hidden;
+    border:1px solid #30322b; border-radius:999px;
+    color:#777b70; background:#11120f; transition:border-color 160ms ease;
+}}
+.theme-toggle:hover {{ border-color:#555b44; color:#aeb593; }}
+.toggle-icon {{
+    position:relative; z-index:2; display:grid; height:28px;
+    place-items:center; transition:color 160ms ease;
+}}
+.toggle-thumb {{
+    position:absolute; z-index:1; top:3px; left:3px; width:22px; height:22px;
+    border-radius:50%; background:var(--accent);
+    box-shadow:0 2px 8px rgb(0 0 0 / 35%); transition:transform 180ms ease;
+}}
+.theme-toggle.day .toggle-icon:first-child,
+.theme-toggle.night .toggle-icon:nth-child(2) {{ color:#111; }}
+.theme-toggle.night .toggle-thumb {{ transform:translateX(28px); }}
+</style>"""
+
+if theme == "day":
+    # Hardcoded dark-mode colors that don't already ride on the
+    # :root tokens above — ported from the Figma day-mode reference.
+    # Plain string (not an f-string), so single braces here are literal CSS.
+    APP_CSS += """<style>
+.side-nav { background:#ffffff; box-shadow:8px 0 28px rgb(41 45 35 / 5%); }
+.sidebar-custom-logo {
+    border-radius:10px; background:#080808;
+    box-shadow:0 4px 14px rgb(41 45 35 / 16%); mix-blend-mode:normal;
+}
+.side-nav nav a { color:#70756b; }
+.kicker,.progress-item { color:#676c62; }
+.context-grid { border-color:#dfe1d8; }
+.context-grid > div { border-color:#dfe1d8; background:#fafbf7; }
+.context-grid span { color:#74796e; }
+.trace-block { border-color:#dfe1d8; background:#ffffff; }
+.trace-block p { color:#555b51; }
+.trace-block code { color:#607719; }
+.trace-block.thought { border-color:rgb(126 153 42 / 28%); background:rgb(217 255 98 / 10%); }
+.empty-state p { color:#454a42; }
+.st-key-downgrade-btn .stFormSubmitButton button {
+    border-color:#cdd0c6!important; background:#ffffff!important;
+}
+[data-testid="stPopoverBody"] {
+    border-color:#d1d4c9!important; background:#ffffff!important;
+    box-shadow:0 14px 40px rgb(41 45 35 / 14%)!important;
+}
+[data-testid="stPopoverBody"] .stDownloadButton button { color:#62675d!important; }
+[data-testid="stPopoverBody"] .stDownloadButton button:hover {
+    color:var(--text)!important; background:#f1f3ed!important;
+}
+.theme-toggle { border-color:#d2d6ca; color:#767b70; background:#eef0e9; }
+.theme-toggle:hover { border-color:#b8bdaf; }
 </style>"""
 
 st.markdown(APP_CSS, unsafe_allow_html=True)
@@ -818,19 +918,29 @@ def _render_sidebar(active: str) -> None:
         if _corner_b64
         else f"data:image/png;base64,{_logo_b64}"
     )
+    other_theme = "night" if theme == "day" else "day"
     st.markdown(
         f'<aside class="side-nav">'
-        f'<a class="side-logo" href="/" target="_top" aria-label="Back to home">'
+        f'<a class="side-logo" href="{_nav_href(page_="landing")}" target="_top" aria-label="Back to home">'
         f'<span class="sidebar-custom-logo" aria-hidden="true">'
         f'<img src="{logo_src}" alt="">'
         f"</span></a>"
         f'<nav aria-label="Workspace navigation">'
-        f'<a class="{"active" if active == "alerts" else ""}" href="?page=alerts" target="_top" title="Progress">'
+        f'<a class="{"active" if active == "alerts" else ""}" href="{_nav_href(page_="alerts")}" target="_top" title="Progress">'
         f'{_icon("pulse", 19)}<span>Progress</span></a>'
-        f'<a class="{"active" if active == "map" else ""}" href="?page=map" target="_top" title="Map">'
+        f'<a class="{"active" if active == "map" else ""}" href="{_nav_href(page_="map")}" target="_top" title="Map">'
         f'{_icon("map", 19)}<span>Map</span></a>'
-        f'<a class="{"active" if active == "about" else ""}" href="?page=about" target="_top" title="About us">'
+        f'<a class="{"active" if active == "about" else ""}" href="{_nav_href(page_="about")}" target="_top" title="About us">'
         f'{_icon("users", 19)}<span>About us</span></a>'
+        f'<div class="theme-switcher">'
+        f'<span class="theme-label">Theme</span>'
+        f'<a class="theme-toggle {theme}" href="{_nav_href(page_=active, alert=selected_alert, theme_=other_theme)}" '
+        f'target="_top" role="switch" aria-checked="{"true" if theme == "day" else "false"}" '
+        f'title="Switch to {other_theme} mode">'
+        f'<span class="toggle-icon">{_icon("sun", 13)}</span>'
+        f'<span class="toggle-icon">{_icon("moon", 13)}</span>'
+        f'<span class="toggle-thumb"></span>'
+        f"</a></div>"
         f"</nav></aside>",
         unsafe_allow_html=True,
     )
