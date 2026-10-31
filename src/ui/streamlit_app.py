@@ -1186,13 +1186,14 @@ def _render_alerts() -> None:
                     unsafe_allow_html=True,
                 )
                 with st.status("Investigating…", expanded=True) as status:
-                    current_step = {"n": 0}
+                    phase = {"n": 0, "last_agent": None}
 
                     def on_event(event: dict) -> None:
-                        if event["step"] != current_step["n"]:
-                            current_step["n"] = event["step"]
-                            st.markdown(f"#### Step {event['step']}")
-                            status.update(label=f"Investigating… step {event['step']}")
+                        if event["kind"] == "routing" and event.get("tool") != phase["last_agent"]:
+                            phase["n"] += 1
+                            phase["last_agent"] = event.get("tool")
+                            st.markdown(f"#### Step {phase['n']}")
+                            status.update(label=f"Investigating… step {phase['n']}")
                         _render_event(event)
 
                     try:
