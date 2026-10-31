@@ -1,6 +1,7 @@
 """Rootly FastAPI — expune run_diagnosis / resume_diagnosis ca endpoint-uri HTTP."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -77,6 +78,10 @@ def _run_background(alert_id: str, thread_id: str) -> None:
 async def lifespan(app: FastAPI):
     setup_phoenix()
     init_observability()
+    from src.tools.incident_search import _backend
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _backend)
+    logger.info("RAG backend warmed up")
     yield
     shutdown_observability()
 

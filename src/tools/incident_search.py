@@ -19,6 +19,14 @@ from functools import lru_cache
 from pathlib import Path
 
 from src.data_loader import DATA_DIR, load_incidents
+
+try:
+    from langsmith import traceable as _traceable
+except ImportError:
+    def _traceable(**_kwargs):
+        def _noop(fn):
+            return fn
+        return _noop
 from src.models.schemas import HistoricalIncident
 
 logger = logging.getLogger(__name__)
@@ -147,6 +155,7 @@ def _backend() -> _ChromaBackend | _BM25Backend:
         return _BM25Backend()
 
 
+@_traceable(run_type="tool", name="similar_incidents_search")
 def similar_incidents_search(query: str, top_k: int = DEFAULT_TOP_K) -> dict:
     if not query or not query.strip():
         return {"error": "query must be a non-empty description of the current issue."}

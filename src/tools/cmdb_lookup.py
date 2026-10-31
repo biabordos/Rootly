@@ -4,6 +4,14 @@ from __future__ import annotations
 
 from src.data_loader import load_cmdb
 
+try:
+    from langsmith import traceable as _traceable
+except ImportError:
+    def _traceable(**_kwargs):
+        def _noop(fn):
+            return fn
+        return _noop
+
 TOOL_DEFINITION = {
     "name": "cmdb_lookup",
     "description": (
@@ -26,6 +34,7 @@ TOOL_DEFINITION = {
 }
 
 
+@_traceable(run_type="tool", name="cmdb_lookup")
 def cmdb_lookup(component_name: str) -> dict:
     wanted = component_name.strip().lower()
     components = load_cmdb()

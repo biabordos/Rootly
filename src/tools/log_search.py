@@ -6,6 +6,14 @@ from datetime import datetime
 
 from src.data_loader import load_cmdb, load_logs
 
+try:
+    from langsmith import traceable as _traceable
+except ImportError:
+    def _traceable(**_kwargs):
+        def _noop(fn):
+            return fn
+        return _noop
+
 MAX_RESULTS = 30
 LEVELS = ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"]
 
@@ -49,6 +57,7 @@ def _parse_time(value: str) -> datetime:
     return datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
 
 
+@_traceable(run_type="tool", name="log_search")
 def log_search(service: str, start_time: str, end_time: str, level: str | None = None) -> dict:
     service_name = service.strip().lower()
     known_services = {c.name for c in load_cmdb()}
