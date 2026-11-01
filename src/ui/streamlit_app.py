@@ -10,6 +10,7 @@ import base64
 import json
 import sys
 from pathlib import Path
+from urllib.parse import parse_qsl
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -919,7 +920,63 @@ if theme == "day":
 .side-nav nav a.theme-toggle:hover { border-color:#b8bdaf; }
 </style>"""
 
+# The link router component has no visible UI; keep its wrapper out of layout.
+APP_CSS += """<style>
+.st-key-link-router-box {
+    position:absolute!important; width:0!important; height:0!important;
+    overflow:hidden!important; margin:0!important; padding:0!important;
+}
+</style>"""
+
 st.markdown(APP_CSS, unsafe_allow_html=True)
+
+# ── Client-side link router ─────────────────────────────────────────────────
+# Every in-app link is a plain <a href="?page=..." target="_top">, which makes
+# the browser do a full page reload (new websocket session, white flash).
+# This invisible Custom Component v2 listens for clicks on those links at the
+# document level, cancels the browser navigation and hands the href to Python
+# instead. Python then updates st.query_params and reruns over the live
+# session. The HTML/CSS of the links stays exactly as it is.
+_link_router = st.components.v2.component(
+    "rootly_link_router",
+    js="""
+    export default function ({ setTriggerValue }) {
+        if (window.__rootlyNavHandler) {
+            document.removeEventListener("click", window.__rootlyNavHandler, true);
+        }
+        const handler = (e) => {
+            // Keep normal browser behaviour for new-tab / modified clicks.
+            if (e.defaultPrevented || e.button !== 0 ||
+                e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            const a = e.target.closest ? e.target.closest('a[href^="?"]') : null;
+            if (!a) return;
+            e.preventDefault();
+            e.stopPropagation();
+            setTriggerValue("nav", a.getAttribute("href"));
+        };
+        window.__rootlyNavHandler = handler;
+        document.addEventListener("click", handler, true);
+        return () => {
+            document.removeEventListener("click", handler, true);
+            if (window.__rootlyNavHandler === handler) window.__rootlyNavHandler = null;
+        };
+    }
+    """,
+)
+
+_NAV_PARAMS = {"page", "alert", "theme"}
+
+with st.container(key="link-router-box"):
+    _nav = _link_router(key="link-router", on_nav_change=lambda: None)
+
+if _nav.nav:
+    _target = {
+        k: v
+        for k, v in parse_qsl(str(_nav.nav).lstrip("?"))
+        if k in _NAV_PARAMS
+    }
+    st.query_params.from_dict(_target)
+    st.rerun()
 
 # Landing page gets full-bleed, no default Streamlit padding.
 # Non-landing pages get their 84px sidebar offset via .st-key-page-shell
