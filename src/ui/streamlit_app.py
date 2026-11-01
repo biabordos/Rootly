@@ -109,19 +109,6 @@ def _nav_href(*, page_: str, alert: str | None = None, theme_: str | None = None
     params["theme"] = theme_ if theme_ is not None else theme
     return "?" + "&".join(f"{k}={v}" for k, v in params.items())
 
-
-def _goto(*, page_: str, alert: str | None = None, theme_: str | None = None) -> None:
-    """Same destination as _nav_href, but navigates with st.rerun() over
-    the live session instead of a real <a href> browser reload — used for
-    the sidebar nav and theme toggle so those specific clicks feel instant
-    instead of flashing a full page reload."""
-    st.query_params.clear()
-    st.query_params["page"] = page_
-    if alert:
-        st.query_params["alert"] = alert
-    st.query_params["theme"] = theme_ if theme_ is not None else theme
-    st.rerun()
-
 # ── Assets ──────────────────────────────────────────────────────────────────
 _logo_b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
 _corner_b64 = ""
@@ -359,76 +346,6 @@ code,pre {{ font-family:var(--mono); }}
 .side-nav nav a.active::before {{
     position:absolute; left:-9px; width:2px; height:24px;
     border-radius:2px; background:var(--accent); content:"";
-}}
-/* Real st.button nav rail — positioned over the .side-nav chrome. */
-.st-key-side-nav-rail {{
-    position:fixed!important; z-index:21; top:83px; bottom:0; left:0;
-    width:84px!important; display:flex!important; flex-direction:column!important;
-    align-items:center!important; padding-top:26px; overflow-y:auto;
-}}
-/* Kill ALL Streamlit-generated gaps/padding inside the rail */
-.st-key-side-nav-rail [data-testid="stVerticalBlock"] {{
-    gap:6px!important; align-items:center!important;
-}}
-/* Streamlit wraps every st.container() in a stLayoutWrapper — force 66px + center */
-.st-key-side-nav-rail [data-testid="stLayoutWrapper"] {{
-    width:66px!important; max-width:66px!important;
-    display:flex!important; flex-direction:column!important;
-    align-items:center!important;
-}}
-/* Each nav card = 66×58 exactly like the old <a> */
-.st-key-side-nav-rail .st-key-nav-alerts,
-.st-key-side-nav-rail .st-key-nav-map,
-.st-key-side-nav-rail .st-key-nav-about,
-.st-key-side-nav-rail .st-key-nav-theme-toggle {{
-    position:relative!important; display:flex!important;
-    width:66px!important; max-width:66px!important;
-    min-height:58px!important;
-    flex-direction:column!important; align-items:center!important;
-    justify-content:center!important;
-    border-radius:10px!important; color:#777;
-    cursor:pointer; transition:150ms ease;
-}}
-/* Force ALL .stElementContainer wrappers inside cards to shrink-wrap */
-.st-key-side-nav-rail .stElementContainer {{
-    min-height:0!important; width:auto!important;
-    height:auto!important; flex-shrink:0!important;
-}}
-/* stMarkdown collapses to h=0 inside flex — force visible */
-.st-key-side-nav-rail .stMarkdown,
-.st-key-side-nav-rail .stMarkdown > div,
-.st-key-side-nav-rail .stMarkdown > div > div {{
-    height:auto!important; overflow:visible!important;
-}}
-.st-key-side-nav-rail .st-key-nav-alerts:hover,
-.st-key-side-nav-rail .st-key-nav-map:hover,
-.st-key-side-nav-rail .st-key-nav-about:hover,
-.st-key-side-nav-rail .st-key-nav-theme-toggle:hover {{
-    color:var(--accent); background:rgb(217 255 98 / 6%);
-}}
-/* Button = just the icon, completely transparent */
-.st-key-side-nav-rail .stButton {{ width:auto!important; }}
-.st-key-side-nav-rail .stButton button {{
-    width:auto!important; height:auto!important; min-height:0!important;
-    padding:0!important; border:0!important; background:transparent!important;
-    color:inherit!important; box-shadow:none!important;
-}}
-.st-key-side-nav-rail .stButton button:hover,
-.st-key-side-nav-rail .stButton button:focus,
-.st-key-side-nav-rail .stButton button:active {{
-    background:transparent!important; box-shadow:none!important;
-    border:0!important;
-}}
-.st-key-side-nav-rail .stButton button p {{ display:none!important; }}
-/* Label under the icon */
-.nav-rail-label {{
-    color:inherit; font-family:"DM Mono",monospace; font-size:10px;
-    text-align:center; line-height:1; white-space:nowrap;
-    margin-top:2px;
-}}
-.theme-label-rail {{
-    margin-top:10px; color:#555; font-family:"DM Mono",monospace;
-    font-size:8px; letter-spacing:0.08em; text-transform:uppercase; text-align:center;
 }}
 
 /* ── Workspace ──────────────────────────────────────────────────── */
@@ -978,11 +895,6 @@ if theme == "day":
     box-shadow:0 4px 14px rgb(41 45 35 / 16%); mix-blend-mode:normal;
 }
 .side-nav nav a { color:#70756b; }
-.st-key-side-nav-rail .st-key-nav-alerts,
-.st-key-side-nav-rail .st-key-nav-map,
-.st-key-side-nav-rail .st-key-nav-about,
-.st-key-side-nav-rail .st-key-nav-theme-toggle { color:#70756b; }
-.theme-label-rail { color:#888d83; }
 .kicker,.progress-item { color:#676c62; }
 .context-grid { border-color:#dfe1d8; }
 .context-grid > div { border-color:#dfe1d8; background:#fafbf7; }
@@ -1033,55 +945,31 @@ def _render_sidebar(active: str) -> None:
         else f"data:image/png;base64,{_logo_b64}"
     )
     other_theme = "night" if theme == "day" else "day"
-
-    # The chrome (background, border, logo) stays plain HTML — it's not
-    # interactive, so a real <a> here is fine and low-traffic.
     st.markdown(
         f'<aside class="side-nav">'
         f'<a class="side-logo" href="{_nav_href(page_="landing")}" target="_top" aria-label="Back to home">'
         f'<span class="sidebar-custom-logo" aria-hidden="true">'
         f'<img src="{logo_src}" alt="">'
         f"</span></a>"
-        f"</aside>",
+        f'<nav aria-label="Workspace navigation">'
+        f'<a class="{"active" if active == "alerts" else ""}" href="{_nav_href(page_="alerts")}" target="_top" title="Progress">'
+        f'{_icon("pulse", 19)}<span>Progress</span></a>'
+        f'<a class="{"active" if active == "map" else ""}" href="{_nav_href(page_="map")}" target="_top" title="Map">'
+        f'{_icon("map", 19)}<span>Map</span></a>'
+        f'<a class="{"active" if active == "about" else ""}" href="{_nav_href(page_="about")}" target="_top" title="About us">'
+        f'{_icon("users", 19)}<span>About us</span></a>'
+        f'<div class="theme-switcher">'
+        f'<span class="theme-label">Theme</span>'
+        f'<a class="theme-toggle {theme}" href="{_nav_href(page_=active, alert=selected_alert, theme_=other_theme)}" '
+        f'target="_top" role="switch" aria-checked="{"true" if theme == "day" else "false"}" '
+        f'title="Switch to {other_theme} mode">'
+        f'<span class="toggle-icon">{_icon("sun", 13)}</span>'
+        f'<span class="toggle-icon">{_icon("moon", 13)}</span>'
+        f'<span class="toggle-thumb"></span>'
+        f"</a></div>"
+        f"</nav></aside>",
         unsafe_allow_html=True,
     )
-
-    # Page nav + theme toggle are real st.button widgets now, not <a href>
-    # links — a click reruns the script over the live session instead of
-    # reloading the whole browser tab, so it doesn't flash/flicker.
-    # Positioned via CSS to sit inside the sidebar drawn above.
-    # Active item gets the same left accent bar + highlight the old <a
-    # class="active"> had — applied to the card (the container), not the
-    # bare button, so it covers icon + label as one piece.
-    st.markdown(
-        f'<style>.st-key-side-nav-rail .st-key-nav-{active} {{ '
-        f'color:var(--accent)!important; background:rgb(217 255 98 / 6%)!important; '
-        f'}}'
-        f'.st-key-side-nav-rail .st-key-nav-{active}::before {{ '
-        f'position:absolute; left:-9px; width:2px; height:24px; '
-        f'border-radius:2px; background:var(--accent); content:""; '
-        f'}}</style>',
-        unsafe_allow_html=True,
-    )
-    with st.container(key="side-nav-rail"):
-        with st.container(key="nav-alerts"):
-            if st.button("Progress", key="btn-nav-alerts", icon=":material/monitor_heart:"):
-                _goto(page_="alerts")
-            st.markdown('<div class="nav-rail-label">Progress</div>', unsafe_allow_html=True)
-        with st.container(key="nav-map"):
-            if st.button("Map", key="btn-nav-map", icon=":material/map:"):
-                _goto(page_="map")
-            st.markdown('<div class="nav-rail-label">Map</div>', unsafe_allow_html=True)
-        with st.container(key="nav-about"):
-            if st.button("About us", key="btn-nav-about", icon=":material/group:"):
-                _goto(page_="about")
-            st.markdown('<div class="nav-rail-label">About us</div>', unsafe_allow_html=True)
-        st.markdown('<div class="theme-label-rail">Theme</div>', unsafe_allow_html=True)
-        theme_icon = ":material/dark_mode:" if theme == "night" else ":material/light_mode:"
-        with st.container(key="nav-theme-toggle"):
-            if st.button(other_theme.capitalize(), key="btn-nav-theme", icon=theme_icon):
-                _goto(page_=active, alert=selected_alert, theme_=other_theme)
-            st.markdown(f'<div class="nav-rail-label">{other_theme.capitalize()}</div>', unsafe_allow_html=True)
 
 
 def _render_event(event: dict) -> None:
@@ -1222,7 +1110,7 @@ def _render_map() -> None:
             status = _get_alert_status(aid)
             sel = " selected" if aid == alert_id else ""
             cards_html.append(
-                f'<a class="alert-card{sel}" href="{_nav_href(page_="map", alert=aid)}" target="_top">'
+                f'<a class="alert-card{sel}" href="?page=map&alert={aid}" target="_top">'
                 f'<span class="status-dot {status}"></span>'
                 f"<span><strong>{aid}</strong>"
                 f"<small>{a.service}</small></span></a>"
@@ -1256,7 +1144,7 @@ def _render_alerts() -> None:
             status = _get_alert_status(aid)
             sel = " selected" if aid == selected_alert else ""
             cards_html.append(
-                f'<a class="alert-card{sel}" href="{_nav_href(page_="alerts", alert=aid)}" target="_top">'
+                f'<a class="alert-card{sel}" href="?page=alerts&alert={aid}" target="_top">'
                 f'<span class="status-dot {status}"></span>'
                 f"<span><strong>{aid}</strong>"
                 f"<small>{alert.service}</small></span></a>"
