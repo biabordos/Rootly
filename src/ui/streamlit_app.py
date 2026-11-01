@@ -1107,11 +1107,11 @@ def _render_landing() -> None:
         f"context, log evidence, and historical incidents into a clear path to resolution.</p>"
         f"</div>"
         f'<nav class="landing-nav" aria-label="Main navigation">'
-        f'<a class="launch-button" href="?page=alerts" target="_top">'
+        f'<a class="launch-button" href="{_nav_href(page_="alerts")}" target="_top">'
         f'<span>Launch Rootly</span>{_icon("arrow")}</a>'
-        f'<a href="?page=about" target="_top">'
+        f'<a href="{_nav_href(page_="about")}" target="_top">'
         f'<span>About Rootly</span>{_icon("arrow")}</a>'
-        f'<a href="?page=map" target="_top">'
+        f'<a href="{_nav_href(page_="map")}" target="_top">'
         f'<span>System Map</span>{_icon("arrow")}</a>'
         f"</nav></div></main>",
         unsafe_allow_html=True,
@@ -1167,7 +1167,7 @@ def _render_map() -> None:
             status = _get_alert_status(aid)
             sel = " selected" if aid == alert_id else ""
             cards_html.append(
-                f'<a class="alert-card{sel}" href="?page=map&alert={aid}" target="_top">'
+                f'<a class="alert-card{sel}" href="{_nav_href(page_="map", alert=aid)}" target="_top">'
                 f'<span class="status-dot {status}"></span>'
                 f"<span><strong>{aid}</strong>"
                 f"<small>{a.service}</small></span></a>"
@@ -1201,7 +1201,7 @@ def _render_alerts() -> None:
             status = _get_alert_status(aid)
             sel = " selected" if aid == selected_alert else ""
             cards_html.append(
-                f'<a class="alert-card{sel}" href="?page=alerts&alert={aid}" target="_top">'
+                f'<a class="alert-card{sel}" href="{_nav_href(page_="alerts", alert=aid)}" target="_top">'
                 f'<span class="status-dot {status}"></span>'
                 f"<span><strong>{aid}</strong>"
                 f"<small>{alert.service}</small></span></a>"
