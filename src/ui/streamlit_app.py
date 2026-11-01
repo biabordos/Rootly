@@ -366,27 +366,36 @@ code,pre {{ font-family:var(--mono); }}
     width:84px!important; display:flex!important; flex-direction:column!important;
     align-items:center!important; padding-top:26px; overflow-y:auto;
 }}
+/* Kill ALL Streamlit-generated gaps/padding inside the rail */
 .st-key-side-nav-rail [data-testid="stVerticalBlock"] {{
-    gap:10px!important; width:66px!important; align-items:center!important;
+    gap:6px!important; align-items:center!important;
 }}
+/* Each nav card = 66x58 exactly like the old <a> */
 .st-key-side-nav-rail .st-key-nav-alerts,
 .st-key-side-nav-rail .st-key-nav-map,
 .st-key-side-nav-rail .st-key-nav-about,
 .st-key-side-nav-rail .st-key-nav-theme-toggle {{
     position:relative!important; display:flex!important;
     width:66px!important; max-width:66px!important;
-    height:58px!important; max-height:58px!important;
+    min-height:58px!important;
     flex-direction:column!important; align-items:center!important;
-    justify-content:center!important; gap:6px!important;
+    justify-content:center!important;
     border-radius:10px!important; color:#777;
-    cursor:pointer; transition:150ms ease; overflow:hidden!important;
+    cursor:pointer; transition:150ms ease;
 }}
-.st-key-side-nav-rail .st-key-nav-alerts > div,
-.st-key-side-nav-rail .st-key-nav-map > div,
-.st-key-side-nav-rail .st-key-nav-about > div,
-.st-key-side-nav-rail .st-key-nav-theme-toggle > div {{
-    width:100%!important; display:flex!important; flex-direction:column!important;
-    align-items:center!important; gap:4px!important; padding:0!important;
+/* Force ALL .stElementContainer wrappers inside cards to shrink-wrap */
+.st-key-side-nav-rail .st-key-nav-alerts .stElementContainer,
+.st-key-side-nav-rail .st-key-nav-map .stElementContainer,
+.st-key-side-nav-rail .st-key-nav-about .stElementContainer,
+.st-key-side-nav-rail .st-key-nav-theme-toggle .stElementContainer {{
+    min-height:0!important; width:auto!important;
+    height:auto!important; flex-shrink:0!important;
+}}
+/* stMarkdown collapses to h=0 inside flex — force visible */
+.st-key-side-nav-rail .stMarkdown,
+.st-key-side-nav-rail .stMarkdown > div,
+.st-key-side-nav-rail .stMarkdown > div > div {{
+    height:auto!important; overflow:visible!important;
 }}
 .st-key-side-nav-rail .st-key-nav-alerts:hover,
 .st-key-side-nav-rail .st-key-nav-map:hover,
@@ -394,6 +403,7 @@ code,pre {{ font-family:var(--mono); }}
 .st-key-side-nav-rail .st-key-nav-theme-toggle:hover {{
     color:var(--accent); background:rgb(217 255 98 / 6%);
 }}
+/* Button = just the icon, completely transparent */
 .st-key-side-nav-rail .stButton {{ width:auto!important; }}
 .st-key-side-nav-rail .stButton button {{
     width:auto!important; height:auto!important; min-height:0!important;
@@ -406,9 +416,11 @@ code,pre {{ font-family:var(--mono); }}
     background:transparent!important; box-shadow:none!important;
 }}
 .st-key-side-nav-rail .stButton button p {{ display:none!important; }}
+/* Label under the icon */
 .nav-rail-label {{
     color:inherit; font-family:"DM Mono",monospace; font-size:10px;
     text-align:center; line-height:1; white-space:nowrap;
+    margin-top:2px;
 }}
 .theme-label-rail {{
     margin-top:10px; color:#555; font-family:"DM Mono",monospace;
