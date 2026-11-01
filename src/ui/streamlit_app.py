@@ -367,23 +367,27 @@ code,pre {{ font-family:var(--mono); }}
     width:84px!important; display:flex!important; flex-direction:column!important;
     align-items:center!important; gap:8px; padding-top:18px; overflow-y:auto;
 }}
-.st-key-side-nav-rail [data-testid="stVerticalBlock"] {{ gap:8px!important; }}
-.st-key-side-nav-rail .stButton {{ width:68px; }}
+.st-key-side-nav-rail [data-testid="stVerticalBlock"] {{ gap:2px!important; }}
+/* Icon-only button (its text label is hidden, not removed — screen
+   readers still get it); the visible label is the plain-text .nav-rail-label
+   underneath, same two-row "icon then small caption" look as before. */
+.st-key-side-nav-rail .stButton {{ width:48px; margin:0 auto; }}
 .st-key-side-nav-rail .stButton button {{
-    width:68px!important; min-height:46px!important; padding:4px!important;
-    border:0!important; border-radius:10px!important;
+    width:48px!important; height:40px!important; min-height:40px!important;
+    padding:0!important; border:0!important; border-radius:10px!important;
     color:#777!important; background:transparent!important;
-    font-family:"DM Mono",monospace!important; font-size:9px!important;
-    justify-content:center!important; gap:4px!important;
+    display:flex!important; align-items:center!important; justify-content:center!important;
 }}
 .st-key-side-nav-rail .stButton button:hover {{
     color:var(--accent)!important; background:rgb(217 255 98 / 6%)!important;
 }}
-.st-key-side-nav-rail .stButton button p {{
-    font-family:"DM Mono",monospace!important; font-size:9px!important;
+.st-key-side-nav-rail .stButton button p {{ display:none!important; }}
+.nav-rail-label {{
+    margin:-2px 0 6px; color:#777; font-family:"DM Mono",monospace;
+    font-size:9px; text-align:center;
 }}
 .theme-label-rail {{
-    margin-top:6px; color:#555; font-family:"DM Mono",monospace;
+    margin-top:10px; color:#555; font-family:"DM Mono",monospace;
     font-size:8px; letter-spacing:0.08em; text-transform:uppercase; text-align:center;
 }}
 
@@ -935,6 +939,7 @@ if theme == "day":
 }
 .side-nav nav a { color:#70756b; }
 .st-key-side-nav-rail .stButton button { color:#70756b!important; }
+.nav-rail-label { color:#70756b; }
 .theme-label-rail { color:#888d83; }
 .kicker,.progress-item { color:#676c62; }
 .context-grid { border-color:#dfe1d8; }
@@ -1006,24 +1011,30 @@ def _render_sidebar(active: str) -> None:
     st.markdown(
         f'<style>.st-key-side-nav-rail .st-key-nav-{active} .stButton button {{ '
         f'color:var(--accent)!important; background:rgb(217 255 98 / 6%)!important; '
-        f'}}</style>',
+        f'}}'
+        f'.st-key-side-nav-rail .st-key-nav-{active} .nav-rail-label {{ '
+        f'color:var(--accent)!important; }}</style>',
         unsafe_allow_html=True,
     )
     with st.container(key="side-nav-rail"):
         with st.container(key="nav-alerts"):
             if st.button("Progress", key="btn-nav-alerts", icon=":material/monitor_heart:", use_container_width=True):
                 _goto(page_="alerts")
+            st.markdown('<div class="nav-rail-label">Progress</div>', unsafe_allow_html=True)
         with st.container(key="nav-map"):
             if st.button("Map", key="btn-nav-map", icon=":material/map:", use_container_width=True):
                 _goto(page_="map")
+            st.markdown('<div class="nav-rail-label">Map</div>', unsafe_allow_html=True)
         with st.container(key="nav-about"):
             if st.button("About us", key="btn-nav-about", icon=":material/group:", use_container_width=True):
                 _goto(page_="about")
+            st.markdown('<div class="nav-rail-label">About us</div>', unsafe_allow_html=True)
         st.markdown('<div class="theme-label-rail">Theme</div>', unsafe_allow_html=True)
         theme_icon = ":material/dark_mode:" if theme == "night" else ":material/light_mode:"
         with st.container(key="nav-theme-toggle"):
             if st.button(other_theme.capitalize(), key="btn-nav-theme", icon=theme_icon, use_container_width=True):
                 _goto(page_=active, alert=selected_alert, theme_=other_theme)
+            st.markdown(f'<div class="nav-rail-label">{other_theme.capitalize()}</div>', unsafe_allow_html=True)
 
 
 def _render_event(event: dict) -> None:
