@@ -360,24 +360,33 @@ code,pre {{ font-family:var(--mono); }}
     position:absolute; left:-9px; width:2px; height:24px;
     border-radius:2px; background:var(--accent); content:"";
 }}
-/* Real st.button nav rail, positioned to sit over the chrome drawn by
-   .side-nav above (same left/width, starting below the 83px logo row).
-   Each nav item's own st.container (.st-key-nav-alerts etc.) IS the
-   66×58 card — same size/shape as the old <a> — so the hover/active
-   background covers icon + label together, not just the icon button. */
+/* Real st.button nav rail — positioned over the .side-nav chrome. */
 .st-key-side-nav-rail {{
     position:fixed!important; z-index:21; top:83px; bottom:0; left:0;
     width:84px!important; display:flex!important; flex-direction:column!important;
-    align-items:center!important; gap:10px; padding-top:26px; overflow-y:auto;
+    align-items:center!important; padding-top:26px; overflow-y:auto;
 }}
-.st-key-side-nav-rail [data-testid="stVerticalBlock"] {{ gap:10px!important; }}
+.st-key-side-nav-rail [data-testid="stVerticalBlock"] {{
+    gap:10px!important; width:66px!important; align-items:center!important;
+}}
 .st-key-side-nav-rail .st-key-nav-alerts,
 .st-key-side-nav-rail .st-key-nav-map,
 .st-key-side-nav-rail .st-key-nav-about,
 .st-key-side-nav-rail .st-key-nav-theme-toggle {{
-    position:relative; display:flex; width:66px; height:58px;
-    flex-direction:column; align-items:center; justify-content:center;
-    gap:6px; border-radius:10px; color:#777; cursor:pointer; transition:150ms ease;
+    position:relative!important; display:flex!important;
+    width:66px!important; max-width:66px!important;
+    height:58px!important; max-height:58px!important;
+    flex-direction:column!important; align-items:center!important;
+    justify-content:center!important; gap:6px!important;
+    border-radius:10px!important; color:#777;
+    cursor:pointer; transition:150ms ease; overflow:hidden!important;
+}}
+.st-key-side-nav-rail .st-key-nav-alerts > div,
+.st-key-side-nav-rail .st-key-nav-map > div,
+.st-key-side-nav-rail .st-key-nav-about > div,
+.st-key-side-nav-rail .st-key-nav-theme-toggle > div {{
+    width:100%!important; display:flex!important; flex-direction:column!important;
+    align-items:center!important; gap:4px!important; padding:0!important;
 }}
 .st-key-side-nav-rail .st-key-nav-alerts:hover,
 .st-key-side-nav-rail .st-key-nav-map:hover,
@@ -385,18 +394,21 @@ code,pre {{ font-family:var(--mono); }}
 .st-key-side-nav-rail .st-key-nav-theme-toggle:hover {{
     color:var(--accent); background:rgb(217 255 98 / 6%);
 }}
-/* The button itself is just the icon, no visible chrome of its own —
-   the card above (its wrapping container) carries color/background. */
-.st-key-side-nav-rail .stButton {{ width:auto; }}
+.st-key-side-nav-rail .stButton {{ width:auto!important; }}
 .st-key-side-nav-rail .stButton button {{
     width:auto!important; height:auto!important; min-height:0!important;
     padding:0!important; border:0!important; background:transparent!important;
-    color:inherit!important;
+    color:inherit!important; box-shadow:none!important;
 }}
-.st-key-side-nav-rail .stButton button:hover {{ background:transparent!important; }}
+.st-key-side-nav-rail .stButton button:hover,
+.st-key-side-nav-rail .stButton button:focus,
+.st-key-side-nav-rail .stButton button:active {{
+    background:transparent!important; box-shadow:none!important;
+}}
 .st-key-side-nav-rail .stButton button p {{ display:none!important; }}
 .nav-rail-label {{
-    color:inherit; font-family:"DM Mono",monospace; font-size:10px; text-align:center;
+    color:inherit; font-family:"DM Mono",monospace; font-size:10px;
+    text-align:center; line-height:1; white-space:nowrap;
 }}
 .theme-label-rail {{
     margin-top:10px; color:#555; font-family:"DM Mono",monospace;
@@ -1037,21 +1049,21 @@ def _render_sidebar(active: str) -> None:
     )
     with st.container(key="side-nav-rail"):
         with st.container(key="nav-alerts"):
-            if st.button("Progress", key="btn-nav-alerts", icon=":material/monitor_heart:", use_container_width=True):
+            if st.button("Progress", key="btn-nav-alerts", icon=":material/monitor_heart:"):
                 _goto(page_="alerts")
             st.markdown('<div class="nav-rail-label">Progress</div>', unsafe_allow_html=True)
         with st.container(key="nav-map"):
-            if st.button("Map", key="btn-nav-map", icon=":material/map:", use_container_width=True):
+            if st.button("Map", key="btn-nav-map", icon=":material/map:"):
                 _goto(page_="map")
             st.markdown('<div class="nav-rail-label">Map</div>', unsafe_allow_html=True)
         with st.container(key="nav-about"):
-            if st.button("About us", key="btn-nav-about", icon=":material/group:", use_container_width=True):
+            if st.button("About us", key="btn-nav-about", icon=":material/group:"):
                 _goto(page_="about")
             st.markdown('<div class="nav-rail-label">About us</div>', unsafe_allow_html=True)
         st.markdown('<div class="theme-label-rail">Theme</div>', unsafe_allow_html=True)
         theme_icon = ":material/dark_mode:" if theme == "night" else ":material/light_mode:"
         with st.container(key="nav-theme-toggle"):
-            if st.button(other_theme.capitalize(), key="btn-nav-theme", icon=theme_icon, use_container_width=True):
+            if st.button(other_theme.capitalize(), key="btn-nav-theme", icon=theme_icon):
                 _goto(page_=active, alert=selected_alert, theme_=other_theme)
             st.markdown(f'<div class="nav-rail-label">{other_theme.capitalize()}</div>', unsafe_allow_html=True)
 
