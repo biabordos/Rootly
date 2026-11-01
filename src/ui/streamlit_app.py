@@ -109,6 +109,19 @@ def _nav_href(*, page_: str, alert: str | None = None, theme_: str | None = None
     params["theme"] = theme_ if theme_ is not None else theme
     return "?" + "&".join(f"{k}={v}" for k, v in params.items())
 
+
+def _goto(*, page_: str, alert: str | None = None, theme_: str | None = None) -> None:
+    """Same destination as _nav_href, but navigates with st.rerun() over
+    the live session instead of a real <a href> browser reload — used for
+    the sidebar nav and theme toggle so those specific clicks feel instant
+    instead of flashing a full page reload."""
+    st.query_params.clear()
+    st.query_params["page"] = page_
+    if alert:
+        st.query_params["alert"] = alert
+    st.query_params["theme"] = theme_ if theme_ is not None else theme
+    st.rerun()
+
 # ── Assets ──────────────────────────────────────────────────────────────────
 _logo_b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
 _corner_b64 = ""
@@ -346,6 +359,32 @@ code,pre {{ font-family:var(--mono); }}
 .side-nav nav a.active::before {{
     position:absolute; left:-9px; width:2px; height:24px;
     border-radius:2px; background:var(--accent); content:"";
+}}
+/* Real st.button nav rail, positioned to sit over the chrome drawn by
+   .side-nav above (same left/width, starting below the 83px logo row). */
+.st-key-side-nav-rail {{
+    position:fixed!important; z-index:21; top:83px; bottom:0; left:0;
+    width:84px!important; display:flex!important; flex-direction:column!important;
+    align-items:center!important; gap:8px; padding-top:18px; overflow-y:auto;
+}}
+.st-key-side-nav-rail [data-testid="stVerticalBlock"] {{ gap:8px!important; }}
+.st-key-side-nav-rail .stButton {{ width:68px; }}
+.st-key-side-nav-rail .stButton button {{
+    width:68px!important; min-height:46px!important; padding:4px!important;
+    border:0!important; border-radius:10px!important;
+    color:#777!important; background:transparent!important;
+    font-family:"DM Mono",monospace!important; font-size:9px!important;
+    justify-content:center!important; gap:4px!important;
+}}
+.st-key-side-nav-rail .stButton button:hover {{
+    color:var(--accent)!important; background:rgb(217 255 98 / 6%)!important;
+}}
+.st-key-side-nav-rail .stButton button p {{
+    font-family:"DM Mono",monospace!important; font-size:9px!important;
+}}
+.theme-label-rail {{
+    margin-top:6px; color:#555; font-family:"DM Mono",monospace;
+    font-size:8px; letter-spacing:0.08em; text-transform:uppercase; text-align:center;
 }}
 
 /* ── Workspace ──────────────────────────────────────────────────── */
@@ -895,6 +934,8 @@ if theme == "day":
     box-shadow:0 4px 14px rgb(41 45 35 / 16%); mix-blend-mode:normal;
 }
 .side-nav nav a { color:#70756b; }
+.st-key-side-nav-rail .stButton button { color:#70756b!important; }
+.theme-label-rail { color:#888d83; }
 .kicker,.progress-item { color:#676c62; }
 .context-grid { border-color:#dfe1d8; }
 .context-grid > div { border-color:#dfe1d8; background:#fafbf7; }
@@ -945,31 +986,44 @@ def _render_sidebar(active: str) -> None:
         else f"data:image/png;base64,{_logo_b64}"
     )
     other_theme = "night" if theme == "day" else "day"
+
+    # The chrome (background, border, logo) stays plain HTML — it's not
+    # interactive, so a real <a> here is fine and low-traffic.
     st.markdown(
         f'<aside class="side-nav">'
         f'<a class="side-logo" href="{_nav_href(page_="landing")}" target="_top" aria-label="Back to home">'
         f'<span class="sidebar-custom-logo" aria-hidden="true">'
         f'<img src="{logo_src}" alt="">'
         f"</span></a>"
-        f'<nav aria-label="Workspace navigation">'
-        f'<a class="{"active" if active == "alerts" else ""}" href="{_nav_href(page_="alerts")}" target="_top" title="Progress">'
-        f'{_icon("pulse", 19)}<span>Progress</span></a>'
-        f'<a class="{"active" if active == "map" else ""}" href="{_nav_href(page_="map")}" target="_top" title="Map">'
-        f'{_icon("map", 19)}<span>Map</span></a>'
-        f'<a class="{"active" if active == "about" else ""}" href="{_nav_href(page_="about")}" target="_top" title="About us">'
-        f'{_icon("users", 19)}<span>About us</span></a>'
-        f'<div class="theme-switcher">'
-        f'<span class="theme-label">Theme</span>'
-        f'<a class="theme-toggle {theme}" href="{_nav_href(page_=active, alert=selected_alert, theme_=other_theme)}" '
-        f'target="_top" role="switch" aria-checked="{"true" if theme == "day" else "false"}" '
-        f'title="Switch to {other_theme} mode">'
-        f'<span class="toggle-icon">{_icon("sun", 13)}</span>'
-        f'<span class="toggle-icon">{_icon("moon", 13)}</span>'
-        f'<span class="toggle-thumb"></span>'
-        f"</a></div>"
-        f"</nav></aside>",
+        f"</aside>",
         unsafe_allow_html=True,
     )
+
+    # Page nav + theme toggle are real st.button widgets now, not <a href>
+    # links — a click reruns the script over the live session instead of
+    # reloading the whole browser tab, so it doesn't flash/flicker.
+    # Positioned via CSS to sit inside the sidebar drawn above.
+    st.markdown(
+        f'<style>.st-key-side-nav-rail .st-key-nav-{active} .stButton button {{ '
+        f'color:var(--accent)!important; background:rgb(217 255 98 / 6%)!important; '
+        f'}}</style>',
+        unsafe_allow_html=True,
+    )
+    with st.container(key="side-nav-rail"):
+        with st.container(key="nav-alerts"):
+            if st.button("Progress", key="btn-nav-alerts", icon=":material/monitor_heart:", use_container_width=True):
+                _goto(page_="alerts")
+        with st.container(key="nav-map"):
+            if st.button("Map", key="btn-nav-map", icon=":material/map:", use_container_width=True):
+                _goto(page_="map")
+        with st.container(key="nav-about"):
+            if st.button("About us", key="btn-nav-about", icon=":material/group:", use_container_width=True):
+                _goto(page_="about")
+        st.markdown('<div class="theme-label-rail">Theme</div>', unsafe_allow_html=True)
+        theme_icon = ":material/dark_mode:" if theme == "night" else ":material/light_mode:"
+        with st.container(key="nav-theme-toggle"):
+            if st.button(other_theme.capitalize(), key="btn-nav-theme", icon=theme_icon, use_container_width=True):
+                _goto(page_=active, alert=selected_alert, theme_=other_theme)
 
 
 def _render_event(event: dict) -> None:
@@ -1110,7 +1164,7 @@ def _render_map() -> None:
             status = _get_alert_status(aid)
             sel = " selected" if aid == alert_id else ""
             cards_html.append(
-                f'<a class="alert-card{sel}" href="?page=map&alert={aid}" target="_top">'
+                f'<a class="alert-card{sel}" href="{_nav_href(page_="map", alert=aid)}" target="_top">'
                 f'<span class="status-dot {status}"></span>'
                 f"<span><strong>{aid}</strong>"
                 f"<small>{a.service}</small></span></a>"
@@ -1144,7 +1198,7 @@ def _render_alerts() -> None:
             status = _get_alert_status(aid)
             sel = " selected" if aid == selected_alert else ""
             cards_html.append(
-                f'<a class="alert-card{sel}" href="?page=alerts&alert={aid}" target="_top">'
+                f'<a class="alert-card{sel}" href="{_nav_href(page_="alerts", alert=aid)}" target="_top">'
                 f'<span class="status-dot {status}"></span>'
                 f"<span><strong>{aid}</strong>"
                 f"<small>{alert.service}</small></span></a>"
