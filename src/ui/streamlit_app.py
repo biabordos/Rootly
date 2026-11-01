@@ -361,30 +361,42 @@ code,pre {{ font-family:var(--mono); }}
     border-radius:2px; background:var(--accent); content:"";
 }}
 /* Real st.button nav rail, positioned to sit over the chrome drawn by
-   .side-nav above (same left/width, starting below the 83px logo row). */
+   .side-nav above (same left/width, starting below the 83px logo row).
+   Each nav item's own st.container (.st-key-nav-alerts etc.) IS the
+   66×58 card — same size/shape as the old <a> — so the hover/active
+   background covers icon + label together, not just the icon button. */
 .st-key-side-nav-rail {{
     position:fixed!important; z-index:21; top:83px; bottom:0; left:0;
     width:84px!important; display:flex!important; flex-direction:column!important;
-    align-items:center!important; gap:8px; padding-top:18px; overflow-y:auto;
+    align-items:center!important; gap:10px; padding-top:26px; overflow-y:auto;
 }}
-.st-key-side-nav-rail [data-testid="stVerticalBlock"] {{ gap:2px!important; }}
-/* Icon-only button (its text label is hidden, not removed — screen
-   readers still get it); the visible label is the plain-text .nav-rail-label
-   underneath, same two-row "icon then small caption" look as before. */
-.st-key-side-nav-rail .stButton {{ width:48px; margin:0 auto; }}
+.st-key-side-nav-rail [data-testid="stVerticalBlock"] {{ gap:10px!important; }}
+.st-key-side-nav-rail .st-key-nav-alerts,
+.st-key-side-nav-rail .st-key-nav-map,
+.st-key-side-nav-rail .st-key-nav-about,
+.st-key-side-nav-rail .st-key-nav-theme-toggle {{
+    position:relative; display:flex; width:66px; height:58px;
+    flex-direction:column; align-items:center; justify-content:center;
+    gap:6px; border-radius:10px; color:#777; cursor:pointer; transition:150ms ease;
+}}
+.st-key-side-nav-rail .st-key-nav-alerts:hover,
+.st-key-side-nav-rail .st-key-nav-map:hover,
+.st-key-side-nav-rail .st-key-nav-about:hover,
+.st-key-side-nav-rail .st-key-nav-theme-toggle:hover {{
+    color:var(--accent); background:rgb(217 255 98 / 6%);
+}}
+/* The button itself is just the icon, no visible chrome of its own —
+   the card above (its wrapping container) carries color/background. */
+.st-key-side-nav-rail .stButton {{ width:auto; }}
 .st-key-side-nav-rail .stButton button {{
-    width:48px!important; height:40px!important; min-height:40px!important;
-    padding:0!important; border:0!important; border-radius:10px!important;
-    color:#777!important; background:transparent!important;
-    display:flex!important; align-items:center!important; justify-content:center!important;
+    width:auto!important; height:auto!important; min-height:0!important;
+    padding:0!important; border:0!important; background:transparent!important;
+    color:inherit!important;
 }}
-.st-key-side-nav-rail .stButton button:hover {{
-    color:var(--accent)!important; background:rgb(217 255 98 / 6%)!important;
-}}
+.st-key-side-nav-rail .stButton button:hover {{ background:transparent!important; }}
 .st-key-side-nav-rail .stButton button p {{ display:none!important; }}
 .nav-rail-label {{
-    margin:-2px 0 6px; color:#777; font-family:"DM Mono",monospace;
-    font-size:9px; text-align:center;
+    color:inherit; font-family:"DM Mono",monospace; font-size:10px; text-align:center;
 }}
 .theme-label-rail {{
     margin-top:10px; color:#555; font-family:"DM Mono",monospace;
@@ -938,8 +950,10 @@ if theme == "day":
     box-shadow:0 4px 14px rgb(41 45 35 / 16%); mix-blend-mode:normal;
 }
 .side-nav nav a { color:#70756b; }
-.st-key-side-nav-rail .stButton button { color:#70756b!important; }
-.nav-rail-label { color:#70756b; }
+.st-key-side-nav-rail .st-key-nav-alerts,
+.st-key-side-nav-rail .st-key-nav-map,
+.st-key-side-nav-rail .st-key-nav-about,
+.st-key-side-nav-rail .st-key-nav-theme-toggle { color:#70756b; }
 .theme-label-rail { color:#888d83; }
 .kicker,.progress-item { color:#676c62; }
 .context-grid { border-color:#dfe1d8; }
@@ -1008,12 +1022,17 @@ def _render_sidebar(active: str) -> None:
     # links — a click reruns the script over the live session instead of
     # reloading the whole browser tab, so it doesn't flash/flicker.
     # Positioned via CSS to sit inside the sidebar drawn above.
+    # Active item gets the same left accent bar + highlight the old <a
+    # class="active"> had — applied to the card (the container), not the
+    # bare button, so it covers icon + label as one piece.
     st.markdown(
-        f'<style>.st-key-side-nav-rail .st-key-nav-{active} .stButton button {{ '
+        f'<style>.st-key-side-nav-rail .st-key-nav-{active} {{ '
         f'color:var(--accent)!important; background:rgb(217 255 98 / 6%)!important; '
         f'}}'
-        f'.st-key-side-nav-rail .st-key-nav-{active} .nav-rail-label {{ '
-        f'color:var(--accent)!important; }}</style>',
+        f'.st-key-side-nav-rail .st-key-nav-{active}::before {{ '
+        f'position:absolute; left:-9px; width:2px; height:24px; '
+        f'border-radius:2px; background:var(--accent); content:""; '
+        f'}}</style>',
         unsafe_allow_html=True,
     )
     with st.container(key="side-nav-rail"):
