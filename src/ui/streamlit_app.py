@@ -370,7 +370,13 @@ code,pre {{ font-family:var(--mono); }}
 .st-key-side-nav-rail [data-testid="stVerticalBlock"] {{
     gap:6px!important; align-items:center!important;
 }}
-/* Each nav card = 66x58 exactly like the old <a> */
+/* Streamlit wraps every st.container() in a stLayoutWrapper — force 66px + center */
+.st-key-side-nav-rail [data-testid="stLayoutWrapper"] {{
+    width:66px!important; max-width:66px!important;
+    display:flex!important; flex-direction:column!important;
+    align-items:center!important;
+}}
+/* Each nav card = 66×58 exactly like the old <a> */
 .st-key-side-nav-rail .st-key-nav-alerts,
 .st-key-side-nav-rail .st-key-nav-map,
 .st-key-side-nav-rail .st-key-nav-about,
@@ -384,10 +390,7 @@ code,pre {{ font-family:var(--mono); }}
     cursor:pointer; transition:150ms ease;
 }}
 /* Force ALL .stElementContainer wrappers inside cards to shrink-wrap */
-.st-key-side-nav-rail .st-key-nav-alerts .stElementContainer,
-.st-key-side-nav-rail .st-key-nav-map .stElementContainer,
-.st-key-side-nav-rail .st-key-nav-about .stElementContainer,
-.st-key-side-nav-rail .st-key-nav-theme-toggle .stElementContainer {{
+.st-key-side-nav-rail .stElementContainer {{
     min-height:0!important; width:auto!important;
     height:auto!important; flex-shrink:0!important;
 }}
@@ -414,6 +417,7 @@ code,pre {{ font-family:var(--mono); }}
 .st-key-side-nav-rail .stButton button:focus,
 .st-key-side-nav-rail .stButton button:active {{
     background:transparent!important; box-shadow:none!important;
+    border:0!important;
 }}
 .st-key-side-nav-rail .stButton button p {{ display:none!important; }}
 /* Label under the icon */
