@@ -23,6 +23,37 @@ from src.models.schemas import Alert, CMDBComponent, LogEntry
 
 ERROR_LEVELS = {"ERROR", "FATAL"}
 
+# Map colors per theme. "night" keeps the original dark values exactly;
+# "day" uses the olive light palette (all text >= 4.5:1 contrast).
+# accent      = brand lime, used as a fill behind dark text (badges)
+# accent_line = accent used as a line, dot or text color
+_MAP_THEMES: dict[str, dict[str, str]] = {
+    "night": {
+        "bg": "#050505", "text": "#f5f5f2", "panel": "#0c0c0c", "border": "#252525",
+        "muted": "#8e8e8e", "accent": "#d9ff62", "accent_line": "#d9ff62",
+        "low": "#7ee2a8", "high": "#f19a66", "critical": "#ff6b6b",
+        "grid_bg": "#070707", "grid_dot": "#202020", "edge": "#393939",
+        "node_bg": "#0d0d0d", "node_border": "#333", "node_shadow": "rgba(0,0,0,.32)",
+        "node_small": "#717171", "node_hover": "#555",
+        "investigating_glow": "rgba(217,255,98,.10)",
+        "overlay_bg": "rgba(12,12,12,.92)", "legend_title": "#777", "legend_text": "#aaa",
+        "note_text": "#777", "tooltip_bg": "rgba(12,12,12,.95)", "tooltip_border": "#353535",
+        "tooltip_shadow": "rgba(0,0,0,.4)",
+    },
+    "day": {
+        "bg": "#f4f5ef", "text": "#171914", "panel": "#ffffff", "border": "#d7d9cf",
+        "muted": "#4a4f45", "accent": "#d9ff62", "accent_line": "#4d6b00",
+        "low": "#1e7046", "high": "#9c4d1f", "critical": "#b83232",
+        "grid_bg": "#fafbf7", "grid_dot": "#d3d6cb", "edge": "#82877a",
+        "node_bg": "#ffffff", "node_border": "#d7d9cf", "node_shadow": "rgba(41,45,35,.10)",
+        "node_small": "#4a4f45", "node_hover": "#9ca191",
+        "investigating_glow": "rgba(77,107,0,.14)",
+        "overlay_bg": "rgba(255,255,255,.94)", "legend_title": "#4a4f45", "legend_text": "#3d4238",
+        "note_text": "#4a4f45", "tooltip_bg": "rgba(255,255,255,.98)", "tooltip_border": "#cfd2c6",
+        "tooltip_shadow": "rgba(41,45,35,.16)",
+    },
+}
+
 
 def _component_id(reference: str) -> str:
     return reference.split(" ", 1)[0]
@@ -218,7 +249,8 @@ def _node_positions(nodes: list[dict[str, Any]]) -> dict[str, tuple[float, float
     return positions
 
 
-def render_system_map(alert: Alert) -> None:
+def render_system_map(alert: Alert, theme: str = "night") -> None:
+    p = _MAP_THEMES.get(theme, _MAP_THEMES["night"])
     data = build_system_map(alert)
     positions = _node_positions(data["nodes"])
     statuses, active_path = _classify_health(data)
@@ -273,28 +305,28 @@ def render_system_map(alert: Alert) -> None:
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       * {{ box-sizing: border-box; }}
-      body {{ margin:0; background:#050505; color:#f5f5f2; font-family:"Manrope",sans-serif; }}
+      body {{ margin:0; background:{p["bg"]}; color:{p["text"]}; font-family:"Manrope",sans-serif; }}
       :root {{
-        --bg:#050505; --panel:#0c0c0c; --border:#252525; --muted:#8e8e8e; --accent:#d9ff62;
-        --low:#7ee2a8; --high:#f19a66; --critical:#ff6b6b;
+        --bg:{p["bg"]}; --panel:{p["panel"]}; --border:{p["border"]}; --muted:{p["muted"]}; --accent:{p["accent"]};
+        --accent-line:{p["accent_line"]}; --low:{p["low"]}; --high:{p["high"]}; --critical:{p["critical"]};
       }}
       .graph {{
         position:relative; height:{height_px}px; overflow:hidden; border:1px solid var(--border);
-        border-radius:14px; background-image:radial-gradient(#202020 .7px, transparent .7px);
-        background-size:22px 22px; background-color:#070707;
+        border-radius:14px; background-image:radial-gradient({p["grid_dot"]} .7px, transparent .7px);
+        background-size:22px 22px; background-color:{p["grid_bg"]};
       }}
       .graph::after {{
         content:""; position:absolute; inset:0; pointer-events:none;
-        background:radial-gradient(circle at center, transparent 30%, #050505 100%);
+        background:radial-gradient(circle at center, transparent 30%, {p["bg"]} 100%);
       }}
       .graph-lines {{ position:absolute; inset:0; width:100%; height:100%; z-index:1; }}
-      .edge {{ fill:none; stroke:#393939; stroke-width:1.2; vector-effect:non-scaling-stroke; }}
-      .edge.active {{ stroke:var(--accent); stroke-dasharray:5 5; animation:dash 10s linear infinite; }}
+      .edge {{ fill:none; stroke:{p["edge"]}; stroke-width:1.2; vector-effect:non-scaling-stroke; }}
+      .edge.active {{ stroke:var(--accent-line); stroke-dasharray:5 5; animation:dash 10s linear infinite; }}
       @keyframes dash {{ to {{ stroke-dashoffset:-100; }} }}
       .graph-node {{
         position:absolute; z-index:3; display:flex; width:180px; min-height:68px;
-        align-items:center; gap:11px; padding:13px 14px; border:1px solid #333; border-radius:10px;
-        background:#0d0d0d; box-shadow:0 10px 25px rgba(0,0,0,.32); transform:translateY(-50%);
+        align-items:center; gap:11px; padding:13px 14px; border:1px solid {p["node_border"]}; border-radius:10px;
+        background:{p["node_bg"]}; box-shadow:0 10px 25px {p["node_shadow"]}; transform:translateY(-50%);
         transition:box-shadow 160ms ease;
       }}
       .graph-node .node-status {{ width:8px; height:8px; flex:none; border-radius:50%; background:var(--low); }}
@@ -302,7 +334,7 @@ def render_system_map(alert: Alert) -> None:
       .graph-node strong {{
         overflow:hidden; font-family:"DM Mono",monospace; font-size:13px; font-weight:500; text-overflow:ellipsis;
       }}
-      .graph-node small {{ color:#717171; font-size:10px; }}
+      .graph-node small {{ color:{p["node_small"]}; font-size:10px; }}
       .graph-node em {{
         position:absolute; top:-9px; right:9px; padding:3px 6px; border-radius:4px; color:#111;
         background:var(--accent); font-family:"DM Mono",monospace; font-size:8px; font-style:normal;
@@ -312,33 +344,33 @@ def render_system_map(alert: Alert) -> None:
       .graph-node.critical {{ border-color:rgba(255,107,107,.7); box-shadow:0 0 25px rgba(255,107,107,.08); }}
       .graph-node.critical .node-status {{ background:var(--critical); }}
       .graph-node.critical em {{ color:#fff; background:var(--critical); }}
-      .graph-node.investigating {{ border-color:var(--accent); box-shadow:0 0 28px rgba(217,255,98,.10); }}
-      .graph-node.investigating .node-status {{ background:var(--accent); }}
-      .graph-node:hover {{ box-shadow:0 0 0 1px #555; }}
+      .graph-node.investigating {{ border-color:var(--accent-line); box-shadow:0 0 28px {p["investigating_glow"]}; }}
+      .graph-node.investigating .node-status {{ background:var(--accent-line); }}
+      .graph-node:hover {{ box-shadow:0 0 0 1px {p["node_hover"]}; }}
       .legend, .graph-note {{
         position:absolute; z-index:4; border:1px solid var(--border); border-radius:10px;
-        background:rgba(12,12,12,.92); backdrop-filter:blur(8px);
+        background:{p["overlay_bg"]}; backdrop-filter:blur(8px);
       }}
       .legend {{ right:18px; bottom:18px; display:grid; min-width:155px; gap:10px; padding:15px; }}
       .legend strong {{
-        margin-bottom:3px; color:#777; font-family:"DM Mono",monospace; font-size:9px; font-weight:500;
+        margin-bottom:3px; color:{p["legend_title"]}; font-family:"DM Mono",monospace; font-size:9px; font-weight:500;
         letter-spacing:.08em; text-transform:uppercase;
       }}
-      .legend span {{ display:flex; align-items:center; gap:8px; color:#aaa; font-size:12px; }}
+      .legend span {{ display:flex; align-items:center; gap:8px; color:{p["legend_text"]}; font-size:12px; }}
       .legend i {{ width:6px; height:6px; border-radius:50%; background:var(--low); }}
       .legend i.degraded {{ background:var(--high); }}
       .legend i.critical {{ background:var(--critical); }}
-      .legend i.investigating {{ background:var(--accent); }}
+      .legend i.investigating {{ background:var(--accent-line); }}
       .graph-note {{
         bottom:18px; left:18px; display:flex; align-items:center; gap:8px; padding:11px 13px;
-        color:var(--accent); font-family:"DM Mono",monospace; font-size:10px; max-width:calc(100% - 200px);
+        color:var(--accent-line); font-family:"DM Mono",monospace; font-size:10px; max-width:calc(100% - 200px);
       }}
-      .graph-note span {{ margin-left:10px; color:#777; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
+      .graph-note span {{ margin-left:10px; color:{p["note_text"]}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
       .tooltip {{
-        position:fixed; display:none; max-width:360px; padding:12px 14px; background:rgba(12,12,12,.95);
-        border:1px solid #353535; border-radius:10px; color:#f5f5f2; font:11px "DM Mono",monospace;
+        position:fixed; display:none; max-width:360px; padding:12px 14px; background:{p["tooltip_bg"]};
+        border:1px solid {p["tooltip_border"]}; border-radius:10px; color:{p["text"]}; font:11px "DM Mono",monospace;
         line-height:1.55; pointer-events:none; z-index:10; backdrop-filter:blur(8px);
-        box-shadow:0 8px 24px rgba(0,0,0,.4);
+        box-shadow:0 8px 24px {p["tooltip_shadow"]};
       }}
       @media (max-width:720px) {{
         .graph-node {{ width:145px; }}

@@ -37,10 +37,12 @@ st.set_page_config(
 )
 
 # ── Data ────────────────────────────────────────────────────────────────────
-ESCALATION_COLOR = {
-    "auto_resolved": "#7ee2a8",
-    "escalate_normal": "#f2c66d",
-    "escalate_urgent_needs_approval": "#ff6b6b",
+# Escalation tags take their color from the active theme's status tokens
+# (night values: low #7ee2a8, medium #f2c66d, critical #ff6b6b).
+ESCALATION_TOKEN = {
+    "auto_resolved": "low",
+    "escalate_normal": "medium",
+    "escalate_urgent_needs_approval": "critical",
 }
 alerts = {a.id: a for a in load_alerts()}
 incidents = {i.id: i for i in load_incidents()}
@@ -94,8 +96,8 @@ _THEME_TOKENS = {
     },
     "day": {
         "bg": "#f4f5ef", "panel": "#ffffff", "elevated": "#eceee6", "border": "#d7d9cf",
-        "text": "#171914", "muted": "#666b61",
-        "low": "#258553", "medium": "#9a6b0c", "high": "#b45c27", "critical": "#c93e3e",
+        "text": "#171914", "muted": "#4a4f45",
+        "low": "#1e7046", "medium": "#85590a", "high": "#9c4d1f", "critical": "#b83232",
     },
 }
 tk = _THEME_TOKENS[theme]
@@ -885,6 +887,13 @@ code,pre {{ font-family:var(--mono); }}
 .side-nav nav a.theme-toggle.night .toggle-thumb {{ transform:translateX(28px); }}
 </style>"""
 
+# Olive accent for light mode: brand lime #d9ff62 has 1.14:1 contrast on
+# white, so in day mode it stays only as a fill behind dark text (buttons,
+# badges). Text, icons, lines and borders use olive #4d6b00 (6.14:1);
+# secondary text uses #4a4f45 (7.82:1).
+# IMPORTANT: this CSS goes through st.markdown, where a blank line or a
+# /* comment */ ends the raw HTML block and the rest shows up as page
+# text. Keep the block below free of blank lines and CSS comments.
 if theme == "day":
     # Hardcoded dark-mode colors that don't already ride on the
     # :root tokens above — ported from the Figma day-mode reference.
@@ -895,14 +904,14 @@ if theme == "day":
     border-radius:10px; background:#080808;
     box-shadow:0 4px 14px rgb(41 45 35 / 16%); mix-blend-mode:normal;
 }
-.side-nav nav a { color:#70756b; }
-.kicker,.progress-item { color:#676c62; }
+.side-nav nav a { color:#4a4f45; }
+.kicker,.progress-item { color:#4a4f45; }
 .context-grid { border-color:#dfe1d8; }
 .context-grid > div { border-color:#dfe1d8; background:#fafbf7; }
-.context-grid span { color:#74796e; }
+.context-grid span { color:#4a4f45; }
 .trace-block { border-color:#dfe1d8; background:#ffffff; }
 .trace-block p { color:#555b51; }
-.trace-block code { color:#607719; }
+.trace-block code { color:#4d6b00; }
 .trace-block.thought { border-color:rgb(126 153 42 / 28%); background:rgb(217 255 98 / 10%); }
 .empty-state p { color:#454a42; }
 .st-key-downgrade-btn .stFormSubmitButton button {
@@ -916,8 +925,41 @@ if theme == "day":
 [data-testid="stPopoverBody"] .stDownloadButton button:hover {
     color:var(--text)!important; background:#f1f3ed!important;
 }
-.side-nav nav a.theme-toggle { border-color:#d2d6ca; color:#767b70; background:#eef0e9; }
+.side-nav nav a.theme-toggle { border-color:#d2d6ca; color:#4a4f45; background:#eef0e9; }
 .side-nav nav a.theme-toggle:hover { border-color:#b8bdaf; }
+.side-nav nav a:not(.theme-toggle):hover,
+.side-nav nav a.active { color:#4d6b00; background:rgb(77 107 0 / 9%); }
+.side-nav nav a.active::before { background:#4d6b00; }
+.side-nav nav a.theme-toggle .toggle-thumb {
+    box-shadow:0 0 0 1px #4d6b00, 0 2px 6px rgb(41 45 35 / 20%);
+}
+.logo-mark span { border-color:#4d6b00; }
+.alert-card.selected {
+    border-color:#4d6b00; box-shadow:inset 0 0 0 1px rgb(77 107 0 / 22%);
+}
+.empty-state > span { color:#4d6b00; }
+.progress-item::before { background:#4d6b00; }
+.progress-item > span { border-color:#82877a; }
+.progress-item > span.complete { border-color:#4d6b00; }
+.trace-block > span { color:#4a4f45; }
+.trace-block em { color:#5c6157; }
+.trace-block.thought { border-color:rgb(77 107 0 / 30%); background:rgb(217 255 98 / 14%); }
+.approval-description { color:#3d4238; }
+.warning-box { color:#a32d2d; border-color:rgb(184 50 50 / 28%); }
+.decision-icon { color:#ffffff; }
+.export-bar-label { color:#4a4f45; }
+[data-testid="stTabs"] button[aria-selected="true"] { color:#4d6b00; }
+.run-button,
+.st-key-run-btn .stButton button,
+.st-key-approve-btn .stFormSubmitButton button,
+.st-key-export-wrap [data-testid="stPopoverButton"] { border-color:#4d6b00!important; }
+.stButton > button,.stDownloadButton > button { border-color:#cdd0c6; }
+.stButton > button:hover,.stDownloadButton > button:hover {
+    border-color:#4d6b00; background:#eef3dc; color:var(--text);
+}
+.about-copy p { color:#4a4f45; }
+.about-principles span { color:#4d6b00; }
+.map-meta { color:#4a4f45; }
 </style>"""
 
 # The link router component has no visible UI; keep its wrapper out of layout.
@@ -1179,7 +1221,7 @@ def _render_map() -> None:
         )
 
         with st.container(key="map-content"):
-            render_system_map(alert)
+            render_system_map(alert, theme=theme)
 
 
 def _render_alerts() -> None:
@@ -1452,7 +1494,7 @@ def _render_alerts() -> None:
 
                     if d.escalation_decision:
                         dv = d.escalation_decision.value
-                        color = ESCALATION_COLOR[dv]
+                        color = tk[ESCALATION_TOKEN[dv]]
                         st.markdown("**Escalation decision**")
                         st.markdown(
                             f'<span class="escalation-tag" style="color:{color};border:1px solid {color}">'
