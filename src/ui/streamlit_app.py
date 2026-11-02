@@ -960,6 +960,23 @@ if theme == "day":
 .about-copy p { color:#4a4f45; }
 .about-principles span { color:#4d6b00; }
 .map-meta { color:#4a4f45; }
+[data-testid="stExpander"] details,
+[data-testid="stExpander"] summary { background:#ffffff!important; color:var(--text)!important; }
+[data-testid="stExpander"] summary:hover { background:#f1f3ed!important; }
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary span { color:var(--text)!important; }
+[data-testid="stExpander"] summary svg { color:#4d6b00!important; }
+[data-testid="stWidgetLabel"] p,
+[data-testid="stTextInput"] label { color:#4a4f45!important; }
+[data-testid="stTextInputRootElement"] {
+    border:1px solid #cdd0c6!important; border-radius:8px!important; background:#ffffff!important;
+}
+[data-testid="stTextInputRootElement"]:focus-within { border-color:#4d6b00!important; }
+[data-testid="stTextInputRootElement"] > div,
+[data-testid="stTextInput"] input {
+    background:#ffffff!important; color:var(--text)!important; caret-color:var(--text)!important;
+}
+[data-testid="stTextInput"] input::placeholder { color:#6b7065!important; }
 </style>"""
 
 # The link router component has no visible UI; keep its wrapper out of layout.
@@ -1306,14 +1323,23 @@ def _render_alerts() -> None:
                     unsafe_allow_html=True,
                 )
                 with st.status("Investigating…", expanded=True) as status:
-                    phase = {"n": 0, "last_agent": None}
+                    # Display only: number live steps with the same event["step"]
+                    # value the finished trace groups by, so "step 6" while
+                    # running matches "Step 6" in the list afterwards.
+                    phase = {"step": None}
 
                     def on_event(event: dict) -> None:
-                        if event["kind"] == "routing" and event.get("tool") != phase["last_agent"]:
-                            phase["n"] += 1
-                            phase["last_agent"] = event.get("tool")
-                            st.markdown(f"#### Step {phase['n']}")
-                            status.update(label=f"Investigating… step {phase['n']}")
+                        step = event.get("step")
+                        if step is not None and step != phase["step"]:
+                            # Steps skipped without events show up as "reasoning".
+                            for gap in range((phase["step"] or 0) + 1, step):
+                                st.markdown(f"#### Step {gap} · reasoning")
+                            phase["step"] = step
+                            st.markdown(f"#### Step {step}")
+                            status.update(label=f"Investigating… step {step}")
+                        if event["kind"] in {"routing", "action"} and event.get("tool"):
+                            what = f"→ {event['tool']} agent" if event["kind"] == "routing" else event["tool"]
+                            status.update(label=f"Investigating… step {phase['step']} · {what}")
                         _render_event(event)
 
                     try:
@@ -1357,6 +1383,11 @@ def _render_alerts() -> None:
             by_step: dict[int, list[dict]] = {}
             for event in result.trace:
                 by_step.setdefault(event["step"], []).append(event)
+            # Display only: a model turn that produced no visible event still
+            # used a step number. Show those gaps as "reasoning" steps so the
+            # list counts every step instead of jumping from 2 to 4.
+            if by_step:
+                by_step = {n: by_step.get(n, []) for n in range(1, max(by_step) + 1)}
 
             # Progress track
             step_labels = []
@@ -1367,6 +1398,8 @@ def _render_alerts() -> None:
                     step_labels.append(routing[0]["tool"])
                 elif actions:
                     step_labels.append(actions[0]["tool"])
+                elif not evts:
+                    step_labels.append("reasoning")
                 else:
                     step_labels.append(f"Step {sn}")
 
@@ -1392,6 +1425,8 @@ def _render_alerts() -> None:
             # Step list
             for step_num, events in by_step.items():
                 with st.expander(_step_title(step_num, events), expanded=False):
+                    if not events:
+                        st.caption("The model reasoned internally in this turn; no text or tool call was recorded.")
                     for event in events:
                         _render_event(event)
 
