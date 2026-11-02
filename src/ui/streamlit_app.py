@@ -990,6 +990,32 @@ if theme == "day":
     background:#ffffff!important; color:var(--text)!important; caret-color:var(--text)!important;
 }
 [data-testid="stTextInput"] input::placeholder { color:#6b7065!important; }
+[data-testid="stMarkdownContainer"] code,
+.trace-block code {
+    background:#eef0e9!important; color:#3f5700!important;
+    border:1px solid #dfe1d8; border-radius:5px; padding:1px 5px;
+}
+[data-testid="stCode"] pre {
+    background:#f6f7f2!important; border:1px solid #dfe1d8!important; color:#171914!important;
+}
+[data-testid="stCode"] pre code,
+[data-testid="stCode"] pre code span { color:#171914!important; background:transparent!important; }
+[data-testid="stJson"],
+[data-testid="stJson"] .react-json-view {
+    background:#ffffff!important; color:#4a4f45!important; border-radius:8px;
+}
+[data-testid="stJson"] .object-key,
+[data-testid="stJson"] .object-key span { color:#3f5700!important; }
+[data-testid="stJson"] .variable-value,
+[data-testid="stJson"] .variable-value div,
+[data-testid="stJson"] .variable-value span { color:#8a4b12!important; }
+[data-testid="stJson"] .data-type-label,
+[data-testid="stJson"] .node-ellipsis,
+[data-testid="stJson"] .object-size { color:#6b7065!important; }
+[data-testid="stJson"] .icon-container,
+[data-testid="stJson"] .icon-container span,
+[data-testid="stJson"] .brace-row,
+[data-testid="stJson"] .brace-row span { color:#4a4f45!important; }
 </style>"""
 
 # The link router component has no visible UI; keep its wrapper out of layout.
