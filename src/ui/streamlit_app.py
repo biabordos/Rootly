@@ -393,6 +393,19 @@ code,pre {{ font-family:var(--mono); }}
     border-color:var(--accent);
     box-shadow:inset 0 0 0 1px rgb(217 255 98 / 12%);
 }}
+/* Finished alert (auto-resolved, approved or downgraded): green from the active theme's --low token
+   (night #7ee2a8, day #1e7046). !important so it also wins over the
+   day-mode olive border of the selected card. */
+.alert-card.done {{
+    border-color:var(--low)!important;
+    background:color-mix(in srgb, var(--low) 8%, var(--panel));
+}}
+.alert-card.done:hover {{
+    background:color-mix(in srgb, var(--low) 14%, var(--panel));
+}}
+.alert-card.done.selected {{
+    box-shadow:inset 0 0 0 1px var(--low)!important;
+}}
 .status-dot {{
     width:7px; height:7px; margin-top:5px; flex:none;
     border-radius:50%; background:#606060;
@@ -1050,7 +1063,25 @@ if page == "landing":
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
+_FINISHED_DECISIONS = {"auto_resolved", "escalate_normal"}
+
+
+def _is_finished(alert_id: str) -> bool:
+    """UI only: the alert has a final outcome (auto-resolved, normal escalation,
+    or a human approved/downgraded it), read straight from the diagnosis result."""
+    result = results.get(alert_id)
+    if not result or result.needs_approval:
+        return False
+    d = result.diagnosis
+    if d.human_decision:
+        return True
+    esc = d.escalation_decision
+    return esc is not None and esc.value in _FINISHED_DECISIONS
+
+
 def _get_alert_status(alert_id: str) -> str:
+    if _is_finished(alert_id):
+        return "resolved"
     return alert_statuses.get(alert_id, "unresolved")
 
 
@@ -1128,7 +1159,7 @@ def _render_event(event: dict) -> None:
         st.warning(event["content"])
 
 
-def _step_title(step: int, events: list[dict]) -> str:
+def _step_tools(events: list[dict]) -> list[str]:
     tools = [f"→ {e['tool']} agent" for e in events if e["kind"] == "routing"]
     tools += [e["tool"] for e in events if e["kind"] == "action"]
     if any(e["kind"] == "guardrail" for e in events):
@@ -1137,6 +1168,11 @@ def _step_title(step: int, events: list[dict]) -> str:
         tools.append("escalation_policy")
     if any(e["kind"] == "human_decision" for e in events):
         tools.append("human_approval")
+    return tools
+
+
+def _step_title(step: int, events: list[dict]) -> str:
+    tools = _step_tools(events)
     return f"Step {step}: " + (" → ".join(tools) if tools else "reasoning")
 
 
@@ -1225,8 +1261,9 @@ def _render_map() -> None:
         for aid, a in alerts.items():
             status = _get_alert_status(aid)
             sel = " selected" if aid == alert_id else ""
+            done = " done" if status == "resolved" else ""
             cards_html.append(
-                f'<a class="alert-card{sel}" href="{_nav_href(page_="map", alert=aid)}" target="_top">'
+                f'<a class="alert-card{sel}{done}" href="{_nav_href(page_="map", alert=aid)}" target="_top">'
                 f'<span class="status-dot {status}"></span>'
                 f"<span><strong>{aid}</strong>"
                 f"<small>{a.service}</small></span></a>"
@@ -1259,8 +1296,9 @@ def _render_alerts() -> None:
         for aid, alert in alerts.items():
             status = _get_alert_status(aid)
             sel = " selected" if aid == selected_alert else ""
+            done = " done" if status == "resolved" else ""
             cards_html.append(
-                f'<a class="alert-card{sel}" href="{_nav_href(page_="alerts", alert=aid)}" target="_top">'
+                f'<a class="alert-card{sel}{done}" href="{_nav_href(page_="alerts", alert=aid)}" target="_top">'
                 f'<span class="status-dot {status}"></span>'
                 f"<span><strong>{aid}</strong>"
                 f"<small>{alert.service}</small></span></a>"
@@ -1340,6 +1378,8 @@ def _render_alerts() -> None:
                         if event["kind"] in {"routing", "action"} and event.get("tool"):
                             what = f"→ {event['tool']} agent" if event["kind"] == "routing" else event["tool"]
                             status.update(label=f"Investigating… step {phase['step']} · {what}")
+                        elif event["kind"] == "thought":
+                            status.update(label=f"Investigating… step {phase['step']} · reasoning")
                         _render_event(event)
 
                     try:
@@ -1391,17 +1431,17 @@ def _render_alerts() -> None:
 
             # Progress track
             step_labels = []
+            # Same naming as the step list below: a step with no handoff or
+            # tool call (only the model's thought, or nothing) is "reasoning".
             for sn, evts in by_step.items():
                 routing = [e for e in evts if e["kind"] == "routing"]
-                actions = [e for e in evts if e["kind"] == "action"]
+                tools = _step_tools(evts)
                 if routing:
                     step_labels.append(routing[0]["tool"])
-                elif actions:
-                    step_labels.append(actions[0]["tool"])
-                elif not evts:
-                    step_labels.append("reasoning")
+                elif tools:
+                    step_labels.append(tools[0])
                 else:
-                    step_labels.append(f"Step {sn}")
+                    step_labels.append("reasoning")
 
             cols = len(step_labels) or 1
             track_items = "".join(
@@ -1466,6 +1506,9 @@ def _render_alerts() -> None:
                 if decision:
                     try:
                         results[selected_alert] = resume_diagnosis(result.thread_id, decision, note=note)
+                        # UI status only: after a human decision (approve or
+                        # downgrade) the alert is finished, so its card turns green.
+                        alert_statuses[selected_alert] = "resolved"
                     except DiagnosisError as exc:
                         errors[selected_alert] = f"Resume failed: {exc}"
                     st.rerun()
