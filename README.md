@@ -2,6 +2,7 @@
 
 **AI-powered incident triage agent for IT operations.**
 Rootly receives a monitoring alert, investigates it through a multi-agent ReAct loop (CMDB + logs + historical incidents), and produces a structured diagnosis package ready for L2 escalation — in seconds instead of 15-30 minutes of manual work.
+Check out our website: https://rootly.streamlit.app/
 
 ---
 
